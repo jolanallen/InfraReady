@@ -1,0 +1,90 @@
+# Preuve : P-21-linux01-service-nginx-processus
+# Hôte : linux01 (root via sudo) — 2026-10-19 15:23:19 CEST
+# Commandes :
+#   export DEBIAN_FRONTEND=noninteractive
+#   apt-get install -y -q nginx >/tmp/nginx-install.log 2>&1 && echo "== nginx installé : $(nginx -v 2>&1)"
+#   cat > /var/www/infraready/index.html <<HTML
+#   <!doctype html><html lang="fr"><head><meta charset="utf-8"><title>InfraReady - linux01</title></head>
+#   <body><h1>InfraReady</h1><p>Serveur : linux01 (192.168.50.20)</p></body></html>
+#   HTML
+#   chown root:webadmins /var/www/infraready/index.html; chmod 664 /var/www/infraready/index.html
+#   cat > /etc/nginx/sites-available/infraready <<NGX
+#   server {
+#       listen 80 default_server;
+#       server_name linux01.infraready.test 192.168.50.20;
+#       root /var/www/infraready;
+#       index index.html;
+#       access_log /var/log/nginx/infraready_access.log;
+#       error_log  /var/log/nginx/infraready_error.log;
+#       location / { try_files \$uri \$uri/ =404; }
+#   }
+#   NGX
+#   ln -sf /etc/nginx/sites-available/infraready /etc/nginx/sites-enabled/infraready; rm -f /etc/nginx/sites-enabled/default
+#   echo; echo "== Validation de la configuration"; nginx -t 2>&1
+#   systemctl enable --now nginx >/dev/null 2>&1; systemctl reload nginx
+#   echo; echo "== État du service"; systemctl status nginx --no-pager -n 0 | head -9
+#   echo; echo "== Port en écoute"; ss -tlnp | grep -E "State|:80 "
+#   echo; echo "== Processus (maître root + workers www-data)"; ps -o user,pid,ppid,%cpu,%mem,cmd -C nginx
+#   echo; echo "== Contrôle du service : stop -> start -> restart"
+#   systemctl stop nginx;    echo "après stop    : $(systemctl is-active nginx) / HTTP $(curl -s -o /dev/null -w %{http_code} http://localhost/ || true)"
+#   systemctl start nginx;   echo "après start   : $(systemctl is-active nginx) / HTTP $(curl -s -o /dev/null -w %{http_code} http://localhost/)"
+#   old=$(pgrep -o nginx); systemctl restart nginx; new=$(pgrep -o nginx); echo "après restart : $(systemctl is-active nginx) / PID maître $old -> $new"
+#   echo "démarrage auto: $(systemctl is-enabled nginx)"
+#   echo; echo "== Charge système"; uptime; free -h | head -2
+
+== nginx installé : nginx version: nginx/1.24.0 (Ubuntu)
+
+== Validation de la configuration
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+
+== État du service
+● nginx.service - A high performance web server and a reverse proxy server
+     Loaded: loaded (/usr/lib/systemd/system/nginx.service; enabled; preset: enabled)
+     Active: active (running) since Mon 2026-10-19 15:23:24 CEST; 4s ago
+       Docs: man:nginx(8)
+    Process: 2442 ExecReload=/usr/sbin/nginx -g daemon on; master_process on; -s reload (code=exited, status=0/SUCCESS)
+   Main PID: 2221 (nginx)
+      Tasks: 9 (limit: 4600)
+     Memory: 6.8M (peak: 8.3M)
+        CPU: 38ms
+
+== Port en écoute
+State  Recv-Q Send-Q Local Address:Port Peer Address:PortProcess                                                                                                                                                                                                                         
+LISTEN 0      511          0.0.0.0:80        0.0.0.0:*    users:(("nginx",pid=2447,fd=5),("nginx",pid=2446,fd=5),("nginx",pid=2445,fd=5),("nginx",pid=2444,fd=5),("nginx",pid=2226,fd=5),("nginx",pid=2225,fd=5),("nginx",pid=2224,fd=5),("nginx",pid=2223,fd=5),("nginx",pid=2221,fd=5))
+LISTEN 0      511             [::]:80           [::]:*    users:(("nginx",pid=2226,fd=6),("nginx",pid=2225,fd=6),("nginx",pid=2224,fd=6),("nginx",pid=2223,fd=6))                                                                                                                        
+
+== Processus (maître root + workers www-data)
+USER         PID    PPID %CPU %MEM CMD
+root        2221       1  0.0  0.1 nginx: master process /usr/sbin/nginx -g daemon on; master_process on;
+www-data    2223    2221  0.0  0.1 nginx: worker process
+www-data    2224    2221  0.0  0.1 nginx: worker process
+www-data    2225    2221  0.0  0.1 nginx: worker process
+www-data    2226    2221  0.0  0.1 nginx: worker process
+www-data    2444    2221  0.0  0.1 nginx: worker process
+www-data    2445    2221  0.0  0.1 nginx: worker process
+www-data    2446    2221  0.0  0.1 nginx: worker process
+www-data    2447    2221  0.0  0.1 nginx: worker process
+
+== Contrôle du service : stop -> start -> restart
+après stop    : inactive / HTTP 000
+après start   : active / HTTP 200
+après restart : active / PID maître 2468 -> 2483
+démarrage auto: enabled
+
+== Charge système
+ 15:23:29 up 25 min,  1 user,  load average: 0.33, 0.08, 0.03
+               total        used        free      shared  buff/cache   available
+Mem:           3.8Gi       423Mi       3.2Gi       1.0Mi       416Mi       3.4Gi
+HTTP/1.1 200 OK
+Server: nginx/1.24.0 (Ubuntu)
+Date: Mon, 19 Oct 2026 13:23:31 GMT
+Content-Type: text/html
+Content-Length: 182
+Last-Modified: Mon, 19 Oct 2026 13:23:28 GMT
+Connection: keep-alive
+ETag: "6ad619d0-b6"
+Accept-Ranges: bytes
+
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>InfraReady - linux01</title></head>
+<body><h1>InfraReady</h1><p>Serveur : linux01 (192.168.50.20)</p></body></html>

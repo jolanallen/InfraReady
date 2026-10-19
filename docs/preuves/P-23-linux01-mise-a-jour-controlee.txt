@@ -1,0 +1,51 @@
+# Preuve : P-23-linux01-mise-a-jour-controlee
+# Hôte : linux01 (root via sudo) + Proxmox — 2026-10-19 15:24:45 CEST
+
+== 1. Snapshot de retour arrière (Proxmox) : qm snapshot 101 s02_avant_maj_c
+snapshotting 'drive-scsi1' (pool-ssd:vm-101-disk-1)
+`-> s01_installation_ok         2026-10-19 14:58:56     OS installe, IP fixe, avant configuration
+ `-> s02_avant_maj_c            2026-10-19 15:24:47     Avant mise a jour apt (phase C)
+  `-> current                                           You are here!
+
+== 2. Pré-contrôles
+/: 25% utilisé, 20G libre
+/boot: 6% utilisé, 1.7G libre
+/data: 1% utilisé, 9.3G libre
+services: nginx=active ssh=active
+noyau: 6.8.0-147-generic
+
+== 3. Rafraîchir les index et simuler
+Reading package lists...
+paquets à mettre à jour : 20
+apparmor/noble-updates 4.0.1really4.0.1-0ubuntu0.24.04.9 amd64 [upgradable from: 4.0.1really4.0.1-0ubuntu0.24.04.7]
+dmidecode/noble-updates 3.5-3ubuntu0.2 amd64 [upgradable from: 3.5-3ubuntu0.1]
+krb5-locales/noble-updates 1.20.1-6ubuntu2.10 all [upgradable from: 1.20.1-6ubuntu2.8]
+libapparmor1/noble-updates 4.0.1really4.0.1-0ubuntu0.24.04.9 amd64 [upgradable from: 4.0.1really4.0.1-0ubuntu0.24.04.7]
+libaudit-common/noble-updates 1:3.1.2-2.1ubuntu0.1 all [upgradable from: 1:3.1.2-2.1build1.1]
+libaudit1/noble-updates 1:3.1.2-2.1ubuntu0.1 amd64 [upgradable from: 1:3.1.2-2.1build1.1]
+libgssapi-krb5-2/noble-updates 1.20.1-6ubuntu2.10 amd64 [upgradable from: 1.20.1-6ubuntu2.8]
+libk5crypto3/noble-updates 1.20.1-6ubuntu2.10 amd64 [upgradable from: 1.20.1-6ubuntu2.8]
+libkrb5-3/noble-updates 1.20.1-6ubuntu2.10 amd64 [upgradable from: 1.20.1-6ubuntu2.8]
+libkrb5support0/noble-updates 1.20.1-6ubuntu2.10 amd64 [upgradable from: 1.20.1-6ubuntu2.8]
+libnetplan1/noble-updates 1.1.2-8ubuntu1~24.04.3 amd64 [upgradable from: 1.1.2-8ubuntu1~24.04.2]
+libopeniscsiusr/noble-updates 2.1.9-3ubuntu5.5 amd64 [upgradable from: 2.1.9-3ubuntu5.4]
+netplan-generator/noble-updates 1.1.2-8ubuntu1~24.04.3 amd64 [upgradable from: 1.1.2-8ubuntu1~24.04.2]
+netplan.io/noble-updates 1.1.2-8ubuntu1~24.04.3 amd64 [upgradable from: 1.1.2-8ubuntu1~24.04.2]
+open-iscsi/noble-updates 2.1.9-3ubuntu5.5 amd64 [upgradable from: 2.1.9-3ubuntu5.4]
+... (20 au total)
+20 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.
+
+== 4. Mise à jour (upgrade, sans suppression de paquets)
+code retour apt : 0
+20 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.
+
+== 5. Trace dans /var/log/apt/history.log
+
+Start-Date: 2026-10-19  15:24:58
+Commandline: apt-get -y -q -o Dpkg::Options::=--force-confold upgrade
+Requested-By: infraadmin (1000)
+Upgrade: dmidecode:amd64 (3.5-3ubuntu0.1, 3.5-3ubuntu0.2), netplan-generator:amd64 (1.1.2-8ubuntu1~24.04.2, 1.1.2-8ubuntu1~24.04.3), krb5-locales:amd64 (1.20.1-6ubuntu2.8, 1.20.1-6ubuntu2.10), libgssapi-krb5-2:amd64 (1.2
+End-Date: 2026-10-19  15:25:24
+
+== 6. Redémarrage nécessaire ?
+non

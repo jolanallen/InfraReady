@@ -1,0 +1,64 @@
+# Preuve : P-22-linux01-disque-test-montage
+# Hôte : linux01 (root via sudo) + Proxmox — 2026-10-19 15:23:58 CEST
+
+== Proxmox : qm set 101 --scsi1 pool-ssd:10,iothread=1,serial=INFRA-DATA01  (ajout à chaud)
+
+== lsblk AVANT ajout
+NAME                       SIZE TYPE FSTYPE      MOUNTPOINTS SERIAL
+sda                         30G disk                         drive-scsi0
+├─sda1                       1M part                         
+├─sda2                       2G part ext4        /boot       
+└─sda3                      28G part LVM2_member             
+  └─ubuntu--vg-ubuntu--lv   28G lvm  ext4        /           
+sr0                       1024M rom                          QM00003
+
+== lsblk APRÈS ajout
+NAME                       SIZE TYPE FSTYPE      MOUNTPOINTS SERIAL
+sda                         30G disk                         drive-scsi0
+├─sda1                       1M part                         
+├─sda2                       2G part ext4        /boot       
+└─sda3                      28G part LVM2_member             
+  └─ubuntu--vg-ubuntu--lv   28G lvm  ext4        /           
+sdb                         10G disk                         INFRA-DATA01
+sr0                       1024M rom                          QM00003
+
+== Identification de la cible par numéro de série (pas par nom de périphérique)
+cible : /dev/disk/by-id/scsi-SQEMU_QEMU_HARDDISK_INFRA-DATA01 -> /dev/sdb
+
+== Contrôles de sécurité avant formatage (tous doivent être conformes)
+taille          : 10G (attendu 10G)
+signatures      : 0 (attendu 0 = disque vierge)
+partitions      : 0 (attendu 0)
+monté           : non
+disque système  : /dev/sda (≠ /dev/sdb)
+
+== Formatage ext4 (label DATA) — contrôles conformes
+/dev/sdb: LABEL="DATA" UUID="0367d17f-e1b6-46d4-b2f6-1f3050168d3f" BLOCK_SIZE="4096" TYPE="ext4"
+
+== Montage persistant par UUID (/etc/fstab, nofail pour ne pas bloquer le boot)
+UUID=0367d17f-e1b6-46d4-b2f6-1f3050168d3f  /data  ext4  defaults,nofail  0  2
+TARGET SOURCE   FSTYPE OPTIONS
+/data  /dev/sdb ext4   rw,relatime
+
+== Données de test et droits
+/data:
+total 28
+drwxr-xr-x  4 root root       4096 Oct 19 15:24 .
+drwxr-xr-x 24 root root       4096 Oct 19 15:24 ..
+drwx------  2 root root      16384 Oct 19 15:24 lost+found
+drwxr-s---  2 root auditeurs  4096 Oct 19 15:24 rapports
+
+/data/rapports:
+total 12
+drwxr-s--- 2 root auditeurs 4096 Oct 19 15:24 .
+drwxr-xr-x 4 root root      4096 Oct 19 15:24 ..
+-rw-r----- 1 root auditeurs   40 Oct 19 15:24 rapport-test.txt
+chloe (auditeurs) lit le rapport   : OK (attendu)
+alice (webadmins) lit le rapport   : REFUSÉ (attendu)
+
+Filesystem     Type  Size  Used Avail Use% Mounted on
+/dev/sdb       ext4  9.8G   32K  9.3G   1% /data
+
+== Test de persistance : démontage puis remontage via fstab
+/dev/sdb /data  ext4   rw,relatime
+Rapport de test InfraReady - 2026-10-19

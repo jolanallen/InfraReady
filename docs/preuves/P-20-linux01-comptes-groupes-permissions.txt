@@ -1,0 +1,47 @@
+# Preuve : P-20-linux01-comptes-groupes-permissions
+# Hôte : linux01 (root via sudo) — 2026-10-19 15:23:02 CEST
+# Commandes :
+#   set -e
+#   # Groupes et comptes (comptes verrouillés : pas de mot de passe, accès via sudo/su uniquement)
+#   groupadd -f webadmins; groupadd -f auditeurs
+#   id alice &>/dev/null || useradd -m -s /bin/bash -c "Alice - admin web" -G webadmins alice
+#   id bruno &>/dev/null || useradd -m -s /bin/bash -c "Bruno - admin web" -G webadmins bruno
+#   id chloe &>/dev/null || useradd -m -s /bin/bash -c "Chloe - auditrice" -G auditeurs,systemd-journal chloe
+#   # Dossier du site : écriture réservée au groupe webadmins (setgid pour hériter du groupe)
+#   mkdir -p /var/www/infraready && chown root:webadmins /var/www/infraready && chmod 2775 /var/www/infraready
+#   echo "== Identités"; for u in alice bruno chloe; do id $u; done
+#   echo; echo "== getent group"; getent group webadmins auditeurs systemd-journal
+#   echo; echo "== Comptes verrouillés (L = pas de mot de passe utilisable)"; for u in alice bruno chloe; do passwd -S $u; done
+#   echo; echo "== Permissions"; ls -ld /var/www/infraready
+#   echo; echo "== Tests de droits"
+#   sudo -u alice bash -c "echo test-alice > /var/www/infraready/test-alice.txt" && echo "alice (webadmins) écrit dans le site      : OK (attendu)"
+#   sudo -u chloe bash -c "echo x > /var/www/infraready/x.txt" 2>/dev/null && echo "chloe écrit : NON ATTENDU" || echo "chloe (auditeurs) écrit dans le site      : REFUSÉ (attendu)"
+#   ls -l /var/www/infraready/test-alice.txt
+#   n=$(sudo -u chloe journalctl -q --no-pager -n 5 -u ssh 2>/dev/null | wc -l); echo "chloe lit le journal système (ssh)        : $n lignes (attendu > 0)"
+#   n=$(sudo -u alice journalctl -q --no-pager -n 5 -u ssh 2>/dev/null | wc -l); echo "alice lit le journal système (ssh)        : $n lignes (attendu 0 : pas membre de systemd-journal)"
+#   rm -f /var/www/infraready/test-alice.txt
+
+== Identités
+uid=1002(alice) gid=1004(alice) groups=1004(alice),1002(webadmins)
+uid=1003(bruno) gid=1005(bruno) groups=1005(bruno),1002(webadmins)
+uid=1004(chloe) gid=1006(chloe) groups=1006(chloe),999(systemd-journal),1003(auditeurs)
+
+== getent group
+webadmins:x:1002:alice,bruno
+auditeurs:x:1003:chloe
+systemd-journal:x:999:chloe
+
+== Comptes verrouillés (L = pas de mot de passe utilisable)
+alice L 2026-10-19 0 99999 7 -1
+bruno L 2026-10-19 0 99999 7 -1
+chloe L 2026-10-19 0 99999 7 -1
+
+== Permissions
+drwxrwsr-x 2 root webadmins 4096 Oct 19 15:23 /var/www/infraready
+
+== Tests de droits
+alice (webadmins) écrit dans le site      : OK (attendu)
+chloe (auditeurs) écrit dans le site      : REFUSÉ (attendu)
+-rw-rw-r-- 1 alice webadmins 11 Oct 19 15:23 /var/www/infraready/test-alice.txt
+chloe lit le journal système (ssh)        : 5 lignes (attendu > 0)
+alice lit le journal système (ssh)        : 0 lignes (attendu 0 : pas membre de systemd-journal)

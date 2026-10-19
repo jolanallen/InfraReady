@@ -1,0 +1,50 @@
+# Preuve : P-24-linux01-analyse-journaux
+# Hôte : linux01 (root via sudo) — 2026-10-19 15:25:44 CEST
+# Commandes :
+#   echo "== Événements générés pour le test (depuis OPS01) : connexion SSH avec un compte inexistant + requête HTTP vers une page absente"
+#   echo; echo "== journalctl -u ssh : tentatives refusées (30 dernières min)"
+#   journalctl -u ssh --since "-30min" --no-pager -q | grep -E "Invalid user|Connection closed by invalid|authenticating user" | tail -4
+#   echo; echo "== nginx : accès (code 404 = page inexistante)"; tail -n 3 /var/log/nginx/infraready_access.log
+#   echo; echo "== Erreurs (priorité err et plus) depuis le démarrage"; journalctl -p err -b --no-pager -q | tail -8 || true
+#   echo; echo "== Noyau : détection à chaud du disque de test"; journalctl -k -b --no-pager -q | grep -E "sdb|INFRA" | head -5
+#   echo; echo "== Unités systemd en échec"; systemctl --failed --no-legend | sed "s/^/  /"; [ -z "$(systemctl --failed --no-legend)" ] && echo "  aucune"
+#   echo; echo "== Redémarrages / démarrages"; journalctl --list-boots --no-pager | tail -3
+#   echo; echo "== Volume des journaux"; journalctl --disk-usage
+#   echo; echo "== Sudo : actions privilégiées tracées (5 dernières)"; journalctl _COMM=sudo --since "-1h" --no-pager -q -o cat | grep COMMAND | tail -5 | cut -c1-160
+
+== Événements générés pour le test (depuis OPS01) : connexion SSH avec un compte inexistant + requête HTTP vers une page absente
+
+== journalctl -u ssh : tentatives refusées (30 dernières min)
+Oct 19 15:25:42 linux01 sshd[10330]: Invalid user pirate from 192.168.50.30 port 56558
+Oct 19 15:25:42 linux01 sshd[10330]: Connection closed by invalid user pirate 192.168.50.30 port 56558 [preauth]
+
+== nginx : accès (code 404 = page inexistante)
+192.168.50.30 - - [19/Oct/2026:15:23:31 +0200] "GET / HTTP/1.1" 200 182 "-" "curl/8.5.0"
+192.168.50.30 - - [19/Oct/2026:15:25:42 +0200] "GET /admin.php HTTP/1.1" 404 162 "-" "curl/8.5.0"
+192.168.50.30 - - [19/Oct/2026:15:25:42 +0200] "GET / HTTP/1.1" 200 182 "-" "curl/8.5.0"
+
+== Erreurs (priorité err et plus) depuis le démarrage
+
+== Noyau : détection à chaud du disque de test
+Oct 19 15:23:51 linux01 kernel: sd 3:0:0:1: [sdb] 20971520 512-byte logical blocks: (10.7 GB/10.0 GiB)
+Oct 19 15:23:51 linux01 kernel: sd 3:0:0:1: [sdb] Write Protect is off
+Oct 19 15:23:51 linux01 kernel: sd 3:0:0:1: [sdb] Mode Sense: 63 00 10 08
+Oct 19 15:23:51 linux01 kernel: sd 3:0:0:1: [sdb] Write cache: enabled, read cache: enabled, supports DPO and FUA
+Oct 19 15:23:51 linux01 kernel: sd 3:0:0:1: [sdb] Attached SCSI disk
+
+== Unités systemd en échec
+  aucune
+
+== Redémarrages / démarrages
+IDX BOOT ID                          FIRST ENTRY                  LAST ENTRY
+  0 c696d4095f054d25b5aad9848edca9eb Mon 2026-10-19 14:58:20 CEST Mon 2026-10-19 15:25:47 CEST
+
+== Volume des journaux
+Archived and active journals take up 24.0M in the file system.
+
+== Sudo : actions privilégiées tracées (5 dernières)
+    root : PWD=/home/infraadmin ; USER=chloe ; COMMAND=/usr/bin/cat /data/rapports/rapport-test.txt
+    root : PWD=/home/infraadmin ; USER=alice ; COMMAND=/usr/bin/cat /data/rapports/rapport-test.txt
+infraadmin : PWD=/home/infraadmin ; USER=root ; COMMAND=/usr/bin/bash -c 'export DEBIAN_FRONTEND=noninteractive#012echo "== 2. Pré-contrôles"; df -h / /boot /
+infraadmin : PWD=/home/infraadmin ; USER=root ; COMMAND=/usr/bin/bash -c 'echo "== Événements générés pour le test (depuis OPS01) : connexion SSH avec un c
+infraadmin : (command continued) aucune"#012echo; echo "== Redémarrages / démarrages"; journalctl --list-boots --no-pager | tail -3#012echo; echo "== Volume d
