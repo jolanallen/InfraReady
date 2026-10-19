@@ -147,7 +147,11 @@
         policy: deny
         direction: incoming
 
-    # Vérifications
+    # Vérifications — les handlers (rechargement nginx) sont exécutés AVANT les tests ; sinon un test en échec
+    # interrompt le play et le rechargement notifié n'a jamais lieu (incident phase H, preuve P-72a).
+    - name: Appliquer les rechargements en attente avant les vérifications
+      ansible.builtin.meta: flush_handlers
+
     - name: Le site répond en HTTP 200
       ansible.builtin.uri:
         url: "http://{{ ansible_host }}/"

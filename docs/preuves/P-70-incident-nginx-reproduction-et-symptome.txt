@@ -1,0 +1,43 @@
+# Preuve : P-70-incident-nginx-reproduction-et-symptome
+# Phase H — incident choisi : site web LINUX01 en erreur 404 après une « mise en production » ratée
+#   (directive root de nginx changée vers /var/www/infraready-v2, répertoire jamais créé). Contrôlé et réversible :
+#   sauvegarde /root/infraready.nginx.bak-incident-h avant modification, configuration de référence dans Ansible.
+# 1) Exécuté sur LINUX01 (root via sudo) — 2026-10-19 19:27:22 CEST : script /tmp/h70-provoquer.sh (cp, sed, nginx -t, systemctl reload nginx)
+# 2) Constat depuis OPS01 — 2026-10-19 19:27:27 CEST : curl -s -o /dev/null -w '%{http_code}', curl, ping
+# Remarque : juste après le reload, l'ancien worker nginx répond encore 200 pendant quelques centaines de ms ;
+#   5 s plus tard le symptôme est stable (404 depuis OPS01, par IP et par nom DNS).
+
+===== 1) Reproduction sur LINUX01 =====
+### 2026-10-19 19:27:22 CEST  hôte : linux01  —  état AVANT
+HTTP/1.1 200 OK
+5:    root /var/www/infraready;
+
+### Sauvegarde pour retour arrière
+'/etc/nginx/sites-available/infraready' -> '/root/infraready.nginx.bak-incident-h'
+
+### Changement (simule une mise en production ratée : nouveau chemin root jamais créé)
+5:    root /var/www/infraready-v2;
+reload nginx : OK  (19:27:22)
+
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+### 2026-10-19 19:27:22 CEST  état APRÈS (vu depuis LINUX01)
+HTTP/1.1 200 OK
+
+===== 2) Constat du symptôme depuis OPS01 =====
+### 2026-10-19 19:27:27 CEST  constat depuis ops01
+http://192.168.50.20/                -> 404 (0.000673s)
+http://linux01.infraready.test/      -> 404 (0.001812s)
+
+### corps de la réponse
+<html>
+<head><title>404 Not Found</title></head>
+<body>
+<center><h1>404 Not Found</h1></center>
+<hr><center>nginx/1.24.0 (Ubuntu)</center>
+</body>
+</html>
+
+### le port 80 répond, la VM est joignable (ping)
+2 packets transmitted, 2 received, 0% packet loss, time 1009ms
+rtt min/avg/max/mdev = 0.111/0.216/0.321/0.105 ms

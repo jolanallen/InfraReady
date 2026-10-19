@@ -1,0 +1,83 @@
+# Preuve : P-72a-incident-nginx-correction-1er-essai-handler-non-execute
+# 1er essai de correction — 2026-10-19 19:28:20 CEST, depuis OPS01 (utilisateur ansible) :
+#   ansible-playbook playbooks/linux_base.yml --limit linux01   (rejouer la configuration de référence)
+# Résultat : le fichier de configuration est bien restauré (« Virtual host nginx : changed »), MAIS le test
+#   « Le site répond en HTTP 200 » échoue à la fin du play et interrompt celui-ci AVANT l'exécution des handlers :
+#   le handler « Recharger nginx » notifié n'est jamais exécuté, nginx garde l'ancienne configuration en mémoire
+#   -> toujours 404 (vérifications depuis OPS01 et LINUX01, second passage changed=0 : la notification est perdue).
+# Cause : ordre des tâches dans le playbook (vérifications placées avant le flush des handlers).
+# Correction du playbook : « meta: flush_handlers » avant les vérifications (voir P-72).
+
+===== 1) Correction, 1er essai =====
+### 2026-10-19 19:28:20 CEST  correction depuis ops01 — ansible-playbook playbooks/linux_base.yml --limit linux01
+PLAY [LINUX01 - configuration de base] *****************************************
+TASK [Gathering Facts] *********************************************************
+ok: [linux01]
+TASK [Fuseau horaire] **********************************************************
+ok: [linux01]
+TASK [Paquets de base] *********************************************************
+ok: [linux01]
+TASK [Groupes du labo] *********************************************************
+ok: [linux01] => (item=webadmins)
+ok: [linux01] => (item=auditeurs)
+TASK [Utilisateurs du labo (sans mot de passe, connexion par su/sudo uniquement)] ***
+ok: [linux01] => (item=alice)
+ok: [linux01] => (item=bruno)
+ok: [linux01] => (item=chloe)
+TASK [Racine du site - écriture réservée à webadmins (setgid)] *****************
+ok: [linux01]
+TASK [Page d'accueil du site] **************************************************
+ok: [linux01]
+TASK [Virtual host nginx] ******************************************************
+changed: [linux01]
+TASK [Activer le site InfraReady] **********************************************
+ok: [linux01]
+TASK [Désactiver le site par défaut] *******************************************
+ok: [linux01]
+TASK [Services actifs au démarrage] ********************************************
+ok: [linux01] => (item=nginx)
+ok: [linux01] => (item=prometheus-node-exporter)
+TASK [Récupérer l'UUID du système de fichiers DATA] ****************************
+ok: [linux01]
+TASK [Lire l'UUID] *************************************************************
+ok: [linux01]
+TASK [Monter le disque de données via fstab - /data] ***************************
+ok: [linux01]
+TASK [Dossier des rapports - lecture pour auditeurs uniquement] ****************
+ok: [linux01]
+TASK [UFW - SSH depuis le sous-réseau du labo] *********************************
+ok: [linux01]
+TASK [UFW - HTTP depuis le sous-réseau du labo] ********************************
+ok: [linux01]
+TASK [UFW - node_exporter depuis OPS01 uniquement] *****************************
+ok: [linux01]
+TASK [UFW - politique par défaut et activation] ********************************
+ok: [linux01]
+TASK [Le site répond en HTTP 200] **********************************************
+fatal: [linux01 -> localhost]: FAILED! => 
+    changed: false
+PLAY RECAP *********************************************************************
+linux01                    : ok=19   changed=1    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+
+### 2026-10-19 19:28:42 CEST  vérification immédiate depuis OPS01
+http://192.168.50.20/                -> 404
+http://linux01.infraready.test/      -> 404
+<title>404 Not Found</title>
+
+===== 2) Vérification sur LINUX01 : fichier restauré mais nginx non rechargé =====
+### 2026-10-19 19:28:45 CEST  vérification sur linux01
+active
+HTTP/1.1 404 Not Found
+194:    root /var/www/infraready;
+configuration identique à la sauvegarde d'avant incident
+Oct 19 19:27:22 linux01 systemd[1]: Reloading nginx.service - A high performance web server and a reverse proxy server...
+Oct 19 19:27:22 linux01 nginx[25760]: 2026/10/19 19:27:22 [notice] 25760#25760: signal process started
+Oct 19 19:27:22 linux01 systemd[1]: Reloaded nginx.service - A high performance web server and a reverse proxy server.
+
+===== 3) Second passage : changed=0, la notification du handler est perdue, toujours 404 =====
+### 2026-10-19 19:28:48 CEST  second passage (stabilité) — ansible-playbook playbooks/linux_base.yml --limit linux01
+PLAY RECAP *********************************************************************
+linux01                    : ok=19   changed=0    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+### 2026-10-19 19:29:02 CEST  tests identiques au constat initial
+http://192.168.50.20/                -> 404
+http://linux01.infraready.test/      -> 404

@@ -14,6 +14,7 @@ Laboratoire : 3 VM sur Proxmox VE, réseau isolé `192.168.50.0/24`.
 
 - **Dossier technique** : [InfraReady - Dossier technique.md](InfraReady%20-%20Dossier%20technique.md) (phases A à H, preuves, écarts)
 - **Procédure de maintenance** : [docs/procedure-maintenance.md](docs/procedure-maintenance.md)
+- **Rapport d'incident** (phase H) : [docs/rapport-incident.md](docs/rapport-incident.md)
 - **Preuves** : `docs/preuves/` (sorties de commandes horodatées et captures, numérotées par phase)
 
 ## Arborescence
@@ -23,7 +24,7 @@ ansible/      inventaire, group_vars (vault chiffré), playbooks, templates
 lab/          modèles d'installation automatique (Ubuntu autoinstall, Windows autounattend) et réseau Proxmox
 monitoring/   configuration Prometheus (cibles, règles d'alerte) et provisioning Grafana (source, dashboard)
 scripts/      scripts d'amorçage, de vérification et de diagnostic (bash, PowerShell)
-docs/         procédure de maintenance, preuves
+docs/         procédure de maintenance, rapport d'incident, preuves
 .github/      workflow de validation (yamllint, ansible-lint, syntax-check, promtool, gitleaks, vault chiffré)
 ```
 

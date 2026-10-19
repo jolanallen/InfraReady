@@ -1,0 +1,57 @@
+# Preuve : P-71-incident-nginx-diagnostic
+# Exécuté sur LINUX01 (root via sudo) — 2026-10-19 19:27:51 CEST : script /tmp/h71-diagnostic.sh
+# Commande(s) : systemctl is-active/status nginx, ss -ltnp, ufw status, curl -I, tail infraready_error.log,
+#   journalctl -u nginx, nginx -T, ls, stat, diff avec la sauvegarde, journalctl _COMM=sudo
+# Hypothèses testées dans l'ordre : service planté (non), port/pare-feu (non), contenu supprimé (non),
+#   configuration (OUI : root -> /var/www/infraready-v2 inexistant, modifié à 19:27:22 par sudo).
+# Remarque : infraready_error.log est vide car « try_files ... =404 » renvoie 404 sans journaliser d'erreur ;
+#   c'est nginx -T (configuration réellement chargée) qui met la cause en évidence.
+
+### 2026-10-19 19:27:51 CEST  diagnostic sur linux01
+
+## 1. Le service tourne-t-il ?   (hypothèse : nginx planté)
+active
+● nginx.service - A high performance web server and a reverse proxy server
+     Loaded: loaded (/usr/lib/systemd/system/nginx.service; enabled; preset: enabled)
+     Active: active (running) since Mon 2026-10-19 15:23:29 CEST; 4h 4min ago
+       Docs: man:nginx(8)
+    Process: 25760 ExecReload=/usr/sbin/nginx -g daemon on; master_process on; -s reload (code=exited, status=0/SUCCESS)
+   Main PID: 2483 (nginx)
+
+## 2. Écoute-t-il sur le port 80 ?   (hypothèse : port fermé / pare-feu)
+State  Recv-Q Send-Q Local Address:Port Peer Address:PortProcess
+LISTEN 0      511          0.0.0.0:80        0.0.0.0:*    users:(("nginx",pid=25766,fd=7),("nginx",pid=25765,fd=7),("nginx",pid=25764,fd=7),("nginx",pid=25763,fd=7),("nginx",pid=2483,fd=7))
+Status: active
+80/tcp                     ALLOW       192.168.50.0/24           
+
+## 3. Que répond-il localement ?
+HTTP/1.1 404 Not Found
+
+## 4. Journaux nginx (erreur du site + journal du service)
+--- journalctl -u nginx (15 dernières min) ---
+Oct 19 19:27:22 linux01 systemd[1]: Reloading nginx.service - A high performance web server and a reverse proxy server...
+Oct 19 19:27:22 linux01 nginx[25760]: 2026/10/19 19:27:22 [notice] 25760#25760: signal process started
+Oct 19 19:27:22 linux01 systemd[1]: Reloaded nginx.service - A high performance web server and a reverse proxy server.
+
+## 5. Configuration réellement chargée (nginx -T) : directive root
+193:    server_name linux01.infraready.test 192.168.50.20;
+194:    root /var/www/infraready-v2;
+
+## 6. Le répertoire pointé existe-t-il ?
+ls: cannot access '/var/www/infraready-v2': No such file or directory
+total 4
+-rw-rw-r-- 1 root webadmins 279 Oct 19 15:26 index.html
+
+## 7. Quand et comment la configuration a-t-elle changé ?
+2026-10-19 19:27:22.021875097 +0200  /etc/nginx/sites-available/infraready
+5c5
+<     root /var/www/infraready;
+---
+>     root /var/www/infraready-v2;
+
+## 8. Journal de l'authentification (qui était connecté ?)
+Oct 19 19:26:46 linux01 sudo[25611]: infraadmin : PWD=/home/infraadmin ; USER=root ; COMMAND=/usr/bin/bash -c 'ls -la /etc/nginx/sites-enabled/ /etc/nginx/sites-available/; nginx -v; systemctl is-active nginx; curl -sI http://127.0.0.1/ | head -3; ls /var/www; tail -3 /var/log/nginx/error.log'
+Oct 19 19:27:22 linux01 sudo[25748]: infraadmin : PWD=/home/infraadmin ; USER=root ; COMMAND=/usr/bin/bash /tmp/h70-provoquer.sh
+Oct 19 19:27:51 linux01 sudo[25902]: infraadmin : PWD=/home/infraadmin ; USER=root ; COMMAND=/usr/bin/bash /tmp/h71-diagnostic.sh
+
+### CAUSE CONFIRMÉE : la directive root pointe vers /var/www/infraready-v2 qui n'existe pas ; nginx est actif et écoute, le contenu est toujours dans /var/www/infraready.

@@ -1,0 +1,26 @@
+# Preuve : P-73-incident-nginx-retour-normale-et-second-passage
+# Retour à la normale : mêmes tests que lors du constat (P-70) et du diagnostic (P-71), puis second passage du playbook.
+# 1) Sur LINUX01 (root via sudo) — 2026-10-19 19:30:53 CEST : systemctl is-active, curl -I, nginx -T | grep root,
+#      diff avec la sauvegarde d'avant incident, journalctl -u nginx
+# 2) Depuis OPS01 (utilisateur ansible) — 19:30:55 : ansible-playbook playbooks/linux_base.yml --limit linux01 (2e passage)
+#      puis curl par IP et par nom DNS
+# Résultat : nginx actif, root = /var/www/infraready, configuration identique à la sauvegarde, rechargement tracé à 19:30:51,
+#   2e passage changed=0 failed=0, HTTP 200 par IP et par nom. Durée totale de l'incident n°2 : 19:30:34 -> 19:30:51 (17 s).
+
+===== 1) Vérification sur LINUX01 =====
+### 2026-10-19 19:30:53 CEST  vérification sur linux01
+active
+HTTP/1.1 200 OK
+194:    root /var/www/infraready;
+configuration identique à la sauvegarde d'avant incident
+Oct 19 19:30:51 linux01 systemd[1]: Reloading nginx.service - A high performance web server and a reverse proxy server...
+Oct 19 19:30:51 linux01 nginx[29904]: 2026/10/19 19:30:51 [notice] 29904#29904: signal process started
+Oct 19 19:30:51 linux01 systemd[1]: Reloaded nginx.service - A high performance web server and a reverse proxy server.
+
+===== 2) Second passage et tests identiques depuis OPS01 =====
+### 2026-10-19 19:30:55 CEST  second passage (stabilité) — ansible-playbook playbooks/linux_base.yml --limit linux01
+PLAY RECAP *********************************************************************
+linux01                    : ok=21   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+### 2026-10-19 19:31:09 CEST  tests identiques au constat initial
+http://192.168.50.20/                -> 200
+http://linux01.infraready.test/      -> 200

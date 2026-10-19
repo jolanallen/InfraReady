@@ -1,0 +1,67 @@
+# Preuve : P-72-incident-nginx-correction-playbook-corrige
+# Correction du playbook linux_base.yml : tâche « meta: flush_handlers » ajoutée avant les vérifications (cause de P-72a).
+# Pour prouver que la correction résout l'incident en un seul passage, l'incident est reproduit une 2e fois
+#   (même script qu'en P-70) puis la configuration de référence est rejouée.
+# 1) Reproduction n°2 sur LINUX01 — 2026-10-19 19:30:34 CEST, constat depuis OPS01 à 19:30:36
+# 2) Correction depuis OPS01 (utilisateur ansible) — 19:30:39 :
+#      ansible-playbook playbooks/linux_base.yml --limit linux01
+#    -> « Virtual host nginx : changed », « RUNNING HANDLER [Recharger nginx] : changed », tests HTTP 200 OK, failed=0.
+#    (les lignes « ok: » sans changement sont filtrées pour la lisibilité ; sortie complète dans ansible.log d'OPS01)
+
+===== 1) Reproduction n°2 =====
+### 2026-10-19 19:30:34 CEST  hôte : linux01  —  état AVANT
+HTTP/1.1 404 Not Found
+5:    root /var/www/infraready;
+
+### Sauvegarde pour retour arrière
+'/etc/nginx/sites-available/infraready' -> '/root/infraready.nginx.bak-incident-h'
+
+### Changement (simule une mise en production ratée : nouveau chemin root jamais créé)
+5:    root /var/www/infraready-v2;
+reload nginx : OK  (19:30:34)
+
+### 2026-10-19 19:30:34 CEST  état APRÈS (vu depuis LINUX01)
+HTTP/1.1 404 Not Found
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+
+--- constat depuis OPS01 ---
+### 2026-10-19 19:30:36 CEST  constat depuis ops01
+http://192.168.50.20/                -> 404 (0.000726s)
+http://linux01.infraready.test/      -> 404 (0.001856s)
+
+===== 2) Correction avec le playbook corrigé =====
+### 2026-10-19 19:30:39 CEST  correction depuis ops01 — ansible-playbook playbooks/linux_base.yml --limit linux01 (playbook corrigé)
+PLAY [LINUX01 - configuration de base] *****************************************
+TASK [Gathering Facts] *********************************************************
+TASK [Fuseau horaire] **********************************************************
+TASK [Paquets de base] *********************************************************
+TASK [Groupes du labo] *********************************************************
+TASK [Utilisateurs du labo (sans mot de passe, connexion par su/sudo uniquement)] ***
+TASK [Racine du site - écriture réservée à webadmins (setgid)] *****************
+TASK [Page d'accueil du site] **************************************************
+TASK [Virtual host nginx] ******************************************************
+changed: [linux01]
+TASK [Activer le site InfraReady] **********************************************
+TASK [Désactiver le site par défaut] *******************************************
+TASK [Services actifs au démarrage] ********************************************
+TASK [Récupérer l'UUID du système de fichiers DATA] ****************************
+TASK [Lire l'UUID] *************************************************************
+TASK [Monter le disque de données via fstab - /data] ***************************
+TASK [Dossier des rapports - lecture pour auditeurs uniquement] ****************
+TASK [UFW - SSH depuis le sous-réseau du labo] *********************************
+TASK [UFW - HTTP depuis le sous-réseau du labo] ********************************
+TASK [UFW - node_exporter depuis OPS01 uniquement] *****************************
+TASK [UFW - politique par défaut et activation] ********************************
+TASK [Appliquer les rechargements en attente avant les vérifications] **********
+RUNNING HANDLER [Recharger nginx] **********************************************
+changed: [linux01]
+TASK [Le site répond en HTTP 200] **********************************************
+TASK [Les métriques node_exporter sont exposées] *******************************
+PLAY RECAP *********************************************************************
+linux01                    : ok=22   changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+### 2026-10-19 19:30:52 CEST  vérification immédiate depuis OPS01
+http://192.168.50.20/                -> 200
+http://linux01.infraready.test/      -> 200
+<title>InfraReady - linux01</title>

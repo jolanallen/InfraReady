@@ -377,7 +377,7 @@ Retour arrière disponible : snapshot `s03_avant_ansible` (WIN-DC01 et LINUX01).
 > [!abstract] Objectif
 > Formaliser et tester une maintenance sûre et traçable sur les deux OS.
 
-**Responsable :** [Nom] · **Dates :** 19/10/2026 · **Statut :** Terminé
+**Responsable :** [Nom] · **Dates :** 19/10/2026 · **Statut :** Fait
 
 ### Travaux réalisés / checklist
 
@@ -565,36 +565,57 @@ Retour arrière disponible : snapshot `s02_avant_monitoring` (OPS01).
 > [!abstract] Objectif
 > Reproduire un incident simple, contrôlé, réversible et justifier le retour à la normale.
 
-**Responsable :** [Nom] · **Dates :** [Date(s)] · **Statut :** À faire
+**Responsable :** [Nom] · **Dates :** 19/10/2026 · **Statut :** Fait
 
 ### Travaux réalisés / checklist
 
-- [ ] Choisir un incident du labo (service, DNS, stockage, exporter, playbook…).
-- [ ] Décrire le symptôme initial et l'heure du constat.
-- [ ] Consigner les tests effectués et les journaux consultés.
-- [ ] Identifier une cause confirmée ou une hypothèse explicitement signalée.
-- [ ] Appliquer et documenter une correction ciblée.
-- [ ] Rejouer les tests pour confirmer le retour à la normale.
-- [ ] Joindre les preuves et préparer un rapport d'incident distinct.
+- [x] Choisir un incident du labo : **site web LINUX01 en 404 après un changement de configuration nginx** (`root` vers un répertoire inexistant).
+- [x] Décrire le symptôme initial et l'heure du constat (19:27, depuis OPS01, par IP et par nom DNS).
+- [x] Consigner les tests effectués et les journaux consultés (service, port/pare-feu, contenu, `nginx -T`, journaux nginx/systemd/sudo).
+- [x] Identifier une cause confirmée (directive `root` vers `/var/www/infraready-v2`, inexistant).
+- [x] Appliquer et documenter une correction ciblée (rejeu de la configuration de référence avec Ansible).
+- [x] Rejouer les tests pour confirmer le retour à la normale (HTTP 200, 2ᵉ passage `changed=0`).
+- [x] Joindre les preuves et préparer un rapport d'incident distinct (**`docs/rapport-incident.md`**, réf. INC-2026-10-19-01).
 
 ### Procédure et configuration
 
-[À compléter : date, incident choisi, systèmes concernés, impact, chronologie et cause / hypothèse.]
+> [!info] Incident INC-2026-10-19-01 — 19/10/2026 19:27 CEST
+> **Système :** LINUX01, service nginx. **Impact :** site indisponible (404), aucun autre service touché. **Type :** erreur de configuration lors d'une « mise en production » simulée. **Contrôlé et réversible :** sauvegarde `/root/infraready.nginx.bak-incident-h` + configuration de référence dans le dépôt.
 
-[À compléter : commandes, journaux, captures avant et après, changement réalisé.]
+```mermaid
+flowchart LR
+    A["19:27:22<br/>root → /var/www/infraready-v2<br/>nginx -t OK, reload"] --> B["19:27:27<br/>Constat depuis OPS01<br/>HTTP 404 (IP et DNS)"]
+    B --> C["19:27:51<br/>Diagnostic<br/>service ? port ? contenu ? config !"]
+    C --> D["19:28:20<br/>1er essai : playbook<br/>fichier OK mais 404<br/>(handler non exécuté)"]
+    D --> E["Correction du playbook<br/>meta: flush_handlers"]
+    E --> F["19:30:34 → 19:30:51<br/>Incident reproduit, playbook corrigé<br/>HTTP 200 en 1 passage"]
+    F --> G["19:31<br/>2e passage changed=0<br/>retour à la normale"]
+```
+
+**Chronologie et cause :** la directive `root` du virtual host a été modifiée vers un répertoire jamais créé ; `nginx -t` ne vérifie pas l'existence du répertoire, le rechargement réussit et le site renvoie 404 pour tout. Diagnostic par élimination sur LINUX01 (P-71) : nginx `active`, en écoute sur `0.0.0.0:80`, règle UFW présente, contenu intact dans `/var/www/infraready` ; `nginx -T` montre le mauvais `root`, `ls` confirme l'absence du répertoire, `stat` et `diff` datent et isolent le changement, le journal `sudo` identifie la session. Le journal d'erreur nginx est resté vide (`try_files … =404` ne journalise pas) : la configuration réellement chargée est la bonne source.
+
+**Commandes et journaux utilisés :** `curl -s -o /dev/null -w '%{http_code}'`, `ping`, `systemctl is-active/status nginx`, `ss -ltnp`, `ufw status`, `tail /var/log/nginx/infraready_error.log`, `journalctl -u nginx`, `journalctl _COMM=sudo`, `nginx -T`, `ls`, `stat`, `diff`, `ansible-playbook playbooks/linux_base.yml --limit linux01`.
+
+**Changement réalisé :** rejeu de la configuration de référence (`linux_base.yml`, limité à LINUX01) plutôt qu'une correction manuelle ; le 1ᵉʳ essai a révélé un défaut du playbook (voir Difficultés), corrigé par un `meta: flush_handlers` avant les vérifications ; l'incident a été reproduit une 2ᵉ fois pour prouver que le playbook corrigé le résout en un seul passage.
 
 ### Tests et preuves
 
 | Vérification | Attendu | Résultat observé | Preuve |
 | --- | --- | --- | --- |
-| Reproduction | Symptôme observé et documenté | [Résultat réel] | [P-7x] |
-| Diagnostic | Hypothèse vérifiée / cause expliquée | [Résultat réel] | [P-7x] |
-| Correction | Modification clairement décrite | [Résultat réel] | [P-7x] |
-| Retour à la normale | Test identique à nouveau réussi | [Résultat réel] | [P-7x] |
+| Reproduction | Symptôme observé et documenté | 404 par IP et par nom depuis OPS01 à 19:27:27, VM joignable, port 80 ouvert ; reproduit à l'identique à 19:30:34 | [P-70](docs/preuves/P-70-incident-nginx-reproduction-et-symptome.txt), [P-72](docs/preuves/P-72-incident-nginx-correction-playbook-corrige.txt) |
+| Diagnostic | Hypothèse vérifiée / cause expliquée | 3 hypothèses écartées (service, port/pare-feu, contenu) ; cause confirmée : `root /var/www/infraready-v2` inexistant, modifié à 19:27:22 | [P-71](docs/preuves/P-71-incident-nginx-diagnostic.txt) |
+| Correction | Modification clairement décrite | 1ᵉʳ essai : fichier restauré, handler non exécuté → 404 ; playbook corrigé → « Virtual host nginx : changed », « RUNNING HANDLER Recharger nginx : changed », tests HTTP OK, `failed=0` | [P-72a](docs/preuves/P-72a-incident-nginx-correction-1er-essai-handler-non-execute.txt), [P-72](docs/preuves/P-72-incident-nginx-correction-playbook-corrige.txt) |
+| Retour à la normale | Test identique à nouveau réussi | nginx actif, `root /var/www/infraready`, configuration identique à la sauvegarde, 200 par IP et par nom, 2ᵉ passage `changed=0 failed=0` | [P-73](docs/preuves/P-73-incident-nginx-retour-normale-et-second-passage.txt) |
 
 ### Difficultés / décision / retour arrière
 
-[À compléter]
+| Problème | Cause | Correction | Résultat |
+| --- | --- | --- | --- |
+| 1ᵉʳ essai de correction : le playbook restaure le fichier (`changed=1`) mais le site reste en 404, et le 2ᵉ passage (`changed=0`) ne change rien | La vérification « HTTP 200 » échoue avant la fin du play ; Ansible n'exécute les handlers qu'en fin de play, donc le rechargement nginx notifié est perdu | `ansible.builtin.meta: flush_handlers` placé avant les vérifications dans `linux_base.yml` | Un seul passage suffit : fichier + rechargement + tests ([P-72a](docs/preuves/P-72a-incident-nginx-correction-1er-essai-handler-non-execute.txt) → [P-72](docs/preuves/P-72-incident-nginx-correction-playbook-corrige.txt)) |
+| Journal d'erreur nginx vide malgré l'incident | `try_files … =404` renvoie 404 sans écrire dans `error.log` | Lire la configuration chargée (`nginx -T`) et le journal systemd | Cause trouvée en moins d'une minute |
+| Le site n'est pas supervisé en HTTP (seul `up` du node_exporter l'est) : l'incident n'a déclenché aucune alerte | Pas de sonde HTTP dans Prometheus | Piste d'amélioration : `blackbox_exporter` + alerte `SiteWebHS` | Noté en section 13 |
+
+Retour arrière disponible : `/root/infraready.nginx.bak-incident-h` sur LINUX01, et la configuration de référence du dépôt (`templates/nginx-infraready.conf.j2`).
 
 ---
 
@@ -624,10 +645,10 @@ Retour arrière disponible : snapshot `s02_avant_monitoring` (OPS01).
 | B | AD DS / groupes / comptes / DNS | ✅ Validé | P-10 à P-13 |
 | C | Permissions / service / stockage / logs | ✅ Validé | P-20 à P-24 |
 | D | Playbooks Linux & Windows / idempotence | ✅ Validé | P-30 à P-35 |
-| E | Mises à jour / maintenance | ⏳ À faire | — |
+| E | Mises à jour / maintenance | ✅ Validé | P-40 à P-43 |
 | F | Exporters / dashboard / alerte | ✅ Validé | P-50 à P-55 |
 | G | Workflow GitHub Actions réussi | ✅ Validé (commits du binôme à compléter) | P-60 |
-| H | Incident corrigé / retour normal | ⏳ À faire | — |
+| H | Incident corrigé / retour normal | ✅ Validé | P-70 à P-73, `docs/rapport-incident.md` |
 
 ### Matrice des preuves
 
@@ -668,6 +689,11 @@ Retour arrière disponible : snapshot `s02_avant_monitoring` (OPS01).
 | P-42b | 19/10/2026 | Diagnostic WIN-DC01 : historique WU, journal Système, plateforme Defender | [P-42b](docs/preuves/P-42b-win-dc01-diagnostic-kb5007651-historique-wu.txt) |
 | P-42c | 19/10/2026 | Maintenance Windows — passage complet après exclusion de KB5007651 | [P-42c](docs/preuves/P-42c-windows-maintenance-installation-complete-apres-exclusion.txt) |
 | P-43 | 19/10/2026 | unattended-upgrades : configuration, minuteries, simulation | [P-43](docs/preuves/P-43-linux01-mises-a-jour-automatiques-unattended.txt) |
+| P-70 | 19/10/2026 | Incident nginx : reproduction contrôlée et constat du symptôme (404) | [P-70](docs/preuves/P-70-incident-nginx-reproduction-et-symptome.txt) |
+| P-71 | 19/10/2026 | Incident nginx : diagnostic par élimination, cause confirmée | [P-71](docs/preuves/P-71-incident-nginx-diagnostic.txt) |
+| P-72a | 19/10/2026 | Incident nginx : 1ᵉʳ essai de correction, handler non exécuté | [P-72a](docs/preuves/P-72a-incident-nginx-correction-1er-essai-handler-non-execute.txt) |
+| P-72 | 19/10/2026 | Incident nginx : correction avec le playbook corrigé (reproduction n°2) | [P-72](docs/preuves/P-72-incident-nginx-correction-playbook-corrige.txt) |
+| P-73 | 19/10/2026 | Incident nginx : retour à la normale et 2ᵉ passage `changed=0` | [P-73](docs/preuves/P-73-incident-nginx-retour-normale-et-second-passage.txt) |
 | P-50a | 19/10/2026 | Monitoring — 1er essai : échec de connexion admin Grafana | [P-50a](docs/preuves/P-50a-ops01-grafana-1er-essai-echec-mot-de-passe-ini.txt) |
 | P-50 | 19/10/2026 | Playbook Prometheus + Grafana (cibles up, admin OK) | [P-50](docs/preuves/P-50-ops01-prometheus-grafana-installation.txt) |
 | P-50b | 19/10/2026 | Playbook monitoring — 2ᵉ passage (changed=0) | [P-50b](docs/preuves/P-50b-ops01-monitoring-2e-passage-idempotence.txt) |
@@ -682,12 +708,12 @@ Retour arrière disponible : snapshot `s02_avant_monitoring` (OPS01).
 
 ## 13. Difficultés, limites et bilan
 
-- **Blocages et corrections :** détaillés dans chaque phase (ISO Ubuntu 26.04 remplacée, carte e1000 → e1000e, nftables à la place d'iptables, paramètre `reboot_timeout` non supporté, `win_powershell` sans `path`, PTR du DC manquant, chemin de disque deviné, secret dans une preuve détecté et nettoyé, push GitHub bloqué par le droit `workflow`).
+- **Blocages et corrections :** détaillés dans chaque phase (ISO Ubuntu 26.04 remplacée, carte e1000 → e1000e, nftables à la place d'iptables, paramètre `reboot_timeout` non supporté, `win_powershell` sans `path`, PTR du DC manquant, chemin de disque deviné, secret dans une preuve détecté et nettoyé, push GitHub bloqué par le droit `workflow`, lecteur CD vu comme volume plein, boucle Windows Update sur KB5007651, handler nginx non exécuté après un test en échec).
 - **Écarts à l'architecture :**
 	- **Proxmox VE 9.1 au lieu de VMware Workstation** — à faire valider par le formateur. Avantages : snapshots, ajout de disque à chaud, installations pilotables en ligne de commande, ressources suffisantes.
 	- Ressources légèrement supérieures au plan (vCPU) ; disque Windows en IDE (choix initial conservé).
 	- Ubuntu 24.04.**5** (dernière révision de la 24.04 LTS).
-- **Fonctionnalités inachevées :** phase H ; commits du second membre du binôme ; `KB5007651` exclue de l'installation automatique (boucle Windows Update) et à suivre manuellement.
+- **Fonctionnalités inachevées / pistes :** commits du second membre du binôme ; `KB5007651` exclue de l'installation automatique (boucle Windows Update) et à suivre manuellement ; pas de sonde HTTP du site dans Prometheus (`blackbox_exporter` à ajouter) ; snapshot Proxmox non pris avant l'incident H (sauvegarde fichier jugée suffisante pour un changement d'une ligne, réversible).
 - **Bilan du binôme :** [À compléter]
 
 ---
@@ -744,6 +770,8 @@ InfraReady/
 | 19/10/2026 16:48 | [Nom] | Maintenance Linux (LINUX01, OPS01), `unattended-upgrades` | Post-contrôles OK, reboot non requis | P-40, P-43 / `s04_avant_maintenance_e` |
 | 19/10/2026 16:54 | [Nom] | Windows Update sur WIN-DC01 (5 MAJ, redémarrage 18:04) | `failed=1` (boucle KB5007651) puis passage complet OK | P-42 à P-42c / `s04_avant_maj_windows` |
 | 19/10/2026 19:21 | [Nom] | `reject_list: [KB5007651]` + gabarit du rapport Windows | `failed=0`, rapport lisible | P-42c / — |
+| 19/10/2026 19:27 | [Nom] | Incident contrôlé : `root` nginx modifié sur LINUX01 | 404 constaté depuis OPS01 | P-70 / `/root/infraready.nginx.bak-incident-h` |
+| 19/10/2026 19:30 | [Nom] | `flush_handlers` avant les vérifications dans `linux_base.yml` ; rejeu sur LINUX01 | HTTP 200, `changed=0` au 2ᵉ passage | P-72, P-73 / — |
 
 **Annexes** : sorties complètes dans `docs/preuves/`, modèles d'installation dans `lab/`, configurations dans `ansible/` et `monitoring/`.
 
@@ -754,9 +782,9 @@ InfraReady/
 - [ ] Dépôt GitHub prêt, avec contributions du binôme
 - [ ] Dossier technique exporté en PDF + lien du dépôt
 - [x] Captures et sorties de commandes classées (`docs/preuves/`, numérotation par phase)
-- [ ] Rapport d'incident distinct rédigé
+- [x] Rapport d'incident distinct rédigé (`docs/rapport-incident.md`)
 - [ ] PowerPoint final préparé selon modalités du formateur
 - [x] Aucun secret présent dans les livrables (vérifié à chaque commit)
-- [x] Tous les écarts et limites sont mentionnés (à mettre à jour avec les phases E à H)
+- [x] Tous les écarts et limites sont mentionnés (section 13)
 
 **Date et plateforme de remise :** [À compléter]
