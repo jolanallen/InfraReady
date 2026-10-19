@@ -1,0 +1,135 @@
+# Preuve : P-12-domaine-dns-verifications
+# Exécuté sur OPS01 (utilisateur ansible, ~/infraready/ansible) — 2026-10-19 15:15:00 CEST
+# Commande(s) :
+#   ansible win-dc01 -m ansible.windows.win_powershell -a '{"script": "{{ lookup(\"file\", \"../scripts/verif-domaine.ps1\") }}"}' | sed -n '/^    output:/,/^    result:/p' | sed 's/^    -   //; s/^        //'
+
+    output:
+    - == Domaine / forêt
+    - |4-
+
+
+DNSRoot           : infraready.test
+NetBIOSName       : INFRAREADY
+DomainMode        : Windows2025Domain
+PDCEmulator       : WIN-DC01.infraready.test
+DistinguishedName : DC=infraready,DC=test
+    - |4-
+
+
+Name           : infraready.test
+ForestMode     : Windows2025Forest
+SchemaMaster   : WIN-DC01.infraready.test
+GlobalCatalogs : {WIN-DC01.infraready.test}
+    - == Comptes de test (OU=Utilisateurs,OU=InfraReady)
+    - |4-
+
+SamAccountName Enabled Groupes
+-------------- ------- -------
+j.martin          True GG_Support_IT
+s.bernard         True GG_Support_IT
+l.petit           True GG_Comptabilite
+t.moreau          True GG_Comptabilite
+    - == Résolution DNS
+    - OK    infraready.test                          A    192.168.50.10
+    - OK    win-dc01.infraready.test                 A    192.168.50.10
+    - OK    _ldap._tcp.dc._msdcs.infraready.test     SRV  win-dc01.infraready.test:389
+    - OK    www.ubuntu.com                           A    185.125.190.46
+    - '== Redirecteurs DNS : 1.1.1.1, 9.9.9.9'
+    - == Zones DNS
+    - |4-
+
+ZoneName               ZoneType IsDsIntegrated DynamicUpdate
+--------               -------- -------------- -------------
+_msdcs.infraready.test Primary            True Secure
+infraready.test        Primary            True Secure
+    - == dcdiag /q (aucune ligne = aucun test en échec)
+    - '         There are warning or error events within the last 24 hours after the'
+    - ''
+    - '         SYSVOL has been shared.  Failing SYSVOL replication problems may cause'
+    - ''
+    - '         Group Policy problems. '
+    - '         ......................... WIN-DC01 failed test DFSREvent'
+    - ''
+    - '         An error event occurred.  EventID: 0xC0001B6F'
+    - ''
+    - '            Time Generated: 10/19/2026   23:53:11'
+    - ''
+    - '            Event String:'
+    - ''
+    - '            The netprofm service terminated with the following error: '
+    - ''
+    - ''
+    - '         An error event occurred.  EventID: 0xC0001B76'
+    - ''
+    - '            Time Generated: 10/19/2026   14:55:45'
+    - ''
+    - '            Event String:'
+    - ''
+    - '            The Printer Extensions and Notifications service is marked as an interactive
+service.  However, the system is configured to not allow interactive services.  This
+service may not function properly.'
+    - ''
+    - '         An error event occurred.  EventID: 0x0000158C'
+    - ''
+    - '            Time Generated: 10/19/2026   15:10:43'
+    - ''
+    - '            Event String:'
+    - ''
+    - '            The computer or domain WIN-DC01 trusts domain INFRAREADY.  (This may
+be an indirect trust.)  However, WIN-DC01 and INFRAREADY have the same machine
+security identifier (SID).  NT should be re-installed on either WIN-DC01 or INFRAREADY.'
+    - ''
+    - '         An error event occurred.  EventID: 0x00004102'
+    - ''
+    - '            Time Generated: 10/19/2026   15:12:37'
+    - ''
+    - '            Event String:'
+    - ''
+    - '            The account-identifier allocator was unable to assign a new identifier.
+The identifier pool for this domain controller may have been depleted. If this
+problem persists, restart the domain controller and view the initialization status
+of the allocator in the event log.'
+    - ''
+    - '         An error event occurred.  EventID: 0x0000410B'
+    - ''
+    - '            Time Generated: 10/19/2026   15:12:37'
+    - ''
+    - '            Event String:'
+    - ''
+    - '            The request for a new account-identifier pool failed. The operation
+will be retried until the request succeeds. The error is '
+    - ''
+    - ''
+    - '         An error event occurred.  EventID: 0x00004102'
+    - ''
+    - '            Time Generated: 10/19/2026   15:12:37'
+    - ''
+    - '            Event String:'
+    - ''
+    - '            The account-identifier allocator was unable to assign a new identifier.
+The identifier pool for this domain controller may have been depleted. If this
+problem persists, restart the domain controller and view the initialization status
+of the allocator in the event log.'
+    - ''
+    - '         An error event occurred.  EventID: 0xC0000007'
+    - ''
+    - '            Time Generated: 10/19/2026   15:12:39'
+    - ''
+    - '            Event String:'
+    - ''
+    - '            The Security Account Manager failed a KDC request in an unexpected
+way. The error is in the data field. The account name was  and lookup type 0x108.'
+    - ''
+    - '         ......................... WIN-DC01 failed test SystemLog'
+    - ''
+    - == Services du DC
+    - |4-
+
+Name      Status StartType
+----      ------ ---------
+ADWS     Running Automatic
+DNS      Running Automatic
+kdc      Running Automatic
+Netlogon Running Automatic
+NTDS     Running Automatic
+    result: {}

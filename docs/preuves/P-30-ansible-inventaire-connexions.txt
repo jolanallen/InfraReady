@@ -1,0 +1,23 @@
+# Preuve : P-30-ansible-inventaire-connexions
+# Exécuté sur OPS01 (utilisateur ansible, ~/infraready/ansible) — 2026-10-19 15:03:36 CEST
+# Commande(s) :
+#   ansible --version | head -2; echo; ansible-inventory --graph; echo; ansible linux -m ansible.builtin.ping -o; ansible windows -m ansible.windows.win_ping
+
+ansible [core 2.16.3]
+  config file = /home/ansible/infraready/ansible/ansible.cfg
+
+@all:
+  |--@ungrouped:
+  |--@linux:
+  |  |--linux01
+  |  |--ops01
+  |--@windows:
+  |  |--win-dc01
+  |--@monitoring:
+  |  |--ops01
+
+ops01 | SUCCESS => {"ansible_facts": {"discovered_interpreter_python": "/usr/bin/python3"},"changed": false,"ping": "pong"}
+linux01 | SUCCESS => {"ansible_facts": {"discovered_interpreter_python": "/usr/bin/python3"},"changed": false,"ping": "pong"}
+win-dc01 | SUCCESS => 
+    changed: false
+    ping: pong

@@ -1,0 +1,54 @@
+# Preuve : P-10-adds-installation-foret
+# Exécuté sur OPS01 (utilisateur ansible, ~/infraready/ansible) — 2026-10-19 15:09:40 CEST
+# Commande(s) :
+#   ansible-playbook playbooks/windows_adds.yml
+
+
+PLAY [WIN-DC01 - AD DS et DNS] *************************************************
+
+TASK [Rôle AD DS + outils d'administration] ************************************
+Monday 19 October 2026  15:09:42 +0200 (0:00:00.026)       0:00:00.026 ******** 
+ok: [win-dc01]
+
+TASK [Créer la forêt infraready.test (redémarre le serveur)] *******************
+Monday 19 October 2026  15:09:48 +0200 (0:00:05.532)       0:00:05.558 ******** 
+changed: [win-dc01]
+
+TASK [Attendre que les services AD soient disponibles] *************************
+Monday 19 October 2026  15:13:00 +0200 (0:03:11.705)       0:03:17.263 ******** 
+ok: [win-dc01]
+
+TASK [Redirecteurs DNS vers Internet (résolution externe pour le labo)] ********
+Monday 19 October 2026  15:13:09 +0200 (0:00:09.848)       0:03:27.112 ******** 
+changed: [win-dc01]
+
+TASK [Le DC utilise son propre DNS] ********************************************
+Monday 19 October 2026  15:13:20 +0200 (0:00:10.209)       0:03:37.322 ******** 
+changed: [win-dc01]
+
+TASK [État du domaine] *********************************************************
+Monday 19 October 2026  15:13:30 +0200 (0:00:10.588)       0:03:47.910 ******** 
+ok: [win-dc01]
+
+TASK [Afficher l'état du domaine] **********************************************
+Monday 19 October 2026  15:13:39 +0200 (0:00:08.287)       0:03:56.197 ******** 
+ok: [win-dc01] => 
+    domain_state.output:
+    -   DC: WIN-DC01.infraready.test
+        DNS: 192.168.50.10
+        Domaine: infraready.test
+        Mode: Windows2025Domain
+        NetBIOS: INFRAREADY
+
+PLAY RECAP *********************************************************************
+win-dc01                   : ok=7    changed=3    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+Monday 19 October 2026  15:13:39 +0200 (0:00:00.021)       0:03:56.219 ******** 
+=============================================================================== 
+Créer la forêt infraready.test (redémarre le serveur) ----------------- 191.71s
+Le DC utilise son propre DNS ------------------------------------------- 10.59s
+Redirecteurs DNS vers Internet (résolution externe pour le labo) ------- 10.21s
+Attendre que les services AD soient disponibles ------------------------- 9.85s
+État du domaine --------------------------------------------------------- 8.29s
+Rôle AD DS + outils d'administration ------------------------------------ 5.53s
+Afficher l'état du domaine ---------------------------------------------- 0.02s

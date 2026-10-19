@@ -1,0 +1,23 @@
+# Preuve : P-12b-dcdiag-tests-fonctionnels-ntp
+# WIN-DC01 via WinRM depuis OPS01 (ansible win_powershell) — 2026-10-19 15:21:21 CEST
+# Script : scripts/verif-dcdiag-ntp.ps1
+
+== Heure du DC : 2026-10-19 15:21:29 +02:00 (Romance Standard Time)
+== Source NTP : 0.fr.pool.ntp.org,0x8 
+|-
+        Stratum: 2 (secondary reference - syncd by (S)NTP)
+        ReferenceId: 0x524375BE (source IP:  82.67.117.190)
+        Last Successful Sync Time: 19/10/2026 15:21:26
+        Source: 0.fr.pool.ntp.org,0x8
+== dcdiag (tests fonctionnels)
+|-
+        ......................... WIN-DC01 passed test Connectivity
+        ......................... WIN-DC01 passed test Advertising
+        ......................... WIN-DC01 passed test SysVolCheck
+        ......................... WIN-DC01 passed test MachineAccount
+        ......................... WIN-DC01 passed test NetLogons
+        ......................... WIN-DC01 passed test RidManager
+        ......................... WIN-DC01 passed test Services
+        ......................... WIN-DC01 passed test DNS
+        ......................... infraready.test passed test DNS
+        ......................... infraready.test passed test FsmoCheck

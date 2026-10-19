@@ -1,0 +1,28 @@
+# Preuve : P-10-adds-installation-foret
+# Exécuté sur OPS01 (utilisateur ansible, ~/infraready/ansible) — 2026-10-19 15:04:59 CEST
+# Commande(s) :
+#   ansible-playbook playbooks/windows_adds.yml
+
+
+PLAY [WIN-DC01 - AD DS et DNS] *************************************************
+
+TASK [Rôle AD DS + outils d'administration] ************************************
+Monday 19 October 2026  15:05:01 +0200 (0:00:00.026)       0:00:00.026 ******** 
+changed: [win-dc01]
+
+TASK [Créer la forêt infraready.test (redémarre le serveur)] *******************
+Monday 19 October 2026  15:09:23 +0200 (0:04:21.473)       0:04:21.500 ******** 
+fatal: [win-dc01]: FAILED! => 
+    changed: false
+    msg: 'Unsupported parameters for (microsoft.ad.domain) module: reboot_timeout. Supported
+        parameters include: log_path, forest_mode, install_dns, dns_domain_name, safe_mode_password,
+        reboot, sysvol_path, create_dns_delegation, domain_netbios_name, database_path,
+        domain_mode'
+
+PLAY RECAP *********************************************************************
+win-dc01                   : ok=1    changed=1    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+
+Monday 19 October 2026  15:09:28 +0200 (0:00:05.322)       0:04:26.823 ******** 
+=============================================================================== 
+Rôle AD DS + outils d'administration ---------------------------------- 261.47s
+Créer la forêt infraready.test (redémarre le serveur) ------------------- 5.32s

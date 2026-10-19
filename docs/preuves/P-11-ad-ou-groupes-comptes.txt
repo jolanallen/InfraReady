@@ -1,0 +1,11 @@
+# Preuve : P-11-ad-ou-groupes-comptes
+# Exécuté sur OPS01 (utilisateur ansible, ~/infraready/ansible) — 2026-10-19 15:14:23 CEST
+# Commande(s) :
+#   ansible win-dc01 -m ansible.windows.win_powershell -a '{"script": "{{ lookup(\"file\", \"../scripts/ad-objets.ps1\") }}", "parameters": {"InitialPassword": "{{ vault_ad_user_password }}"}}' | sed -n '/output:/,/result:/p'
+
+    output:
+    -   Groupe: GG_Support_IT
+        Membres: j.martin, s.bernard
+    -   Groupe: GG_Comptabilite
+        Membres: l.petit, t.moreau
+    result: {}

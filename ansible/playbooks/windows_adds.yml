@@ -1,0 +1,80 @@
+---
+# Phase B — installation d'AD DS et création de la forêt infraready.test sur WIN-DC01.
+# Équivalent PowerShell :
+#   Install-WindowsFeature AD-Domain-Services -IncludeManagementTools
+#   Install-ADDSForest -DomainName infraready.test -DomainNetbiosName INFRAREADY -InstallDns `
+#       -SafeModeAdministratorPassword (Read-Host -AsSecureString) -Force
+#   Set-DnsServerForwarder -IPAddress 1.1.1.1,9.9.9.9
+- name: WIN-DC01 - AD DS et DNS
+  hosts: win-dc01
+  gather_facts: false
+
+  tasks:
+    - name: Rôle AD DS + outils d'administration
+      ansible.windows.win_feature:
+        name: AD-Domain-Services
+        include_management_tools: true
+        state: present
+      register: adds_feature
+
+    - name: Créer la forêt {{ ad_domain }} (redémarre le serveur)
+      microsoft.ad.domain:
+        dns_domain_name: "{{ ad_domain }}"
+        domain_netbios_name: "{{ ad_netbios }}"
+        safe_mode_password: "{{ vault_dsrm_password }}"
+        install_dns: true
+        reboot: true
+
+    - name: Attendre que les services AD soient disponibles
+      ansible.windows.win_powershell:
+        script: |
+          $ErrorActionPreference = 'Stop'
+          for ($i = 0; $i -lt 60; $i++) {
+            try { Get-ADDomain -ErrorAction Stop | Out-Null; $Ansible.Changed = $false; return 'AD prêt' }
+            catch { Start-Sleep -Seconds 10 }
+          }
+          throw 'AD indisponible après 10 minutes'
+
+    - name: Redirecteurs DNS vers Internet (résolution externe pour le labo)
+      ansible.windows.win_powershell:
+        script: |
+          $wanted = @('1.1.1.1', '9.9.9.9')
+          $current = @((Get-DnsServerForwarder).IPAddress.IPAddressToString)
+          if (Compare-Object $current $wanted) {
+            Set-DnsServerForwarder -IPAddress $wanted
+            $Ansible.Changed = $true
+          } else { $Ansible.Changed = $false }
+
+    - name: Source de temps NTP externe (le DC racine sert l'heure à tout le domaine — Kerberos)
+      ansible.windows.win_powershell:
+        script: |
+          $peers = '0.fr.pool.ntp.org,0x8 1.fr.pool.ntp.org,0x8'
+          $current = (Get-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Services\W32Time\Parameters).NtpServer
+          if ($current -ne $peers) {
+            w32tm /config /manualpeerlist:"$($peers -replace ',0x8 ', ',0x8 ')" /syncfromflags:manual /reliable:yes /update | Out-Null
+            Restart-Service w32time
+            w32tm /resync /force | Out-Null
+            $Ansible.Changed = $true
+          } else { $Ansible.Changed = $false }
+
+    - name: Le DC utilise son propre DNS
+      ansible.windows.win_dns_client:
+        adapter_names: "*"
+        dns_servers: ["127.0.0.1"]
+
+    - name: État du domaine
+      ansible.windows.win_powershell:
+        script: |
+          $d = Get-ADDomain
+          [pscustomobject]@{
+            Domaine = $d.DNSRoot; NetBIOS = $d.NetBIOSName; Mode = "$($d.DomainMode)"
+            DC = (Get-ADDomainController).HostName
+            DNS = (Resolve-DnsName $d.DNSRoot -Type A -Server 127.0.0.1).IPAddress -join ','
+          }
+        error_action: stop
+      register: domain_state
+      changed_when: false
+
+    - name: Afficher l'état du domaine
+      ansible.builtin.debug:
+        var: domain_state.output

@@ -1,0 +1,68 @@
+# Preuve : P-13-journaux-windows-ad
+# WIN-DC01 via WinRM depuis OPS01 (ansible win_powershell) — 2026-10-19 15:22:20 CEST
+# Script : scripts/journaux-ad.ps1
+
+== Création de comptes utilisateurs (Security, IDs 4720)
+
+
+        TimeCreated           Id Message
+        -----------           -- -------
+        19/10/2026 15:14:35 4720 A user account was created.
+        19/10/2026 15:14:35 4720 A user account was created.
+        19/10/2026 15:14:35 4720 A user account was created.
+        19/10/2026 15:14:35 4720 A user account was created.
+        19/10/2026 15:11:58 4720 A user account was created.
+        19/10/2026 15:11:58 4720 A user account was created.
+        19/10/2026 23:52:44 4720 A user account was created.
+== Ajout de membres à un groupe global de sécurité (Security, IDs 4728)
+
+
+        TimeCreated           Id Message
+        -----------           -- -------
+        19/10/2026 15:14:35 4728 A member was added to a security-enabled global group.
+        19/10/2026 15:14:35 4728 A member was added to a security-enabled global group.
+        19/10/2026 15:14:35 4728 A member was added to a security-enabled global group.
+        19/10/2026 15:14:35 4728 A member was added to a security-enabled global group.
+        19/10/2026 15:11:58 4728 A member was added to a security-enabled global group.
+        19/10/2026 15:11:58 4728 A member was added to a security-enabled global group.
+        19/10/2026 15:11:58 4728 A member was added to a security-enabled global group.
+        19/10/2026 23:52:44 4728 A member was added to a security-enabled global group.
+== Création de groupes globaux de sécurité (Security, IDs 4727)
+
+
+        TimeCreated           Id Message
+        -----------           -- -------
+        19/10/2026 15:14:34 4727 A security-enabled global group was created.
+        19/10/2026 15:14:34 4727 A security-enabled global group was created.
+        19/10/2026 15:11:58 4727 A security-enabled global group was created.
+        19/10/2026 15:11:58 4727 A security-enabled global group was created.
+        19/10/2026 15:11:58 4727 A security-enabled global group was created.
+        19/10/2026 15:11:58 4727 A security-enabled global group was created.
+        19/10/2026 15:11:58 4727 A security-enabled global group was created.
+        19/10/2026 15:11:58 4727 A security-enabled global group was created.
+== Démarrage AD DS / événements annuaire (Directory Service, IDs 1000,1394,2887)
+
+
+        TimeCreated           Id Message
+        -----------           -- -------
+        19/10/2026 15:12:37 1394 All problems preventing updates to the Active Directory Domain Services database have been cleared. New updates to the Active Directory Domain
+                                 Services database are succeeding. The Net Logon service has restarted.
+        19/10/2026 15:12:07 1000 Microsoft Active Directory Domain Services startup complete
+        19/10/2026 15:10:31 1000 Microsoft Active Directory Domain Services startup complete
+== Démarrage du service DNS / zones chargées (DNS Server, IDs 2,4)
+
+
+        TimeCreated         Id Message
+        -----------         -- -------
+        19/10/2026 15:12:38  2 The DNS server has started.
+        19/10/2026 15:12:38  4 The DNS server has finished the background loading and signing of zones. All zones are now available for DNS updates and zone transfers, as
+                               allowed by their individual zone configuration.
+== Redémarrages demandés (promotion DC) (System, IDs 1074)
+
+
+        TimeCreated           Id Message
+        -----------           -- -------
+        19/10/2026 15:10:51 1074 The process C:\WINDOWS\system32\shutdown.exe (WIN-DC01) has initiated the restart of computer WIN-DC01 on behalf of user WIN-DC01\Administrator
+                                 for the following reason: No title for this reason could be found
+        19/10/2026 14:54:33 1074 The process C:\WINDOWS\system32\winlogon.exe (INFRARE-4EI77HH) has initiated the restart of computer INFRARE-4EI77HH on behalf of user NT
+                                 AUTHORITY\SYSTEM for the following reason: Operating System: Upgrade (Planned)
