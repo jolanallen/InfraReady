@@ -623,7 +623,7 @@ Retour arrière disponible : `/root/infraready.nginx.bak-incident-h` sur LINUX01
 
 - [x] VM du laboratoire uniquement, aucun système externe — seules les VM 100 à 102 ont été modifiées ; les autres VM de l'hôte n'ont pas été touchées.
 - [x] Cibles contrôlées avant formatage / partitionnement — disques système vérifiés vides avant installation ; disque de test identifié par numéro de série + 5 contrôles avec arrêt automatique.
-- [x] Snapshots avant changements majeurs — `s01_installation_ok`, `s02_avant_adds`, `s02_avant_maj_c`, `s03_avant_ansible`.
+- [x] Snapshots avant changements majeurs — `s01_installation_ok`, `s02_avant_adds`, `s02_avant_maj_c`, `s02_avant_monitoring`, `s03_avant_ansible`, `s04_avant_maintenance_e`, `s04_avant_maj_windows` ; état final figé dans `s05_phases_a_h_terminees` (arbre complet : [P-05](docs/preuves/P-05-proxmox-snapshots-arbre-complet.txt)).
 - [x] Moindre privilège — comptes Linux verrouillés, droits par groupe, chloe lit sans écrire, support IT en lecture seule sur le partage Compta, compte `ansible` dédié.
 - [x] Ports limités au strict besoin — UFW sur LINUX01 (refus par défaut), WinRM/ICMP limités au labo, exporters limités à OPS01, labo isolé du réseau domestique.
 - [x] Aucun secret en clair dans Git ou dans ce dossier — vault AES256, modèles avec `__PLACEHOLDERS__`, fichiers de réponse supprimés après usage, recherche des vrais secrets avant chaque commit, gitleaks dans la CI.
@@ -660,6 +660,7 @@ Retour arrière disponible : `/root/infraready.nginx.bak-incident-h` sur LINUX01
 | P-03 | 19/10/2026 | Capture : WIN-DC01 installé, Server Manager | [P-03](docs/preuves/P-03-win-dc01-installe-server-manager.png) |
 | P-04 | 19/10/2026 | LINUX01 : DNS du domaine (A, PTR, SRV) | [P-04](docs/preuves/P-04-linux01-resolution-dns-domaine.txt) |
 | P-04b | 19/10/2026 | OPS01 : DNS du domaine (A, PTR, SRV) | [P-04b](docs/preuves/P-04b-ops01-resolution-dns-domaine.txt) |
+| P-05 | 19/10/2026 | Arbre complet des snapshots Proxmox des 3 VM, snapshot final s05 | [P-05](docs/preuves/P-05-proxmox-snapshots-arbre-complet.txt) |
 | P-04c | 19/10/2026 | WIN-DC01 : IP, ping et résolution des serveurs | [P-04c](docs/preuves/P-04c-win-dc01-ip-dns.txt) |
 | P-10a | 19/10/2026 | 1er essai de promotion en échec (`reboot_timeout`) | [P-10a](docs/preuves/P-10a-adds-premier-essai-echec-reboot_timeout.txt) |
 | P-10 | 19/10/2026 | Installation AD DS + forêt infraready.test | [P-10](docs/preuves/P-10-adds-installation-foret.txt) |
@@ -772,6 +773,7 @@ InfraReady/
 | 19/10/2026 19:21 | [Nom] | `reject_list: [KB5007651]` + gabarit du rapport Windows | `failed=0`, rapport lisible | P-42c / — |
 | 19/10/2026 19:27 | [Nom] | Incident contrôlé : `root` nginx modifié sur LINUX01 | 404 constaté depuis OPS01 | P-70 / `/root/infraready.nginx.bak-incident-h` |
 | 19/10/2026 19:30 | [Nom] | `flush_handlers` avant les vérifications dans `linux_base.yml` ; rejeu sur LINUX01 | HTTP 200, `changed=0` au 2ᵉ passage | P-72, P-73 / — |
+| 19/10/2026 19:37 | [Nom] | Snapshot final des 3 VM | `qm listsnapshot` | P-05 / `s05_phases_a_h_terminees` |
 
 **Annexes** : sorties complètes dans `docs/preuves/`, modèles d'installation dans `lab/`, configurations dans `ansible/` et `monitoring/`.
 

@@ -1,0 +1,59 @@
+# Preuve : P-05-proxmox-snapshots-arbre-complet
+# Exécuté sur l'hôte Proxmox corsair1 (root via sudo) — 2026-10-19 19:37 CEST
+# Commande(s) :
+#   qm list
+#   qm listsnapshot 100 ; qm listsnapshot 101 ; qm listsnapshot 102
+#   qm snapshot <vmid> s05_phases_a_h_terminees --description "Etat final : phases A a H terminees et documentees"
+# Lecture : chaque changement majeur a son point de retour (s01 à s04) ; s05 fige l'état final livré.
+
+      VMID NAME                 STATUS     MEM(MB)    BOOTDISK(GB) PID       
+       100 WIN-DC01             running    6144              50.00 48073     
+       101 LINUX01              running    4096              30.00 52193     
+       102 OPS01                running    6144              50.00 52319     
+
+--- qm listsnapshot 100 ---
+`-> s01_installation_ok         2026-10-19 14:58:55     OS installe, IP fixe, avant configuration
+ `-> s02_avant_adds             2026-10-19 15:03:47     Avant installation AD DS et promotion DC
+  `-> s03_avant_ansible         2026-10-19 15:26:05     Avant premier passage des playbooks (phase D)
+   `-> s04_avant_maj_windows    2026-10-19 16:54:20     Avant Windows Update (phase E) - KB5126646
+    `-> s05_phases_a_h_terminees 2026-10-19 19:37:15     Etat final : phases A a H terminees et documentees (19/10/2026 soir)
+     `-> current                                        You are here!
+
+--- qm listsnapshot 101 ---
+`-> s01_installation_ok         2026-10-19 14:58:56     OS installe, IP fixe, avant configuration
+ `-> s02_avant_maj_c            2026-10-19 15:24:47     Avant mise a jour apt (phase C)
+  `-> s03_avant_ansible         2026-10-19 15:26:06     Avant premier passage des playbooks (phase D)
+   `-> s04_avant_maintenance_e  2026-10-19 16:48:12     Avant maintenance standard (phase E)
+    `-> s05_phases_a_h_terminees 2026-10-19 19:37:15     Etat final : phases A a H terminees et documentees (19/10/2026 soir)
+     `-> current                                        You are here!
+
+--- qm listsnapshot 102 ---
+`-> s01_installation_ok         2026-10-19 14:58:57     OS installe, IP fixe, avant configuration
+ `-> s02_avant_monitoring       2026-10-19 16:30:12     Avant Prometheus/Grafana (phase F)
+  `-> s04_avant_maintenance_e   2026-10-19 16:48:13     Avant maintenance standard (phase E)
+   `-> s05_phases_a_h_terminees 2026-10-19 19:37:16     Etat final : phases A a H terminees et documentees (19/10/2026 soir)
+    `-> current                                         You are here!
+
+--- création de s05 (19:37) ---
+Mon Oct 19 07:37:14 PM CEST 2026
+snapshotting 'drive-ide0' (pool-ssd:vm-100-disk-1)
+snapshotting 'drive-efidisk0' (pool-ssd:vm-100-disk-0)
+snapshotting 'drive-tpmstate0' (pool-ssd:vm-100-disk-2)
+VM 100 : snapshot OK
+snapshotting 'drive-scsi0' (pool-ssd:vm-101-disk-0)
+snapshotting 'drive-scsi1' (pool-ssd:vm-101-disk-1)
+VM 101 : snapshot OK
+snapshotting 'drive-scsi0' (pool-ssd:vm-102-disk-0)
+VM 102 : snapshot OK
+--- VM 100 ---
+   `-> s04_avant_maj_windows    2026-10-19 16:54:20     Avant Windows Update (phase E) - KB5126646
+    `-> s05_phases_a_h_terminees 2026-10-19 19:37:15     Etat final : phases A a H terminees et documentees (19/10/2026 soir)
+     `-> current                                        You are here!
+--- VM 101 ---
+   `-> s04_avant_maintenance_e  2026-10-19 16:48:12     Avant maintenance standard (phase E)
+    `-> s05_phases_a_h_terminees 2026-10-19 19:37:15     Etat final : phases A a H terminees et documentees (19/10/2026 soir)
+     `-> current                                        You are here!
+--- VM 102 ---
+  `-> s04_avant_maintenance_e   2026-10-19 16:48:13     Avant maintenance standard (phase E)
+   `-> s05_phases_a_h_terminees 2026-10-19 19:37:16     Etat final : phases A a H terminees et documentees (19/10/2026 soir)
+    `-> current                                         You are here!
