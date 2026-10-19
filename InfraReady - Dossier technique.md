@@ -660,8 +660,8 @@ Retour arrière disponible : `/root/infraready.nginx.bak-incident-h` sur LINUX01
 | P-03 | 19/10/2026 | Capture : WIN-DC01 installé, Server Manager | [P-03](docs/preuves/P-03-win-dc01-installe-server-manager.png) |
 | P-04 | 19/10/2026 | LINUX01 : DNS du domaine (A, PTR, SRV) | [P-04](docs/preuves/P-04-linux01-resolution-dns-domaine.txt) |
 | P-04b | 19/10/2026 | OPS01 : DNS du domaine (A, PTR, SRV) | [P-04b](docs/preuves/P-04b-ops01-resolution-dns-domaine.txt) |
-| P-05 | 19/10/2026 | Arbre complet des snapshots Proxmox des 3 VM, snapshot final s05 | [P-05](docs/preuves/P-05-proxmox-snapshots-arbre-complet.txt) |
 | P-04c | 19/10/2026 | WIN-DC01 : IP, ping et résolution des serveurs | [P-04c](docs/preuves/P-04c-win-dc01-ip-dns.txt) |
+| P-05 | 19/10/2026 | Arbre complet des snapshots Proxmox des 3 VM, snapshot final s05 | [P-05](docs/preuves/P-05-proxmox-snapshots-arbre-complet.txt) |
 | P-10a | 19/10/2026 | 1er essai de promotion en échec (`reboot_timeout`) | [P-10a](docs/preuves/P-10a-adds-premier-essai-echec-reboot_timeout.txt) |
 | P-10 | 19/10/2026 | Installation AD DS + forêt infraready.test | [P-10](docs/preuves/P-10-adds-installation-foret.txt) |
 | P-11 | 19/10/2026 | OU, groupes, comptes AD | [P-11](docs/preuves/P-11-ad-ou-groupes-comptes.txt) |
