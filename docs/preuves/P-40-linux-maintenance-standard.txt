@@ -1,0 +1,194 @@
+# Preuve : P-40-linux-maintenance-standard
+# Exécuté sur OPS01 (utilisateur ansible, ~/infraready/ansible) — 2026-10-19 16:48:13 CEST
+# Commande(s) :
+#   ansible-playbook playbooks/linux_maintenance.yml
+
+
+PLAY [Maintenance Linux] *******************************************************
+
+TASK [Gathering Facts] *********************************************************
+Monday 19 October 2026  16:48:16 +0200 (0:00:00.008)       0:00:00.008 ******** 
+ok: [linux01]
+
+TASK [Occupation des systèmes de fichiers] *************************************
+Monday 19 October 2026  16:48:18 +0200 (0:00:01.764)       0:00:01.773 ******** 
+ok: [linux01]
+
+TASK [Calcul du pourcentage utilisé par montage] *******************************
+Monday 19 October 2026  16:48:18 +0200 (0:00:00.048)       0:00:01.821 ******** 
+ok: [linux01] => (item=/)
+ok: [linux01] => (item=/boot)
+ok: [linux01] => (item=/data)
+
+TASK [Espace disque suffisant avant mise à jour] *******************************
+Monday 19 October 2026  16:48:18 +0200 (0:00:00.057)       0:00:01.878 ******** 
+ok: [linux01]
+
+TASK [État des services avant maintenance] *************************************
+Monday 19 October 2026  16:48:18 +0200 (0:00:00.039)       0:00:01.918 ******** 
+ok: [linux01]
+
+TASK [Les services attendus sont actifs avant maintenance] *********************
+Monday 19 October 2026  16:48:21 +0200 (0:00:02.694)       0:00:04.612 ******** 
+ok: [linux01] => (item=ssh)
+ok: [linux01] => (item=nginx)
+ok: [linux01] => (item=prometheus-node-exporter)
+
+TASK [Paquet unattended-upgrades] **********************************************
+Monday 19 October 2026  16:48:21 +0200 (0:00:00.037)       0:00:04.650 ******** 
+ok: [linux01]
+
+TASK [Mises à jour de sécurité automatiques quotidiennes, sans redémarrage automatique] ***
+Monday 19 October 2026  16:48:22 +0200 (0:00:00.929)       0:00:05.580 ******** 
+changed: [linux01]
+
+TASK [Mise à jour des index et des paquets (upgrade, sans suppression)] ********
+Monday 19 October 2026  16:48:23 +0200 (0:00:00.616)       0:00:06.197 ******** 
+ok: [linux01]
+
+TASK [Suppression des dépendances devenues inutiles] ***************************
+Monday 19 October 2026  16:48:27 +0200 (0:00:04.192)       0:00:10.389 ******** 
+ok: [linux01]
+
+TASK [Redémarrage requis ?] ****************************************************
+Monday 19 October 2026  16:48:28 +0200 (0:00:01.094)       0:00:11.483 ******** 
+ok: [linux01]
+
+TASK [Redémarrage (uniquement si demandé ET autorisé par -e allow_reboot=true)] ***
+Monday 19 October 2026  16:48:28 +0200 (0:00:00.189)       0:00:11.673 ******** 
+skipping: [linux01]
+
+TASK [État des services après maintenance] *************************************
+Monday 19 October 2026  16:48:28 +0200 (0:00:00.041)       0:00:11.714 ******** 
+ok: [linux01]
+
+TASK [Les services attendus sont actifs après maintenance] *********************
+Monday 19 October 2026  16:48:31 +0200 (0:00:02.539)       0:00:14.253 ******** 
+ok: [linux01] => (item=ssh)
+ok: [linux01] => (item=nginx)
+ok: [linux01] => (item=prometheus-node-exporter)
+
+TASK [Le site web répond toujours (LINUX01)] ***********************************
+Monday 19 October 2026  16:48:31 +0200 (0:00:00.039)       0:00:14.293 ******** 
+ok: [linux01 -> localhost]
+
+TASK [Dossier des rapports sur le nœud de contrôle] ****************************
+Monday 19 October 2026  16:48:31 +0200 (0:00:00.414)       0:00:14.707 ******** 
+ok: [linux01 -> localhost]
+
+TASK [Rapport de maintenance] **************************************************
+Monday 19 October 2026  16:48:31 +0200 (0:00:00.293)       0:00:15.001 ******** 
+changed: [linux01 -> localhost]
+
+TASK [Résumé] ******************************************************************
+Monday 19 October 2026  16:48:32 +0200 (0:00:00.380)       0:00:15.382 ******** 
+ok: [linux01] => 
+    msg: 'linux01 : disques 29.1 % max, paquets à jour, reboot requis=False'
+
+PLAY [Maintenance Linux] *******************************************************
+
+TASK [Gathering Facts] *********************************************************
+Monday 19 October 2026  16:48:32 +0200 (0:00:00.087)       0:00:15.469 ******** 
+ok: [ops01]
+
+TASK [Occupation des systèmes de fichiers] *************************************
+Monday 19 October 2026  16:48:33 +0200 (0:00:00.853)       0:00:16.323 ******** 
+ok: [ops01]
+
+TASK [Calcul du pourcentage utilisé par montage] *******************************
+Monday 19 October 2026  16:48:33 +0200 (0:00:00.044)       0:00:16.367 ******** 
+ok: [ops01] => (item=/)
+ok: [ops01] => (item=/boot)
+
+TASK [Espace disque suffisant avant mise à jour] *******************************
+Monday 19 October 2026  16:48:33 +0200 (0:00:00.046)       0:00:16.414 ******** 
+ok: [ops01]
+
+TASK [État des services avant maintenance] *************************************
+Monday 19 October 2026  16:48:33 +0200 (0:00:00.038)       0:00:16.453 ******** 
+ok: [ops01]
+
+TASK [Les services attendus sont actifs avant maintenance] *********************
+Monday 19 October 2026  16:48:35 +0200 (0:00:02.633)       0:00:19.087 ******** 
+ok: [ops01] => (item=ssh)
+ok: [ops01] => (item=prometheus)
+ok: [ops01] => (item=grafana-server)
+ok: [ops01] => (item=prometheus-node-exporter)
+
+TASK [Paquet unattended-upgrades] **********************************************
+Monday 19 October 2026  16:48:35 +0200 (0:00:00.043)       0:00:19.130 ******** 
+ok: [ops01]
+
+TASK [Mises à jour de sécurité automatiques quotidiennes, sans redémarrage automatique] ***
+Monday 19 October 2026  16:48:36 +0200 (0:00:00.828)       0:00:19.959 ******** 
+changed: [ops01]
+
+TASK [Mise à jour des index et des paquets (upgrade, sans suppression)] ********
+Monday 19 October 2026  16:48:37 +0200 (0:00:00.385)       0:00:20.345 ******** 
+changed: [ops01]
+
+TASK [Suppression des dépendances devenues inutiles] ***************************
+Monday 19 October 2026  16:49:09 +0200 (0:00:32.173)       0:00:52.518 ******** 
+ok: [ops01]
+
+TASK [Redémarrage requis ?] ****************************************************
+Monday 19 October 2026  16:49:10 +0200 (0:00:01.161)       0:00:53.679 ******** 
+ok: [ops01]
+
+TASK [Redémarrage (uniquement si demandé ET autorisé par -e allow_reboot=true)] ***
+Monday 19 October 2026  16:49:10 +0200 (0:00:00.196)       0:00:53.876 ******** 
+skipping: [ops01]
+
+TASK [État des services après maintenance] *************************************
+Monday 19 October 2026  16:49:10 +0200 (0:00:00.044)       0:00:53.920 ******** 
+ok: [ops01]
+
+TASK [Les services attendus sont actifs après maintenance] *********************
+Monday 19 October 2026  16:49:13 +0200 (0:00:02.623)       0:00:56.544 ******** 
+ok: [ops01] => (item=ssh)
+ok: [ops01] => (item=prometheus)
+ok: [ops01] => (item=grafana-server)
+ok: [ops01] => (item=prometheus-node-exporter)
+
+TASK [Le site web répond toujours (LINUX01)] ***********************************
+Monday 19 October 2026  16:49:13 +0200 (0:00:00.043)       0:00:56.587 ******** 
+skipping: [ops01]
+
+TASK [Dossier des rapports sur le nœud de contrôle] ****************************
+Monday 19 October 2026  16:49:13 +0200 (0:00:00.021)       0:00:56.609 ******** 
+ok: [ops01 -> localhost]
+
+TASK [Rapport de maintenance] **************************************************
+Monday 19 October 2026  16:49:13 +0200 (0:00:00.207)       0:00:56.816 ******** 
+changed: [ops01 -> localhost]
+
+TASK [Résumé] ******************************************************************
+Monday 19 October 2026  16:49:14 +0200 (0:00:00.396)       0:00:57.212 ******** 
+ok: [ops01] => 
+    msg: 'ops01 : disques 26.1 % max, paquets mis à jour, reboot requis=False'
+
+PLAY RECAP *********************************************************************
+linux01                    : ok=17   changed=2    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+ops01                      : ok=16   changed=3    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
+
+Monday 19 October 2026  16:49:14 +0200 (0:00:00.063)       0:00:57.276 ******** 
+=============================================================================== 
+Mise à jour des index et des paquets (upgrade, sans suppression) ------- 36.37s
+État des services avant maintenance ------------------------------------- 5.33s
+État des services après maintenance ------------------------------------- 5.16s
+Suppression des dépendances devenues inutiles --------------------------- 2.26s
+Gathering Facts --------------------------------------------------------- 1.77s
+Paquet unattended-upgrades ---------------------------------------------- 1.76s
+Mises à jour de sécurité automatiques quotidiennes, sans redémarrage automatique --- 1.00s
+Gathering Facts --------------------------------------------------------- 0.85s
+Rapport de maintenance -------------------------------------------------- 0.78s
+Dossier des rapports sur le nœud de contrôle ---------------------------- 0.50s
+Le site web répond toujours (LINUX01) ----------------------------------- 0.44s
+Redémarrage requis ? ---------------------------------------------------- 0.39s
+Résumé ------------------------------------------------------------------ 0.15s
+Calcul du pourcentage utilisé par montage ------------------------------- 0.10s
+Occupation des systèmes de fichiers ------------------------------------- 0.09s
+Redémarrage (uniquement si demandé ET autorisé par -e allow_reboot=true) --- 0.09s
+Les services attendus sont actifs après maintenance --------------------- 0.08s
+Les services attendus sont actifs avant maintenance --------------------- 0.08s
+Espace disque suffisant avant mise à jour ------------------------------- 0.08s

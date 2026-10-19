@@ -1,0 +1,158 @@
+---
+# Phase E — maintenance standard de WIN-DC01 (voir docs/procedure-maintenance.md).
+# Par défaut : pré-contrôles + RECHERCHE des mises à jour seulement. Installation avec -e maintenance_apply=true,
+# redémarrage géré par Ansible uniquement avec -e allow_reboot=true. Snapshot Proxmox à prendre AVANT.
+- name: Maintenance Windows
+  hosts: windows
+  gather_facts: true
+
+  vars:
+    maintenance_apply: false
+    allow_reboot: false
+    disk_max_percent: 85
+    services_critiques: [NTDS, DNS, Netlogon, kdc, windows_exporter]
+    wu_categories: [SecurityUpdates, CriticalUpdates, UpdateRollups, DefinitionUpdates]
+    rapport_dir: "{{ lookup('ansible.builtin.env', 'HOME') }}/infraready-logs"
+
+  tasks:
+    # --- Pré-contrôles ------------------------------------------------------------
+    - name: Occupation des volumes
+      ansible.windows.win_powershell:
+        script: |
+          # Disques fixes uniquement : le lecteur CD vide apparaît comme un volume E: de 0 octet (P-41a)
+          Get-Volume | Where-Object { $_.DriveLetter -and $_.DriveType -eq 'Fixed' -and $_.Size -gt 0 } | ForEach-Object {
+            [pscustomobject]@{ Lettre = $_.DriveLetter; TailleGo = [math]::Round($_.Size/1GB,1)
+                               LibreGo = [math]::Round($_.SizeRemaining/1GB,1)
+                               Pct = [math]::Round((1 - $_.SizeRemaining/$_.Size)*100,1) } }
+      register: volumes
+      changed_when: false
+
+    - name: Espace disque suffisant avant mise à jour
+      ansible.builtin.assert:
+        that: volumes.output | map(attribute='Pct') | max < disk_max_percent
+        fail_msg: "Un volume dépasse {{ disk_max_percent }} % : {{ volumes.output }}"
+        quiet: true
+
+    - name: Services critiques avant maintenance
+      ansible.windows.win_service_info:
+        name: "{{ item }}"
+      loop: "{{ services_critiques }}"
+      register: svc_avant
+
+    - name: Les services critiques sont démarrés avant maintenance
+      ansible.builtin.assert:
+        that: item.services[0].state == 'started'
+        fail_msg: "{{ item.item }} n'est pas démarré — arrêt de la maintenance"
+        quiet: true
+      loop: "{{ svc_avant.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Aucun redémarrage déjà en attente (clés de registre CBS / Windows Update)
+      ansible.windows.win_powershell:
+        script: |
+          $keys = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending',
+                  'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired'
+          ($keys | Where-Object { Test-Path $_ }).Count -gt 0
+      register: reboot_pending
+      changed_when: false
+
+    - name: Pas de redémarrage en attente avant de commencer
+      ansible.builtin.assert:
+        that: not reboot_pending.output[0]
+        fail_msg: "Un redémarrage est déjà en attente : le faire avant la maintenance"
+        quiet: true
+
+    # --- Windows Update -----------------------------------------------------------
+    - name: Recherche des mises à jour disponibles (sans installation)
+      ansible.windows.win_updates:
+        category_names: "{{ wu_categories }}"
+        state: searched
+        log_path: C:\Windows\Temp\infraready-windowsupdate.log
+      register: wu_search
+
+    - name: Mises à jour trouvées
+      ansible.builtin.debug:
+        msg: "{{ wu_search.found_update_count }} mise(s) à jour : {{ wu_search.updates.values() | map(attribute='title') | list }}"
+
+    - name: Installation des mises à jour (uniquement avec -e maintenance_apply=true)
+      ansible.windows.win_updates:
+        category_names: "{{ wu_categories }}"
+        state: installed
+        reboot: "{{ allow_reboot | bool }}"
+        reboot_timeout: 1800
+        log_path: C:\Windows\Temp\infraready-windowsupdate.log
+      register: wu_install
+      when: maintenance_apply | bool
+
+    # --- Post-contrôles -----------------------------------------------------------
+    - name: Services critiques après maintenance
+      ansible.windows.win_service_info:
+        name: "{{ item }}"
+      loop: "{{ services_critiques }}"
+      register: svc_apres
+
+    - name: Les services critiques sont démarrés après maintenance
+      ansible.builtin.assert:
+        that: item.services[0].state == 'started'
+        fail_msg: "{{ item.item }} n'est plus démarré après la maintenance"
+        quiet: true
+      loop: "{{ svc_apres.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Le domaine répond (Get-ADDomain) et la résolution DNS fonctionne
+      ansible.windows.win_powershell:
+        script: |
+          $d = Get-ADDomain
+          $r = (Resolve-DnsName $d.DNSRoot -Type A -Server 127.0.0.1).IPAddress
+          "Domaine $($d.DNSRoot) OK — DNS -> $r"
+      changed_when: false
+      register: ad_check
+
+    - name: Historique Windows Update récent
+      ansible.windows.win_powershell:
+        script: |
+          $s = New-Object -ComObject Microsoft.Update.Session
+          $s.CreateUpdateSearcher().QueryHistory(0, 10) | Where-Object Title |
+            ForEach-Object { "{0:yyyy-MM-dd HH:mm}  code={1}  {2}" -f $_.Date, $_.ResultCode, $_.Title }
+      changed_when: false
+      register: wu_history
+
+    # --- Trace --------------------------------------------------------------------
+    - name: Dossier des rapports sur le nœud de contrôle
+      ansible.builtin.file:
+        path: "{{ rapport_dir }}"
+        state: directory
+        mode: "0750"
+      delegate_to: localhost
+
+    - name: Rapport de maintenance
+      ansible.builtin.copy:
+        dest: "{{ rapport_dir }}/maintenance-{{ inventory_hostname }}-{{ ansible_date_time.iso8601_basic_short }}.txt"
+        mode: "0640"
+        content: |
+          Rapport de maintenance InfraReady — {{ inventory_hostname }} ({{ ansible_host }})
+          Date      : {{ ansible_date_time.iso8601 }}
+          Système   : {{ ansible_os_name }} ({{ ansible_kernel }})
+          Volumes   : {% for v in volumes.output %}{{ v.Lettre }}:={{ v.Pct }}% ({{ v.LibreGo }} Go libres) {% endfor %}
+
+          Services  : {{ services_critiques | join(', ') }} -> OK
+          Recherche : {{ wu_search.found_update_count }} mise(s) à jour disponible(s)
+          {% for u in wu_search.updates.values() %}  - {{ u.title }}
+          {% endfor %}
+          {% if maintenance_apply | bool %}
+          Installation : {{ wu_install.installed_update_count }} installée(s), redémarrage requis={{ wu_install.reboot_required }}
+          {% else %}
+          Installation : non (recherche seulement)
+          {% endif %}
+          Contrôle AD : {{ ad_check.output[0] }}
+          --- Historique Windows Update (10 derniers) ---
+          {{ wu_history.output | join('\n') }}
+      delegate_to: localhost
+
+    - name: Résumé
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }} : volumes {{ volumes.output | map(attribute='Pct') | max }} % max,
+          {{ wu_search.found_update_count }} MAJ disponibles, appliquées={{ maintenance_apply }}

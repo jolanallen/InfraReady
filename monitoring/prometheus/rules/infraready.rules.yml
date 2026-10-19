@@ -9,6 +9,15 @@ groups:
           summary: "{{ $labels.host }} ne répond plus ({{ $labels.instance }})"
           description: "La cible {{ $labels.job }} de {{ $labels.host }} est injoignable depuis plus d'1 minute."
 
+      # windows_exporter (collecteur service) : état des services du contrôleur de domaine
+      - alert: ServiceWindowsCritiqueArrete
+        expr: windows_service_state{name=~"DNS|NTDS|Netlogon|Kdc", state="running"} == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "Service {{ $labels.name }} arrêté sur {{ $labels.host }}"
+          description: "Le service Windows {{ $labels.name }} n'est plus en cours d'exécution depuis 1 minute."
+
       - alert: CpuEleve
         expr: |
           (100 - avg by (host) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100) > 80

@@ -1,0 +1,45 @@
+# Preuve : P-43-linux01-mises-a-jour-automatiques-unattended
+# Hôte : linux01 (root via sudo) — 2026-10-19 16:50:15 CEST
+# Commandes :
+#   echo "== Configuration déployée par Ansible"; cat /etc/apt/apt.conf.d/52infraready-unattended
+#   echo; echo "== Origines autorisées (sécurité uniquement, config Ubuntu par défaut)"; grep -E "^\s*\"\\$\{distro_id\}" /etc/apt/apt.conf.d/50unattended-upgrades
+#   echo; echo "== Minuteries systemd (exécution quotidienne)"; systemctl list-timers apt-daily.timer apt-daily-upgrade.timer --no-pager | head -4
+#   echo; echo "== Simulation (dry-run) : ce que unattended-upgrades ferait maintenant"; unattended-upgrade --dry-run 2>&1 | tail -3; echo "code retour : $?"
+#   echo; echo "== Journal unattended-upgrades"; tail -n 5 /var/log/unattended-upgrades/unattended-upgrades.log 2>/dev/null || echo "(pas encore d exécution planifiée : installé aujourd hui)"
+#   echo; echo "== Historique apt (dernière opération)"; grep -A3 "^Start-Date" /var/log/apt/history.log | tail -4 | cut -c1-150
+
+== Configuration déployée par Ansible
+// Géré par Ansible (linux_maintenance.yml)
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+APT::Periodic::AutocleanInterval "7";
+Unattended-Upgrade::Automatic-Reboot "false";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+
+== Origines autorisées (sécurité uniquement, config Ubuntu par défaut)
+	"${distro_id}:${distro_codename}";
+	"${distro_id}:${distro_codename}-security";
+	"${distro_id}ESMApps:${distro_codename}-apps-security";
+	"${distro_id}ESM:${distro_codename}-infra-security";
+
+== Minuteries systemd (exécution quotidienne)
+NEXT                         LEFT LAST PASSED UNIT                    ACTIVATES
+Mon 2026-10-19 23:27:37 CEST   6h -         - apt-daily.timer         apt-daily.service
+Tue 2026-10-20 06:39:14 CEST  13h -         - apt-daily-upgrade.timer apt-daily-upgrade.service
+
+
+== Simulation (dry-run) : ce que unattended-upgrades ferait maintenant
+code retour : 0
+
+== Journal unattended-upgrades
+2026-10-19 16:50:18,674 INFO Allowed origins are: o=Ubuntu,a=noble, o=Ubuntu,a=noble-security, o=UbuntuESMApps,a=noble-apps-security, o=UbuntuESM,a=noble-infra-security
+2026-10-19 16:50:18,674 INFO Initial blacklist: 
+2026-10-19 16:50:18,674 INFO Initial whitelist (not strict): 
+2026-10-19 16:50:19,485 INFO No packages found that can be upgraded unattended and no pending auto-removals
+2026-10-19 16:50:19,485 INFO The list of kept packages can't be calculated in dry-run mode.
+
+== Historique apt (dernière opération)
+Start-Date: 2026-10-19  15:26:21
+Commandline: /usr/bin/apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold install acl=2.3.2-1build1.1 prometheus-node-exp
+Requested-By: ansible (1001)
+Install: libtimedate-perl:amd64 (2.3300-2, automatic), libsnmp-base:amd64 (5.9.4+dfsg-1.1ubuntu3.2, automatic), libtime-duration-perl:amd64 (1.21-2, a

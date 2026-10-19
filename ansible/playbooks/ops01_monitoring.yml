@@ -1,0 +1,234 @@
+---
+# Phase F — Prometheus + Grafana sur OPS01 (nœud de contrôle, connexion locale).
+# Les fichiers de configuration viennent du dépôt (monitoring/) : la supervision est versionnée.
+- name: OPS01 - Prometheus et Grafana
+  hosts: monitoring
+  gather_facts: true
+
+  vars:
+    repo_monitoring: "{{ playbook_dir }}/../../monitoring"
+    grafana_dashboards_dir: /var/lib/grafana/dashboards/infraready
+
+  tasks:
+    # --- Prometheus (paquet Ubuntu 24.04) ---------------------------------------
+    - name: Paquets Prometheus et node_exporter local
+      ansible.builtin.apt:
+        name: [prometheus, prometheus-node-exporter]
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Dossier des règles d'alerte
+      ansible.builtin.file:
+        path: /etc/prometheus/rules
+        state: directory
+        owner: root
+        group: prometheus
+        mode: "0750"
+
+    - name: Configuration Prometheus (cibles) depuis le dépôt
+      ansible.builtin.copy:
+        src: "{{ repo_monitoring }}/prometheus/prometheus.yml"
+        dest: /etc/prometheus/prometheus.yml
+        owner: root
+        group: prometheus
+        mode: "0640"
+      notify: Redémarrer prometheus
+
+    - name: Règles d'alerte depuis le dépôt
+      ansible.builtin.copy:
+        src: "{{ repo_monitoring }}/prometheus/rules/infraready.rules.yml"
+        dest: /etc/prometheus/rules/infraready.rules.yml
+        owner: root
+        group: prometheus
+        mode: "0640"
+      notify: Redémarrer prometheus
+
+    - name: Valider la configuration avant tout redémarrage (promtool)
+      ansible.builtin.command: promtool check config /etc/prometheus/prometheus.yml
+      changed_when: false
+
+    - name: Prometheus et node_exporter démarrés et activés
+      ansible.builtin.service:
+        name: "{{ item }}"
+        state: started
+        enabled: true
+      loop: [prometheus, prometheus-node-exporter]
+
+    # --- Grafana (dépôt officiel) ---------------------------------------------
+    - name: Clé de signature du dépôt Grafana
+      ansible.builtin.get_url:
+        url: https://apt.grafana.com/gpg.key
+        dest: /etc/apt/keyrings/grafana.asc
+        mode: "0644"
+
+    - name: Dépôt APT Grafana
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/grafana.asc] https://apt.grafana.com stable main"
+        filename: grafana
+        state: present
+
+    - name: Paquet grafana
+      ansible.builtin.apt:
+        name: grafana
+        state: present
+        update_cache: true
+
+    # Le mot de passe ne doit contenir ni « # » ni « ; » (début de commentaire dans un .ini) ni guillemet (P-50a).
+    # Pris en compte à la création de la base Grafana (premier démarrage) ; sinon : grafana-cli admin reset-admin-password.
+    - name: Le mot de passe admin Grafana ne contient aucun caractère ambigu pour un fichier .ini
+      ansible.builtin.assert:
+        that: vault_grafana_admin_password is not search('[#;"\']')
+        fail_msg: "vault_grafana_admin_password contient # ; ou un guillemet : choisir un autre mot de passe"
+        quiet: true
+
+    - name: Mot de passe admin initial
+      community.general.ini_file:
+        path: /etc/grafana/grafana.ini
+        section: security
+        option: admin_password
+        value: "{{ vault_grafana_admin_password }}"
+        owner: root
+        group: grafana
+        mode: "0640"
+      no_log: true
+      notify: Redémarrer grafana
+
+    # Affichage du dashboard sans compte (lecture seule), accès déjà limité au labo par UFW ;
+    # toute modification reste réservée au compte admin.
+    - name: Accès anonyme en lecture seule (rôle Viewer)
+      community.general.ini_file:
+        path: /etc/grafana/grafana.ini
+        section: auth.anonymous
+        option: "{{ item.option }}"
+        value: "{{ item.value }}"
+        owner: root
+        group: grafana
+        mode: "0640"
+      loop:
+        - { option: enabled, value: "true" }
+        - { option: org_role, value: Viewer }
+      notify: Redémarrer grafana
+
+    - name: Dossiers de provisioning et de dashboards
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: "{{ item.owner }}"
+        group: grafana
+        mode: "0750"
+      loop:
+        - { path: /etc/grafana/provisioning/datasources, owner: root }
+        - { path: /etc/grafana/provisioning/dashboards, owner: root }
+        - { path: "{{ grafana_dashboards_dir }}", owner: grafana }
+
+    - name: Source de données et fournisseur de dashboards (provisioning)
+      ansible.builtin.copy:
+        src: "{{ repo_monitoring }}/grafana/provisioning/{{ item }}"
+        dest: "/etc/grafana/provisioning/{{ item }}"
+        owner: root
+        group: grafana
+        mode: "0640"
+      loop: [datasources/prometheus.yml, dashboards/infraready.yml]
+      notify: Redémarrer grafana
+
+    - name: Dashboard InfraReady (JSON versionné)
+      ansible.builtin.copy:
+        src: "{{ repo_monitoring }}/grafana/dashboards/infraready.json"
+        dest: "{{ grafana_dashboards_dir }}/infraready.json"
+        owner: grafana
+        group: grafana
+        mode: "0640"
+
+    - name: Grafana démarré et activé
+      ansible.builtin.service:
+        name: grafana-server
+        state: started
+        enabled: true
+
+    # --- Pare-feu OPS01 : SSH, Grafana, Prometheus depuis le labo uniquement ----
+    - name: Paquet ufw
+      ansible.builtin.apt:
+        name: ufw
+        state: present
+
+    - name: UFW - SSH, Grafana (3000) et Prometheus (9090) depuis le sous-réseau du labo
+      community.general.ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+        src: "{{ lab_subnet }}"
+      loop: ["22", "3000", "9090"]
+
+    - name: UFW - politique par défaut et activation
+      community.general.ufw:
+        state: enabled
+        policy: deny
+        direction: incoming
+
+    # --- Vérifications ----------------------------------------------------------
+    - name: Forcer les handlers maintenant pour tester l'état final
+      ansible.builtin.meta: flush_handlers
+
+    - name: Attendre Prometheus et Grafana
+      ansible.builtin.wait_for:
+        port: "{{ item }}"
+        host: 127.0.0.1
+        timeout: 60
+      loop: [9090, 3000]
+
+    - name: Cibles Prometheus
+      ansible.builtin.uri:
+        url: http://127.0.0.1:9090/api/v1/targets
+        return_content: true
+      register: targets
+      become: false
+
+    - name: Toutes les cibles sont « up »
+      ansible.builtin.assert:
+        that: targets.json.data.activeTargets | map(attribute='health') | reject('equalto', 'up') | list | length == 0
+        fail_msg: >-
+          Cibles en défaut :
+          {{ targets.json.data.activeTargets | rejectattr('health', 'equalto', 'up') | map(attribute='labels.host') | list }}
+        success_msg: >-
+          {{ targets.json.data.activeTargets | length }} cibles up :
+          {{ targets.json.data.activeTargets | map(attribute='labels.host') | list }}
+
+    # /api/admin/stats exige le rôle administrateur serveur : un mot de passe faux donne 401,
+    # l'accès anonyme (Viewer) donne 403 — le test prouve donc que le compte admin fonctionne.
+    - name: Le compte admin Grafana fonctionne avec le mot de passe du vault
+      ansible.builtin.uri:
+        url: http://127.0.0.1:3000/api/admin/stats
+        user: admin
+        password: "{{ vault_grafana_admin_password }}"
+        force_basic_auth: true
+        return_content: true
+      register: gstats
+      become: false
+      no_log: true
+
+    - name: La source Prometheus est provisionnée (lecture anonyme)
+      ansible.builtin.uri:
+        url: http://127.0.0.1:3000/api/datasources/uid/prometheus-infraready
+        user: admin
+        password: "{{ vault_grafana_admin_password }}"
+        force_basic_auth: true
+        return_content: true
+      register: ds
+      become: false
+      no_log: true
+
+    - name: Résumé
+      ansible.builtin.debug:
+        msg: "Grafana OK — {{ gstats.json.dashboards }} dashboard(s), source '{{ ds.json.name }}' -> {{ ds.json.url }}"
+
+  handlers:
+    - name: Redémarrer prometheus
+      ansible.builtin.service:
+        name: prometheus
+        state: restarted
+
+    - name: Redémarrer grafana
+      ansible.builtin.service:
+        name: grafana-server
+        state: restarted

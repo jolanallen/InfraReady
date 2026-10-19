@@ -414,38 +414,89 @@ Retour arrière disponible : snapshot `s03_avant_ansible` (WIN-DC01 et LINUX01).
 > [!abstract] Objectif
 > Collecter et visualiser les métriques réelles des serveurs et présenter une alerte.
 
-**Responsable :** [Nom] · **Dates :** [Date(s)] · **Statut :** En cours (exporters déployés en phase D, configuration Prometheus écrite)
+**Responsable :** [Nom] · **Dates :** 19/10/2026 · **Statut :** Fait
 
 ### Travaux réalisés / checklist
 
-- [ ] Installer et configurer Prometheus sur OPS01.
+- [x] Installer et configurer Prometheus sur OPS01 (playbook `ops01_monitoring.yml`).
 - [x] Configurer Node Exporter pour LINUX01 (installé par `linux_base.yml`, port 9100 ouvert pour OPS01).
 - [x] Configurer Windows Exporter pour WIN-DC01 (0.31.8, port 9182 ouvert pour OPS01).
-- [ ] Vérifier les cibles et données reçues par Prometheus.
-- [ ] Installer/configurer Grafana avec Prometheus comme source.
-- [ ] Créer un dashboard avec CPU, mémoire, stockage, disponibilité.
-- [ ] Démontrer un seuil ou une alerte simple.
-- [ ] Documenter origine, ports et cheminement des métriques.
+- [x] Vérifier les cibles et données reçues par Prometheus.
+- [x] Installer/configurer Grafana avec Prometheus comme source.
+- [x] Créer un dashboard avec CPU, mémoire, stockage, disponibilité.
+- [x] Démontrer un seuil ou une alerte simple.
+- [x] Documenter origine, ports et cheminement des métriques.
 
 ### Procédure et configuration
 
-Fichiers déjà écrits : `monitoring/prometheus/prometheus.yml` (jobs `prometheus`, `linux`, `windows`, label `host`), `monitoring/prometheus/rules/infraready.rules.yml` (alertes InstanceDown, CpuEleve, MemoireElevee, DisquePresquePlein), provisioning Grafana (source `Prometheus` + dossier de dashboards).
+Tout est déployé par **`ansible/playbooks/ops01_monitoring.yml`** à partir des fichiers versionnés dans `monitoring/` (snapshot `s02_avant_monitoring` pris avant) :
 
-[À compléter : installation, cibles, nom du dashboard, captures, démonstration de l'alerte.]
+| Composant | Version | Configuration | Vérification intégrée au playbook |
+| --- | --- | --- | --- |
+| Prometheus | 2.45.3 (paquet Ubuntu 24.04) | `/etc/prometheus/prometheus.yml` et `rules/infraready.rules.yml` copiés depuis le dépôt ; `promtool check config` **avant** tout redémarrage | `/api/v1/targets` : toutes les cibles `up` (sinon échec) |
+| Grafana | 13.2.4 (dépôt officiel `apt.grafana.com`) | Source de données et dashboard **provisionnés** (`/etc/grafana/provisioning/`, JSON dans `/var/lib/grafana/dashboards/infraready/`) ; mot de passe admin dans le vault ; accès anonyme **Viewer** (lecture seule) pour l'affichage | Compte admin testé sur `/api/admin/stats` ; source `prometheus-infraready` présente |
+| Pare-feu OPS01 | UFW | 22, 3000, 9090 depuis le labo uniquement, refus par défaut | — |
+
+**Origine, ports et cheminement des métriques**
+
+```mermaid
+flowchart LR
+    L1["LINUX01<br/>node_exporter :9100<br/>(UFW : OPS01 seulement)"]
+    DC["WIN-DC01<br/>windows_exporter 0.31.8 :9182<br/>cpu, memory, logical_disk, os, system, net, service<br/>(pare-feu : OPS01 seulement)"]
+    O1["OPS01<br/>node_exporter :9100 (local)"]
+    PR["Prometheus :9090<br/>scrape toutes les 15 s<br/>jobs linux / windows / prometheus<br/>règles d'alerte"]
+    GR["Grafana :3000<br/>source Prometheus (localhost:9090)<br/>dashboard « InfraReady — Serveurs »"]
+    L1 -- "HTTP GET /metrics" --> PR
+    DC -- "HTTP GET /metrics" --> PR
+    O1 --> PR
+    PR -- "PromQL" --> GR
+```
+
+Chaque cible porte un label `host` (linux01, ops01, win-dc01) et `os`, utilisés dans les requêtes et la légende du dashboard.
+
+**Dashboard « InfraReady — Serveurs »** (`monitoring/grafana/dashboards/infraready.json`, uid `infraready-serveurs`) — 5 panneaux : disponibilité (`up`), CPU %, mémoire %, stockage % par volume, table des alertes Prometheus actives. Requêtes Linux (`node_*`) et Windows (`windows_*`) côte à côte dans chaque panneau.
+
+**Règles d'alerte** (`monitoring/prometheus/rules/infraready.rules.yml`, validées par `promtool` dans la CI) :
+
+| Alerte | Condition | Durée | Sévérité |
+| --- | --- | --- | --- |
+| `InstanceDown` | `up == 0` (cible Linux ou Windows) | 1 min | critical |
+| `ServiceWindowsCritiqueArrete` | service DNS / NTDS / Netlogon / Kdc non `running` (collecteur `service`) | 1 min | critical |
+| `CpuEleve` | CPU > 80 % | 2 min | warning |
+| `MemoireElevee` | mémoire > 90 % | 5 min | warning |
+| `DisquePresquePlein` | volume > 85 % | 5 min | warning |
+
+**Démonstration d'alerte** (contrôlée et réversible, rejouée 3 fois avec le même résultat) : arrêt de `prometheus-node-exporter` sur LINUX01 → `InstanceDown[linux01]` passe en `pending` après 10 s, puis **`firing` après 60 s** (durée `for: 1m`) ; dashboard : LINUX01 « HORS LIGNE » et alerte dans la table ; redémarrage du service → alerte disparue 16 s plus tard.
+
+**Points de contrôle réellement utilisés** : `/api/v1/targets`, `/api/v1/rules`, `/api/v1/alerts`, `/api/v1/query`, page `/classic/targets` et `/classic/alerts`, `/metrics` de chaque exporter, API Grafana (`/api/health`, `/api/admin/stats`, `/api/datasources`), `ss -tlnp`, `promtool check config`.
+
+![[P-53-grafana-dashboard-infraready.png|700]]
+
+![[P-55-grafana-dashboard-alerte-linux01-hors-ligne.png|700]]
 
 ### Tests et preuves
 
 | Vérification | Attendu | Résultat observé | Preuve |
 | --- | --- | --- | --- |
-| Collecte Linux | Métriques de LINUX01 disponibles | [Résultat réel] | [P-5x] |
-| Collecte Windows | Métriques de WIN-DC01 disponibles | [Résultat réel] | [P-5x] |
-| Source Grafana | Prometheus connecté | [Résultat réel] | [P-5x] |
-| Dashboard | CPU, RAM, disque et disponibilité visibles | [Résultat réel] | [P-5x] |
-| Seuil / alerte | Démonstration vérifiable | [Résultat réel] | [P-5x] |
+| Collecte Linux | Métriques de LINUX01 disponibles | Cible `192.168.50.20:9100` **up** (scrape 60 ms, 1 709 métriques) ; CPU 0,2 %, mémoire 11,3 %, `/` 29,1 %, `/data` 5,3 % | [P-51](docs/preuves/P-51-prometheus-targets.png), [P-52](docs/preuves/P-52-prometheus-cibles-metriques-regles.txt) |
+| Collecte Windows | Métriques de WIN-DC01 disponibles | Cible `192.168.50.10:9182` **up** (3 263 métriques) ; CPU 1,0 %, mémoire 26,7 %, `C:` 24,2 % ; services DNS/NTDS/Netlogon/Kdc `running=1` | [P-51](docs/preuves/P-51-prometheus-targets.png), [P-52](docs/preuves/P-52-prometheus-cibles-metriques-regles.txt) |
+| Source Grafana | Prometheus connecté | Source `Prometheus` → `http://localhost:9090` provisionnée ; `/api/admin/stats` : 1 dashboard, 1 source | [P-50](docs/preuves/P-50-ops01-prometheus-grafana-installation.txt) |
+| Dashboard | CPU, RAM, disque et disponibilité visibles | 3 serveurs « EN LIGNE », courbes CPU/mémoire des 3 hôtes, 6 volumes, table d'alertes vide | [P-53](docs/preuves/P-53-grafana-dashboard-infraready.png) |
+| Seuil / alerte | Démonstration vérifiable | `InstanceDown[linux01]` pending → firing à +60 s, visible dans Prometheus et Grafana, résolue 16 s après retour du service | [P-54](docs/preuves/P-54-alerte-instancedown-demonstration.txt), [P-54 png](docs/preuves/P-54-prometheus-alerte-instancedown.png), [P-55](docs/preuves/P-55-grafana-dashboard-alerte-linux01-hors-ligne.png) |
+| Idempotence | Second passage stable | `ops01_monitoring.yml` : changed=0 au 2ᵉ passage | [P-50b](docs/preuves/P-50b-ops01-monitoring-2e-passage-idempotence.txt) |
 
 ### Difficultés / décision / retour arrière
 
-[À compléter]
+| Problème | Cause | Correction | Résultat |
+| --- | --- | --- | --- |
+| Connexion admin Grafana refusée (401) après le 1er passage | **Cause confirmée** : le mot de passe contenait `#`, lu comme début de commentaire dans `grafana.ini` → mot de passe tronqué (test : la partie avant `#` fonctionnait) | Nouveau mot de passe sans `#`/`;`/guillemets, réinitialisation contrôlée (`grafana-cli admin reset-admin-password`, mot de passe lu sur stdin), contrôle `assert` dans le playbook, vérification sur `/api/admin/stats` (401 si faux, 403 si anonyme) | Admin OK, 2ᵉ passage changed=0 ([P-50a](docs/preuves/P-50a-ops01-grafana-1er-essai-echec-mot-de-passe-ini.txt) → [P-50](docs/preuves/P-50-ops01-prometheus-grafana-installation.txt)) |
+| Après modification du fichier et redémarrage, même la valeur tronquée ne fonctionnait plus | **Hypothèse non confirmée** : Grafana 13 réapplique `admin_password` au démarrage ; non vérifiée pour ne pas multiplier les essais | Réinitialisation explicite (ci-dessus) | Mot de passe maîtrisé |
+| `/targets` et `/alerts` renvoient 404 | Le paquet Ubuntu de Prometheus 2.45 est construit sans la nouvelle interface React | Utilisation de l'interface classique `/classic/targets`, `/classic/alerts` (l'API est identique) | Captures P-51, P-54 |
+| Séries sans label `host` (`job="node"`) dans la fenêtre d'1 h du dashboard | Prometheus a démarré une première fois avec la configuration Debian par défaut avant la copie de la nôtre | Aucune action : séries périmées, hors fenêtre après 1 h ; captures faites sur 10 min | Dashboard propre (P-53) |
+| Pics de CPU LINUX01 à 80 % pendant la démonstration | Artefact de `rate()` sur les trous de données (exporter arrêté), pas de charge réelle (`uptime` : charge < 0,4) | Expliqué ; disparaît avec les données | Non bloquant |
+| Captures Grafana parfois vides avec Chrome headless | Deux lancements consécutifs partageaient le même profil (verrou) | Profil temporaire unique par capture | Captures fiables |
+
+Retour arrière disponible : snapshot `s02_avant_monitoring` (OPS01).
 
 ---
 
@@ -454,7 +505,7 @@ Fichiers déjà écrits : `monitoring/prometheus/prometheus.yml` (jobs `promethe
 > [!abstract] Objectif
 > Versionner les livrables et valider le dépôt automatiquement via GitHub Actions.
 
-**Responsable :** [Nom] · **Dates :** 19/10/2026 · **Statut :** En cours (bloqué : droit `workflow` du jeton GitHub)
+**Responsable :** [Nom] · **Dates :** 19/10/2026 · **Statut :** Fait (pipeline vert) — il manque les commits du second membre
 
 ### Travaux réalisés / checklist
 
@@ -464,7 +515,7 @@ Fichiers déjà écrits : `monitoring/prometheus/prometheus.yml` (jobs `promethe
 - [x] Créer `.github/workflows/validation.yml`.
 - [x] Déclencher des validations à chaque push ou pull request (`on: push, pull_request, workflow_dispatch`).
 - [x] Inclure des contrôles pertinents : fichiers attendus, `yamllint`, `ansible-playbook --syntax-check`, `ansible-lint`, `promtool check config`, JSON du dashboard, **gitleaks** sur tout l'historique, vault obligatoirement chiffré.
-- [ ] Fournir une preuve d'exécution réussie du workflow.
+- [x] Fournir une preuve d'exécution réussie du workflow (P-60).
 - [x] Contrôler l'absence de secrets en clair (recherche des vrais mots de passe dans le dépôt avant chaque commit, `.gitignore`, vault chiffré).
 
 ### Procédure et configuration
@@ -472,22 +523,24 @@ Fichiers déjà écrits : `monitoring/prometheus/prometheus.yml` (jobs `promethe
 - **Dépôt** : https://github.com/Nothypaa/InfraReady — branche `main`.
 - **Jobs** : `fichiers`, `yaml-ansible`, `monitoring`, `secrets` (voir `.github/workflows/validation.yml`).
 
-[À compléter : lien du run GitHub Actions réussi.]
+- **Validation locale avant push** : les mêmes outils que la CI (ansible-core 2.16, ansible-lint 24, yamllint, collections aux versions d'OPS01) sont installés sur le poste pour corriger avant de pousser.
+- **Run réussi** : https://github.com/Nothypaa/InfraReady/actions/runs/39268575079 (4 jobs `success`).
 
 ### Tests et preuves
 
 | Vérification | Attendu | Résultat observé | Preuve |
 | --- | --- | --- | --- |
-| Dépôt et arborescence | Fichiers attendus présents | Voir arborescence (annexe) | [Lien](https://github.com/Nothypaa/InfraReady) |
-| Contributions | Contributions du binôme traçables | [Résultat réel] | [Lien] |
-| Workflow automatique | Push / PR déclenche la validation | [Résultat réel] | [P-6x] |
-| Pipeline vert | Exécution terminée avec succès | [Résultat réel] | [P-6x] |
+| Dépôt et arborescence | Fichiers attendus présents | Voir arborescence (annexe) ; job `Arborescence attendue` : success | [Lien](https://github.com/Nothypaa/InfraReady), [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
+| Contributions | Contributions du binôme traçables | Pour l'instant un seul auteur (`git shortlog`) — **à compléter par le second membre** | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
+| Workflow automatique | Push / PR déclenche la validation | Chaque `push` sur `main` a lancé un run (événement `push`) | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
+| Pipeline vert | Exécution terminée avec succès | Run 39268575079 : `Arborescence attendue`, `YAML + Ansible`, `Prometheus + Grafana`, `Aucun secret en clair` → success | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
 
 ### Difficultés / décision / retour arrière
 
 | Problème | Cause | Correction | Résultat |
 | --- | --- | --- | --- |
-| `git push` refusé : « refusing to allow an OAuth App to create or update workflow … without `workflow` scope » | Le jeton GitHub CLI n'a pas le droit `workflow`, obligatoire pour modifier `.github/workflows/` | `gh auth refresh -h github.com -s workflow` | En attente |
+| `git push` refusé : « refusing to allow an OAuth App to create or update workflow … without `workflow` scope » | Le jeton GitHub CLI n'a pas le droit `workflow`, obligatoire pour modifier `.github/workflows/` | `gh auth refresh -h github.com -s workflow` | Push accepté, 6 commits publiés |
+| 1er run en échec (3 jobs sur 4) | Dashboard Grafana absent, ligne > 160 caractères, 7 remarques `ansible-lint` | Dashboard écrit, playbooks corrigés et rejoués (`changed=0`), validation locale avant push | 2ᵉ run vert ([P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt)) |
 
 ---
 
@@ -541,7 +594,7 @@ Fichiers déjà écrits : `monitoring/prometheus/prometheus.yml` (jobs `promethe
 - [x] Changements perturbateurs documentés — redémarrage de promotion du DC, modification réseau de l'hôte (sauvegarde `interfaces.bak-infraready`), changement DNS des VM Linux (sauvegarde netplan).
 - [x] Fonctionnalités non réalisées signalées — voir section 13.
 
-**Limites connues** : WinRM en HTTP (5985) avec chiffrement NTLM du message, mais sans certificat TLS ; OPS01 sans pare-feu local pour l'instant ; mot de passe `sudo` de l'hôte Proxmox faible et à changer en fin de projet.
+**Limites connues** : WinRM en HTTP (5985) avec chiffrement NTLM du message, mais sans certificat TLS ; Grafana consultable sans compte en lecture seule (rôle Viewer, réseau du labo uniquement) ; Prometheus et Grafana sans TLS (labo isolé) ; mot de passe `sudo` de l'hôte Proxmox faible et à changer en fin de projet.
 
 ---
 
@@ -556,8 +609,8 @@ Fichiers déjà écrits : `monitoring/prometheus/prometheus.yml` (jobs `promethe
 | C | Permissions / service / stockage / logs | ✅ Validé | P-20 à P-24 |
 | D | Playbooks Linux & Windows / idempotence | ✅ Validé | P-30 à P-35 |
 | E | Mises à jour / maintenance | ⏳ À faire | — |
-| F | Exporters / dashboard / alerte | 🔶 En cours (exporters OK) | P-33 |
-| G | Workflow GitHub Actions réussi | 🔶 En cours (push bloqué) | — |
+| F | Exporters / dashboard / alerte | ✅ Validé | P-50 à P-55 |
+| G | Workflow GitHub Actions réussi | ✅ Validé (commits du binôme à compléter) | P-60 |
 | H | Incident corrigé / retour normal | ⏳ À faire | — |
 
 ### Matrice des preuves
@@ -591,6 +644,20 @@ Fichiers déjà écrits : `monitoring/prometheus/prometheus.yml` (jobs `promethe
 | P-36 | 19/10/2026 | Diagnostic : enregistrements de la zone inverse (statique/dynamique) | [P-36](docs/preuves/P-36-diagnostic-ptr-dc-statique-vs-dynamique.txt) |
 | P-36b | 19/10/2026 | Zone inverse après réenregistrement du DC | [P-36b](docs/preuves/P-36b-ptr-dc-apres-reenregistrement-dynamique.txt) |
 | P-37 | 19/10/2026 | Playbook Windows stable après réenregistrement du DC (changed=0 ×2) | [P-37](docs/preuves/P-37-playbook-windows-ptr-dc-stable.txt) |
+| P-40 | 19/10/2026 | Maintenance Linux (linux01, ops01) : pré-contrôles, apt, post-contrôles | [P-40](docs/preuves/P-40-linux-maintenance-standard.txt) |
+| P-40b | 19/10/2026 | Rapports de maintenance générés (`~/infraready-logs/`) | [P-40b](docs/preuves/P-40b-rapports-maintenance-generes.txt) |
+| P-41a | 19/10/2026 | Maintenance Windows — 1er essai : lecteur CD vu comme volume plein | [P-41a](docs/preuves/P-41a-windows-maintenance-1er-essai-lecteur-cd.txt) |
+| P-41 | 19/10/2026 | Maintenance Windows — recherche des mises à jour (5 trouvées) | [P-41](docs/preuves/P-41-windows-maintenance-recherche-maj.txt) |
+| P-43 | 19/10/2026 | unattended-upgrades : configuration, minuteries, simulation | [P-43](docs/preuves/P-43-linux01-mises-a-jour-automatiques-unattended.txt) |
+| P-50a | 19/10/2026 | Monitoring — 1er essai : échec de connexion admin Grafana | [P-50a](docs/preuves/P-50a-ops01-grafana-1er-essai-echec-mot-de-passe-ini.txt) |
+| P-50 | 19/10/2026 | Playbook Prometheus + Grafana (cibles up, admin OK) | [P-50](docs/preuves/P-50-ops01-prometheus-grafana-installation.txt) |
+| P-50b | 19/10/2026 | Playbook monitoring — 2ᵉ passage (changed=0) | [P-50b](docs/preuves/P-50b-ops01-monitoring-2e-passage-idempotence.txt) |
+| P-51 | 19/10/2026 | Capture : cibles Prometheus (4/4 up) | [P-51](docs/preuves/P-51-prometheus-targets.png) |
+| P-52 | 19/10/2026 | Cibles, règles, métriques réelles, exporters, ports | [P-52](docs/preuves/P-52-prometheus-cibles-metriques-regles.txt) |
+| P-53 | 19/10/2026 | Capture : dashboard Grafana, état normal | [P-53](docs/preuves/P-53-grafana-dashboard-infraready.png) |
+| P-54 | 19/10/2026 | Démonstration InstanceDown : chronologie + capture Prometheus | [P-54](docs/preuves/P-54-alerte-instancedown-demonstration.txt), [png](docs/preuves/P-54-prometheus-alerte-instancedown.png) |
+| P-55 | 19/10/2026 | Capture : dashboard pendant l'alerte (LINUX01 hors ligne) | [P-55](docs/preuves/P-55-grafana-dashboard-alerte-linux01-hors-ligne.png) |
+| P-60 | 19/10/2026 | GitHub Actions : runs (1er en échec, 2ᵉ vert), jobs, déclencheurs, auteurs | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
 
 ---
 
@@ -601,7 +668,7 @@ Fichiers déjà écrits : `monitoring/prometheus/prometheus.yml` (jobs `promethe
 	- **Proxmox VE 9.1 au lieu de VMware Workstation** — à faire valider par le formateur. Avantages : snapshots, ajout de disque à chaud, installations pilotables en ligne de commande, ressources suffisantes.
 	- Ressources légèrement supérieures au plan (vCPU) ; disque Windows en IDE (choix initial conservé).
 	- Ubuntu 24.04.**5** (dernière révision de la 24.04 LTS).
-- **Fonctionnalités inachevées :** phases E, F (Prometheus/Grafana/alerte), G (pipeline vert), H ; commits du second membre du binôme ; pare-feu local d'OPS01.
+- **Fonctionnalités inachevées :** phase E (installation Windows Update en cours), phase H ; commits du second membre du binôme.
 - **Bilan du binôme :** [À compléter]
 
 ---

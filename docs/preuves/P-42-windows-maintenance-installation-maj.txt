@@ -1,0 +1,59 @@
+# Preuve : P-42-windows-maintenance-installation-maj
+# Exécuté sur OPS01 (utilisateur ansible, ~/infraready/ansible) — 2026-10-19 16:54:21 CEST
+# Commande(s) :
+#   ansible-playbook playbooks/windows_maintenance.yml -e maintenance_apply=true -e allow_reboot=true
+
+
+PLAY [Maintenance Windows] *****************************************************
+
+TASK [Gathering Facts] *********************************************************
+Monday 19 October 2026  16:54:24 +0200 (0:00:00.025)       0:00:00.025 ******** 
+ok: [win-dc01]
+
+TASK [Occupation des volumes] **************************************************
+Monday 19 October 2026  16:54:27 +0200 (0:00:02.809)       0:00:02.834 ******** 
+ok: [win-dc01]
+
+TASK [Espace disque suffisant avant mise à jour] *******************************
+Monday 19 October 2026  16:54:30 +0200 (0:00:03.578)       0:00:06.413 ******** 
+ok: [win-dc01]
+
+TASK [Services critiques avant maintenance] ************************************
+Monday 19 October 2026  16:54:30 +0200 (0:00:00.039)       0:00:06.452 ******** 
+ok: [win-dc01] => (item=NTDS)
+ok: [win-dc01] => (item=DNS)
+ok: [win-dc01] => (item=Netlogon)
+ok: [win-dc01] => (item=kdc)
+ok: [win-dc01] => (item=windows_exporter)
+
+TASK [Les services critiques sont démarrés avant maintenance] ******************
+Monday 19 October 2026  16:54:39 +0200 (0:00:09.000)       0:00:15.453 ******** 
+ok: [win-dc01] => (item=NTDS)
+ok: [win-dc01] => (item=DNS)
+ok: [win-dc01] => (item=Netlogon)
+ok: [win-dc01] => (item=kdc)
+ok: [win-dc01] => (item=windows_exporter)
+
+TASK [Aucun redémarrage déjà en attente (clés de registre CBS / Windows Update)] ***
+Monday 19 October 2026  16:54:39 +0200 (0:00:00.047)       0:00:15.500 ******** 
+ok: [win-dc01]
+
+TASK [Pas de redémarrage en attente avant de commencer] ************************
+Monday 19 October 2026  16:54:41 +0200 (0:00:02.156)       0:00:17.657 ******** 
+ok: [win-dc01]
+
+TASK [Recherche des mises à jour disponibles (sans installation)] **************
+Monday 19 October 2026  16:54:41 +0200 (0:00:00.023)       0:00:17.680 ******** 
+ok: [win-dc01]
+
+TASK [Mises à jour trouvées] ***************************************************
+Monday 19 October 2026  16:55:03 +0200 (0:00:21.765)       0:00:39.446 ******** 
+ok: [win-dc01] => 
+    msg: '5 mise(s) à jour : [''2026-10 .NET Framework Security Update (KB5127690)'',
+        ''2026-10 Security Update (KB5126646) (26100.33650)'', ''Update for Windows Security
+        platform - KB5007651 (Version 10.0.29628.1000)'', ''Windows Malicious Software
+        Removal Tool x64 - v5.146 (KB890830)'', ''Security Intelligence Update for Microsoft
+        Defender Antivirus - KB2267602 (Version 1.461.106.0) - Current Channel (Broad)'']'
+
+TASK [Installation des mises à jour (uniquement avec -e maintenance_apply=true)] ***
+Monday 19 October 2026  16:55:03 +0200 (0:00:00.036)       0:00:39.482 ******** 

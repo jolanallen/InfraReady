@@ -1,0 +1,17 @@
+# Preuve : P-54 — Démonstration d'alerte InstanceDown (arrêt contrôlé et réversible de node_exporter sur LINUX01)
+# Règle : up{job=~"linux|windows"} == 0 pendant 1 min -> InstanceDown (critical). Heures locales CEST ; activeAt de Prometheus en UTC — 2026-10-19
+# Démonstration rejouée 3 fois (16:41, 16:45, ci-dessous) : comportement identique à chaque fois.
+
+16:51:43  état initial            : aucune alerte  — capture P-53 (dashboard, état normal)
+16:51:46  action                  : systemctl stop prometheus-node-exporter sur linux01 -> inactive
+16:52:02  +10s                   : InstanceDown[linux01] état=pending depuis 14:52:00 UTC
+16:52:15  +20s                   : InstanceDown[linux01] état=pending depuis 14:52:00 UTC
+16:52:28  +30s                   : InstanceDown[linux01] état=pending depuis 14:52:00 UTC
+16:52:40  +40s                   : InstanceDown[linux01] état=pending depuis 14:52:00 UTC
+16:52:53  +50s                   : InstanceDown[linux01] état=pending depuis 14:52:00 UTC
+16:53:06  +60s                   : InstanceDown[linux01] état=firing depuis 14:52:00 UTC
+
+16:53:26  captures               : P-54 (Prometheus /alerts), P-55 (dashboard Grafana : linux01 HORS LIGNE + alerte active)
+
+16:53:37  retour à la normale     : systemctl start prometheus-node-exporter -> active
+16:53:53  +10s                   : aucune alerte

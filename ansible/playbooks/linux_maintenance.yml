@@ -1,0 +1,144 @@
+---
+# Phase E — maintenance standard des serveurs Ubuntu (voir docs/procedure-maintenance.md).
+# Par défaut : pré-contrôles, mises à jour, post-contrôles, rapport. Aucun redémarrage sans -e allow_reboot=true.
+# Prérequis : snapshot Proxmox pris AVANT (qm snapshot <vmid> s0x_avant_maj).
+- name: Maintenance Linux
+  hosts: linux
+  gather_facts: true
+  serial: 1                      # un serveur à la fois : jamais tout le parc en même temps
+
+  vars:
+    allow_reboot: false
+    disk_max_percent: 85
+    services_attendus:
+      linux01: [ssh, nginx, prometheus-node-exporter]
+      ops01: [ssh, prometheus, grafana-server, prometheus-node-exporter]
+    rapport_dir: "{{ lookup('ansible.builtin.env', 'HOME') }}/infraready-logs"
+
+  tasks:
+    # --- Pré-contrôles ------------------------------------------------------------
+    - name: Occupation des systèmes de fichiers
+      ansible.builtin.set_fact:
+        disques: >-
+          {{ ansible_mounts | selectattr('fstype', 'in', ['ext4', 'xfs'])
+             | map('combine', {'pct': 0}) | list }}
+
+    - name: Calcul du pourcentage utilisé par montage
+      ansible.builtin.set_fact:
+        disques_pct: >-
+          {{ disques_pct | default([])
+             + [{'mount': item.mount, 'pct': (100 - item.size_available * 100 / item.size_total) | round(1)}] }}
+      loop: "{{ disques }}"
+      loop_control:
+        label: "{{ item.mount }}"
+
+    - name: Espace disque suffisant avant mise à jour
+      ansible.builtin.assert:
+        that: disques_pct | map(attribute='pct') | max < disk_max_percent
+        fail_msg: "Un système de fichiers dépasse {{ disk_max_percent }} % : {{ disques_pct }}"
+        quiet: true
+
+    - name: État des services avant maintenance
+      ansible.builtin.service_facts:
+
+    - name: Les services attendus sont actifs avant maintenance
+      ansible.builtin.assert:
+        that: ansible_facts.services[item ~ '.service'].state == 'running'
+        fail_msg: "{{ item }} n'est pas actif avant la maintenance — arrêt"
+        quiet: true
+      loop: "{{ services_attendus[inventory_hostname] }}"
+
+    # --- Mises à jour automatiques de sécurité (unattended-upgrades) ---------------
+    - name: Paquet unattended-upgrades
+      ansible.builtin.apt:
+        name: unattended-upgrades
+        state: present
+
+    - name: Mises à jour de sécurité automatiques quotidiennes, sans redémarrage automatique
+      ansible.builtin.copy:
+        dest: /etc/apt/apt.conf.d/52infraready-unattended
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          // Géré par Ansible (linux_maintenance.yml)
+          APT::Periodic::Update-Package-Lists "1";
+          APT::Periodic::Unattended-Upgrade "1";
+          APT::Periodic::AutocleanInterval "7";
+          Unattended-Upgrade::Automatic-Reboot "false";
+          Unattended-Upgrade::Remove-Unused-Dependencies "true";
+
+    # --- Mise à jour contrôlée ----------------------------------------------------
+    - name: Mise à jour des index et des paquets (upgrade, sans suppression)
+      ansible.builtin.apt:
+        update_cache: true
+        upgrade: safe
+      register: apt_result
+
+    - name: Suppression des dépendances devenues inutiles
+      ansible.builtin.apt:
+        autoremove: true
+      register: apt_autoremove
+
+    - name: Redémarrage requis ?
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: reboot_required
+
+    - name: Redémarrage (uniquement si demandé ET autorisé par -e allow_reboot=true)
+      ansible.builtin.reboot:
+        msg: "Redémarrage de maintenance InfraReady"
+        reboot_timeout: 600
+      when: reboot_required.stat.exists and allow_reboot | bool
+
+    # --- Post-contrôles -----------------------------------------------------------
+    - name: État des services après maintenance
+      ansible.builtin.service_facts:
+
+    - name: Les services attendus sont actifs après maintenance
+      ansible.builtin.assert:
+        that: ansible_facts.services[item ~ '.service'].state == 'running'
+        fail_msg: "{{ item }} n'est plus actif après la maintenance"
+        quiet: true
+      loop: "{{ services_attendus[inventory_hostname] }}"
+
+    - name: Le site web répond toujours (LINUX01)
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}/"
+        status_code: 200
+      delegate_to: localhost
+      become: false
+      when: inventory_hostname == 'linux01'
+
+    # --- Trace --------------------------------------------------------------------
+    - name: Dossier des rapports sur le nœud de contrôle
+      ansible.builtin.file:
+        path: "{{ rapport_dir }}"
+        state: directory
+        mode: "0750"
+      delegate_to: localhost
+      become: false
+
+    - name: Rapport de maintenance
+      ansible.builtin.copy:
+        dest: "{{ rapport_dir }}/maintenance-{{ inventory_hostname }}-{{ ansible_date_time.iso8601_basic_short }}.txt"
+        mode: "0640"
+        content: |
+          Rapport de maintenance InfraReady — {{ inventory_hostname }} ({{ ansible_host }})
+          Date      : {{ ansible_date_time.iso8601 }}
+          Noyau     : {{ ansible_kernel }}  |  Ubuntu {{ ansible_distribution_version }}
+          Disques   : {% for d in disques_pct %}{{ d.mount }}={{ d.pct }}% {% endfor %}
+
+          Services  : {{ services_attendus[inventory_hostname] | join(', ') }} -> OK
+          Paquets   : {{ 'mis à jour' if apt_result.changed else 'déjà à jour' }}{{ ' | autoremove' if apt_autoremove.changed else '' }}
+          Redémarrage requis : {{ 'OUI' if reboot_required.stat.exists else 'non' }} (autorisé : {{ allow_reboot }})
+          --- apt ---
+          {{ apt_result.stdout | default('') | trim }}
+      delegate_to: localhost
+      become: false
+
+    - name: Résumé
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }} : disques {{ disques_pct | map(attribute='pct') | max }} % max,
+          paquets {{ 'mis à jour' if apt_result.changed else 'à jour' }}, reboot requis={{ reboot_required.stat.exists }}

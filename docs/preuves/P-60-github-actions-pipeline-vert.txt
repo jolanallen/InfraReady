@@ -1,0 +1,26 @@
+# Preuve : P-60a — 1er run GitHub Actions (échec) et P-60 — run réussi
+# Dépôt : https://github.com/Nothypaa/InfraReady — 2026-10-19 16:29:02 CEST
+
+run 39265972254 | 2026-10-19T14:06:33Z | événement=push branche=main commit=7999034 | failure | https://github.com/Nothypaa/InfraReady/actions/runs/39265972254
+run 39268575079 | 2026-10-19T14:23:54Z | événement=push branche=main commit=a89b1d4 | success | https://github.com/Nothypaa/InfraReady/actions/runs/39268575079
+
+== Jobs du run 39265972254
+  Aucun secret en clair : success (2026-10-19T14:06:35Z -> 2026-10-19T14:06:41Z)
+  Prometheus + Grafana : failure (2026-10-19T14:06:36Z -> 2026-10-19T14:06:49Z)
+  YAML + Ansible (syntaxe et lint) : failure (2026-10-19T14:06:37Z -> 2026-10-19T14:07:34Z)
+  Arborescence attendue : failure (2026-10-19T14:06:36Z -> 2026-10-19T14:06:42Z)
+== Jobs du run 39268575079
+  Arborescence attendue : success (2026-10-19T14:23:57Z -> 2026-10-19T14:24:03Z)
+  Prometheus + Grafana : success (2026-10-19T14:23:57Z -> 2026-10-19T14:24:14Z)
+  Aucun secret en clair : success (2026-10-19T14:23:57Z -> 2026-10-19T14:24:06Z)
+  YAML + Ansible (syntaxe et lint) : success (2026-10-19T14:23:57Z -> 2026-10-19T14:24:55Z)
+
+== Déclencheurs du workflow (.github/workflows/validation.yml)
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+
+== Auteurs des commits (git shortlog -sn)
+     8	Nothypaa

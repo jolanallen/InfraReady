@@ -1,0 +1,64 @@
+# Preuve : P-52-prometheus-cibles-metriques-regles
+# Hôte : ops01 — 2026-10-19 16:41:01 CEST
+# Commande(s) :
+#   echo "== Versions"; prometheus --version 2>&1 | head -1; dpkg -l grafana prometheus-node-exporter | awk "/^ii/{print \$2, \$3}"
+#   echo; echo "== Cibles Prometheus (/api/v1/targets)"; curl -s http://127.0.0.1:9090/api/v1/targets | python3 -c "
+#   import sys,json
+#   for t in json.load(sys.stdin)[\"data\"][\"activeTargets\"]:
+#       l=t[\"labels\"]; print(f\"   {l[\"job\"]:<11} {l.get(\"host\",\"\"):<9} {t[\"scrapeUrl\"]:<40} {t[\"health\"]:<4} dernier scrape {t[\"lastScrape\"][11:19]} ({t[\"lastScrapeDuration\"]*1000:.0f} ms)\")"
+#   echo; echo "== Règles d\x27alerte chargées (/api/v1/rules)"; curl -s http://127.0.0.1:9090/api/v1/rules | python3 -c "
+#   import sys,json
+#   for g in json.load(sys.stdin)[\"data\"][\"groups\"]:
+#       for r in g[\"rules\"]: print(f\"   {r[\"name\"]:<20} état={r[\"state\"]:<9} for={r.get(\"duration\",0)}s sévérité={r[\"labels\"].get(\"severity\",\"\")}\")"
+#   echo; echo "== Métriques réelles (valeur instantanée)"
+#   q(){ printf "   %-52s " "$1"; curl -s --data-urlencode "query=$2" http://127.0.0.1:9090/api/v1/query | python3 -c "import sys,json;r=json.load(sys.stdin)[\"data\"][\"result\"];print(\"  \".join(f\"{x[\"metric\"].get(\"host\",\"\")}{\" \"+x[\"metric\"][\"mountpoint\"] if \"mountpoint\" in x[\"metric\"] else \"\"}{\" \"+x[\"metric\"][\"volume\"] if \"volume\" in x[\"metric\"] else \"\"}={float(x[\"value\"][1]):.1f}\" for x in r) or \"(aucun)\")"; }
+#   q "Disponibilité (up)" "up{job=~\"linux|windows\"}"
+#   q "CPU % Linux" "100 - avg by (host) (rate(node_cpu_seconds_total{mode=\"idle\"}[2m])) * 100"
+#   q "CPU % Windows" "100 - avg by (host) (rate(windows_cpu_time_total{mode=\"idle\"}[2m])) * 100"
+#   q "Mémoire % Linux" "(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100"
+#   q "Mémoire % Windows" "(1 - windows_memory_available_bytes / windows_memory_physical_total_bytes) * 100"
+#   q "Disque % Linux" "(1 - node_filesystem_avail_bytes{fstype=~\"ext4|xfs\"} / node_filesystem_size_bytes{fstype=~\"ext4|xfs\"}) * 100"
+#   q "Disque % Windows" "(1 - windows_logical_disk_free_bytes{volume=~\"[A-Z]:\"} / windows_logical_disk_size_bytes{volume=~\"[A-Z]:\"}) * 100"
+#   echo; echo "== Cheminement : exporters interrogés directement"; for t in 192.168.50.20:9100 127.0.0.1:9100 192.168.50.10:9182; do printf "   %-20s HTTP %s  %s métriques\n" $t "$(curl -s -o /tmp/m -w %{http_code} http://$t/metrics)" "$(grep -c "^[a-z]" /tmp/m)"; done; rm -f /tmp/m
+#   echo; echo "== Ports en écoute sur OPS01"; ss -tlnp 2>/dev/null | awk "NR==1 || /:(9090|9100|3000) /{print \$1, \$4, \$6}" | sed "s/users:((//; s/,.*//"
+#   echo; echo "== Pare-feu OPS01"; sudo -n ufw status 2>/dev/null || echo "(ufw status nécessite sudo : voir P-50)"
+
+== Versions
+prometheus, version 2.45.3+ds (branch: debian/sid, revision: 2.45.3+ds-2ubuntu0.3)
+grafana 13.2.4
+prometheus-node-exporter 1.7.0-1ubuntu0.3
+
+== Cibles Prometheus (/api/v1/targets)
+   linux       linux01   http://192.168.50.20:9100/metrics        up   dernier scrape 16:40:57 (60 ms)
+   linux       ops01     http://localhost:9100/metrics            up   dernier scrape 16:40:58 (57 ms)
+   prometheus  ops01     http://localhost:9090/metrics            up   dernier scrape 16:40:53 (3 ms)
+   windows     win-dc01  http://192.168.50.10:9182/metrics        up   dernier scrape 16:41:00 (27 ms)
+
+== Règles d\x27alerte chargées (/api/v1/rules)
+   InstanceDown         état=inactive  for=60s sévérité=critical
+   CpuEleve             état=inactive  for=120s sévérité=warning
+   MemoireElevee        état=inactive  for=300s sévérité=warning
+   DisquePresquePlein   état=inactive  for=300s sévérité=warning
+
+== Métriques réelles (valeur instantanée)
+   Disponibilité (up)                                  linux01=1.0  ops01=1.0  win-dc01=1.0
+   CPU % Linux                                          linux01=0.2  ops01=4.9
+   CPU % Windows                                        win-dc01=1.0
+   Mémoire % Linux                                     linux01=11.3  ops01=17.3
+   Mémoire % Windows                                   win-dc01=26.7
+   Disque % Linux                                       linux01 /=29.1  ops01 /=26.1  linux01 /boot=11.4  ops01 /boot=11.4  linux01 /data=5.3
+   Disque % Windows                                     win-dc01 C:=24.2
+
+== Cheminement : exporters interrogés directement
+   192.168.50.20:9100   HTTP 200  1709 métriques
+   127.0.0.1:9100       HTTP 200  1797 métriques
+   192.168.50.10:9182   HTTP 200  3263 métriques
+
+== Ports en écoute sur OPS01
+State Local Peer
+LISTEN *:3000 
+LISTEN *:9100 
+LISTEN *:9090 
+
+== Pare-feu OPS01
+(ufw status nécessite sudo : voir P-50)
