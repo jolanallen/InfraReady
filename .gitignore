@@ -1,0 +1,10 @@
+# Secrets — never committed
+*.secret
+secrets.env
+.vault_pass*
+*.retry
+# Generated / local
+lab/build/
+*.iso
+*.ppm
+.obsidian/

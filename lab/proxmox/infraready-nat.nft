@@ -1,0 +1,14 @@
+# /etc/network/infraready-nat.nft — loaded by vmbr1 post-up
+# NAT lab -> internet, and block new connections from the lab to the home LAN.
+table ip infraready_nat
+flush table ip infraready_nat
+table ip infraready_nat {
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+		ip saddr 192.168.50.0/24 oifname "vmbr0" masquerade
+	}
+	chain forward {
+		type filter hook forward priority filter; policy accept;
+		ip saddr 192.168.50.0/24 ip daddr 192.168.0.0/24 ct state new drop
+	}
+}

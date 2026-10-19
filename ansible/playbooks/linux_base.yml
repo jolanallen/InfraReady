@@ -1,0 +1,169 @@
+---
+# Configuration de base de LINUX01 : identités, permissions, service web, stockage, pare-feu, exporter.
+# Rejouable : un second passage doit afficher changed=0.
+- name: LINUX01 - configuration de base
+  hosts: linux01
+  gather_facts: true
+
+  vars:
+    base_packages: [curl, vim, htop, acl, ufw, nginx, prometheus-node-exporter]
+    lab_groups: [webadmins, auditeurs]
+    lab_users:
+      - { name: alice, groups: [webadmins], comment: "Alice - admin web" }
+      - { name: bruno, groups: [webadmins], comment: "Bruno - admin web" }
+      - { name: chloe, groups: [auditeurs, systemd-journal], comment: "Chloe - auditrice (lecture des journaux)" }
+    web_root: /var/www/infraready
+    data_label: DATA
+    data_mount: /data
+
+  tasks:
+    - name: Fuseau horaire
+      community.general.timezone:
+        name: "{{ timezone }}"
+
+    - name: Paquets de base
+      ansible.builtin.apt:
+        name: "{{ base_packages }}"
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Groupes du labo
+      ansible.builtin.group:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ lab_groups }}"
+
+    - name: Utilisateurs du labo (sans mot de passe, connexion par su/sudo uniquement)
+      ansible.builtin.user:
+        name: "{{ item.name }}"
+        comment: "{{ item.comment }}"
+        groups: "{{ item.groups }}"
+        append: true
+        shell: /bin/bash
+        password: "!"
+        update_password: on_create
+      loop: "{{ lab_users }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Racine du site - écriture réservée à webadmins (setgid)
+      ansible.builtin.file:
+        path: "{{ web_root }}"
+        state: directory
+        owner: root
+        group: webadmins
+        mode: "2775"
+
+    - name: Page d'accueil du site
+      ansible.builtin.template:
+        src: ../templates/index.html.j2
+        dest: "{{ web_root }}/index.html"
+        owner: root
+        group: webadmins
+        mode: "0664"
+
+    - name: Virtual host nginx
+      ansible.builtin.template:
+        src: ../templates/nginx-infraready.conf.j2
+        dest: /etc/nginx/sites-available/infraready
+        mode: "0644"
+      notify: Recharger nginx
+
+    - name: Activer le site InfraReady
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/infraready
+        dest: /etc/nginx/sites-enabled/infraready
+        state: link
+      notify: Recharger nginx
+
+    - name: Désactiver le site par défaut
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Recharger nginx
+
+    - name: Services actifs au démarrage
+      ansible.builtin.service:
+        name: "{{ item }}"
+        state: started
+        enabled: true
+      loop: [nginx, prometheus-node-exporter]
+
+    - name: Disque de données monté par UUID
+      when: ansible_devices.sdb is defined
+      block:
+        - name: Récupérer l'UUID du système de fichiers DATA
+          ansible.builtin.command: blkid -L {{ data_label }}
+          register: data_dev
+          changed_when: false
+
+        - name: Lire l'UUID
+          ansible.builtin.command: blkid -s UUID -o value {{ data_dev.stdout }}
+          register: data_uuid
+          changed_when: false
+
+        - name: Monter {{ data_mount }} (fstab)
+          ansible.posix.mount:
+            path: "{{ data_mount }}"
+            src: "UUID={{ data_uuid.stdout }}"
+            fstype: ext4
+            opts: defaults,nofail
+            state: mounted
+
+        - name: Dossier des rapports - lecture pour auditeurs uniquement
+          ansible.builtin.file:
+            path: "{{ data_mount }}/rapports"
+            state: directory
+            owner: root
+            group: auditeurs
+            mode: "2750"
+
+    # Pare-feu : uniquement ce dont le labo a besoin
+    - name: UFW - SSH depuis le sous-réseau du labo
+      community.general.ufw:
+        rule: allow
+        port: "22"
+        proto: tcp
+        src: "{{ lab_subnet }}"
+
+    - name: UFW - HTTP depuis le sous-réseau du labo
+      community.general.ufw:
+        rule: allow
+        port: "80"
+        proto: tcp
+        src: "{{ lab_subnet }}"
+
+    - name: UFW - node_exporter depuis OPS01 uniquement
+      community.general.ufw:
+        rule: allow
+        port: "9100"
+        proto: tcp
+        src: "{{ ops_ip }}"
+
+    - name: UFW - politique par défaut et activation
+      community.general.ufw:
+        state: enabled
+        policy: deny
+        direction: incoming
+
+    # Vérifications
+    - name: Le site répond en HTTP 200
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}/"
+        status_code: 200
+      delegate_to: localhost
+      become: false
+
+    - name: node_exporter expose des métriques
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:9100/metrics"
+        status_code: 200
+      delegate_to: localhost
+      become: false
+
+  handlers:
+    - name: Recharger nginx
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded

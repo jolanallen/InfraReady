@@ -1,0 +1,10 @@
+# Appended to /etc/network/interfaces on the Proxmox host (backup: interfaces.bak-infraready)
+auto vmbr1
+iface vmbr1 inet static
+	address 192.168.50.1/24
+	bridge-ports none
+	bridge-stp off
+	bridge-fd 0
+	post-up /usr/sbin/sysctl -w net.ipv4.ip_forward=1
+	post-up /usr/sbin/nft -f /etc/network/infraready-nat.nft
+	post-down /usr/sbin/nft delete table ip infraready_nat

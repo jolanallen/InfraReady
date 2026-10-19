@@ -1,0 +1,199 @@
+---
+# Configuration de WIN-DC01 : annuaire (OU, groupes, comptes), partage avec droits NTFS,
+# DNS (zone inverse + enregistrements), windows_exporter et pare-feu.
+# Prérequis : AD DS installé et domaine infraready.test créé (phase B).
+- name: WIN-DC01 - configuration de base
+  hosts: windows
+  gather_facts: true
+
+  vars:
+    base_dn: "DC=infraready,DC=test"
+    ou_root: "OU=InfraReady,{{ base_dn }}"
+    ad_groups:
+      - { name: GG_Support_IT, description: "Support informatique - lecture sur le partage Compta" }
+      - { name: GG_Comptabilite, description: "Comptabilité - modification sur le partage Compta" }
+    ad_users:
+      - { sam: j.martin, given: Julie, surname: Martin, groups: [GG_Support_IT] }
+      - { sam: s.bernard, given: Samir, surname: Bernard, groups: [GG_Support_IT] }
+      - { sam: l.petit, given: Lea, surname: Petit, groups: [GG_Comptabilite] }
+      - { sam: t.moreau, given: Theo, surname: Moreau, groups: [GG_Comptabilite] }
+    share_path: C:\Partages\Comptabilite
+    dns_records:
+      - { name: linux01, ip: 192.168.50.20 }
+      - { name: ops01, ip: 192.168.50.30 }
+    windows_exporter_version: "{{ lookup('ansible.builtin.env', 'WINDOWS_EXPORTER_VERSION') | default('0.31.8', true) }}"
+
+  tasks:
+    - name: Fuseau horaire
+      community.windows.win_timezone:
+        timezone: Romance Standard Time
+
+    # --- Annuaire -------------------------------------------------------------
+    - name: OU racine InfraReady
+      microsoft.ad.ou:
+        name: InfraReady
+        path: "{{ base_dn }}"
+        state: present
+
+    - name: OU Utilisateurs et Groupes
+      microsoft.ad.ou:
+        name: "{{ item }}"
+        path: "{{ ou_root }}"
+        state: present
+      loop: [Utilisateurs, Groupes]
+
+    - name: Groupes de sécurité globaux
+      microsoft.ad.group:
+        name: "{{ item.name }}"
+        description: "{{ item.description }}"
+        scope: global
+        category: security
+        path: "OU=Groupes,{{ ou_root }}"
+        state: present
+      loop: "{{ ad_groups }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Comptes utilisateurs de test
+      microsoft.ad.user:
+        name: "{{ item.sam }}"
+        sam_account_name: "{{ item.sam }}"
+        upn: "{{ item.sam }}@{{ ad_domain }}"
+        firstname: "{{ item.given }}"
+        surname: "{{ item.surname }}"
+        display_name: "{{ item.given }} {{ item.surname }}"
+        path: "OU=Utilisateurs,{{ ou_root }}"
+        password: "{{ vault_ad_user_password }}"
+        update_password: on_create
+        password_never_expires: false
+        enabled: true
+        groups:
+          add: "{{ item.groups }}"
+        state: present
+      loop: "{{ ad_users }}"
+      loop_control:
+        label: "{{ item.sam }}"
+      no_log: true
+
+    # --- Partage et droits ---------------------------------------------------
+    - name: Dossier partagé Comptabilité
+      ansible.windows.win_file:
+        path: "{{ share_path }}"
+        state: directory
+
+    - name: NTFS - désactiver l'héritage (copie des ACE existantes)
+      ansible.windows.win_acl_inheritance:
+        path: "{{ share_path }}"
+        state: absent
+        reorganize: true
+
+    - name: NTFS - retirer Users (BUILTIN) hérité
+      ansible.windows.win_acl:
+        path: "{{ share_path }}"
+        user: BUILTIN\Users
+        rights: ReadAndExecute,Synchronize
+        type: allow
+        state: absent
+
+    - name: NTFS - Comptabilité en modification, Support IT en lecture
+      ansible.windows.win_acl:
+        path: "{{ share_path }}"
+        user: "{{ ad_netbios }}\\{{ item.group }}"
+        rights: "{{ item.rights }}"
+        type: allow
+        state: present
+        inherit: ContainerInherit, ObjectInherit
+        propagation: None
+      loop:
+        - { group: GG_Comptabilite, rights: Modify }
+        - { group: GG_Support_IT, rights: ReadAndExecute }
+
+    - name: Partage SMB \\WIN-DC01\Compta
+      ansible.windows.win_share:
+        name: Compta
+        description: Partage du service comptabilité
+        path: "{{ share_path }}"
+        list: false
+        change: "{{ ad_netbios }}\\GG_Comptabilite"
+        read: "{{ ad_netbios }}\\GG_Support_IT"
+        state: present
+
+    # --- DNS -----------------------------------------------------------------
+    - name: Zone DNS inverse 50.168.192.in-addr.arpa
+      community.windows.win_dns_zone:
+        name: 50.168.192.in-addr.arpa
+        type: primary
+        replication: forest
+        dynamic_update: secure
+        state: present
+
+    - name: Enregistrements A des serveurs Linux
+      community.windows.win_dns_record:
+        zone: "{{ ad_domain }}"
+        name: "{{ item.name }}"
+        type: A
+        value: "{{ item.ip }}"
+        state: present
+      loop: "{{ dns_records }}"
+
+    - name: Enregistrements PTR des serveurs Linux
+      community.windows.win_dns_record:
+        zone: 50.168.192.in-addr.arpa
+        name: "{{ item.ip.split('.')[-1] }}"
+        type: PTR
+        value: "{{ item.name }}.{{ ad_domain }}"
+        state: present
+      loop: "{{ dns_records }}"
+
+    # --- Supervision ---------------------------------------------------------
+    - name: Télécharger windows_exporter {{ windows_exporter_version }}
+      ansible.windows.win_get_url:
+        url: "https://github.com/prometheus-community/windows_exporter/releases/download/v{{ windows_exporter_version }}/windows_exporter-{{ windows_exporter_version }}-amd64.msi"
+        dest: C:\Windows\Temp\windows_exporter-{{ windows_exporter_version }}.msi
+        force: false
+
+    - name: Installer windows_exporter (collecteurs CPU, mémoire, disques, système, services)
+      ansible.windows.win_package:
+        path: C:\Windows\Temp\windows_exporter-{{ windows_exporter_version }}.msi
+        arguments: ENABLED_COLLECTORS=cpu,memory,logical_disk,os,system,net,service
+        state: present
+
+    - name: Service windows_exporter démarré
+      ansible.windows.win_service:
+        name: windows_exporter
+        start_mode: auto
+        state: started
+
+    - name: Pare-feu - port 9182 ouvert pour OPS01 uniquement
+      community.windows.win_firewall_rule:
+        name: InfraReady - windows_exporter depuis OPS01
+        localport: "9182"
+        protocol: tcp
+        direction: in
+        action: allow
+        remoteip: "{{ ops_ip }}"
+        profiles: [domain, private, public]
+        state: present
+        enabled: true
+
+    # --- Vérifications -------------------------------------------------------
+    - name: Services critiques du contrôleur de domaine
+      ansible.windows.win_service_info:
+        name: "{{ item }}"
+      loop: [NTDS, DNS, Netlogon, kdc, windows_exporter]
+      register: dc_services
+
+    - name: Tous les services critiques sont en cours d'exécution
+      ansible.builtin.assert:
+        that: item.services[0].state == 'started'
+        fail_msg: "{{ item.item }} n'est pas démarré"
+        quiet: true
+      loop: "{{ dc_services.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: windows_exporter répond depuis OPS01
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:9182/metrics"
+        status_code: 200
+      delegate_to: localhost

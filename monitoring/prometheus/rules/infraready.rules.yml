@@ -1,0 +1,41 @@
+groups:
+  - name: infraready
+    rules:
+      - alert: InstanceDown
+        expr: up{job=~"linux|windows"} == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.host }} ne répond plus ({{ $labels.instance }})"
+          description: "La cible {{ $labels.job }} de {{ $labels.host }} est injoignable depuis plus d'1 minute."
+
+      - alert: CpuEleve
+        expr: |
+          (100 - avg by (host) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100) > 80
+          or
+          (100 - avg by (host) (rate(windows_cpu_time_total{mode="idle"}[2m])) * 100) > 80
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: "CPU > 80 % sur {{ $labels.host }}"
+          description: "Utilisation CPU à {{ $value | printf \"%.0f\" }} % depuis 2 minutes."
+
+      - alert: MemoireElevee
+        expr: |
+          (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 > 90
+          or
+          (1 - windows_memory_available_bytes / windows_memory_physical_total_bytes) * 100 > 90
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Mémoire > 90 % sur {{ $labels.host }}"
+
+      - alert: DisquePresquePlein
+        expr: |
+          (1 - node_filesystem_avail_bytes{fstype=~"ext4|xfs"} / node_filesystem_size_bytes{fstype=~"ext4|xfs"}) * 100 > 85
+          or
+          (1 - windows_logical_disk_free_bytes{volume=~"[A-Z]:"} / windows_logical_disk_size_bytes{volume=~"[A-Z]:"}) * 100 > 85
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Disque > 85 % sur {{ $labels.host }} ({{ $labels.mountpoint }}{{ $labels.volume }})"

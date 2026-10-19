@@ -1,0 +1,59 @@
+# Preuve : P-01-proxmox-vms-et-reseau
+# Hôte : pve — 2026-10-19 14:59:29 CEST
+# Commande(s) :
+#   sudo /usr/sbin/qm list; echo; for v in 100 101 102; do echo "--- VM $v"; sudo /usr/sbin/qm config $v | grep -E "^(name|cores|sockets|memory|net0|ide0|scsi0|ostype|bios)"; done; echo; echo "--- Snapshots"; for v in 100 101 102; do echo "VM $v: $(sudo /usr/sbin/qm listsnapshot $v | head -1)"; done; echo; echo "--- Pont du labo (vmbr1) et interfaces attachees"; ip -br addr show vmbr1; /usr/sbin/bridge link | grep "master vmbr1"; echo; echo "--- NAT / isolation (nftables)"; sudo /usr/sbin/nft list table ip infraready_nat
+
+      VMID NAME                 STATUS     MEM(MB)    BOOTDISK(GB) PID       
+       100 WIN-DC01             running    6144              50.00 48073     
+       101 LINUX01              running    4096              30.00 52193     
+       102 OPS01                running    6144              50.00 52319     
+
+--- VM 100
+bios: ovmf
+cores: 2
+ide0: pool-ssd:vm-100-disk-1,size=50G
+memory: 6144
+name: WIN-DC01
+net0: e1000e=BC:24:11:EA:70:74,bridge=vmbr1,firewall=1
+ostype: win11
+sockets: 2
+--- VM 101
+cores: 2
+memory: 4096
+name: LINUX01
+net0: virtio=BC:24:11:7A:CA:61,bridge=vmbr1,firewall=1
+ostype: l26
+scsi0: pool-ssd:vm-101-disk-0,iothread=1,size=30G
+sockets: 2
+--- VM 102
+cores: 4
+memory: 6144
+name: OPS01
+net0: virtio=BC:24:11:A1:B4:22,bridge=vmbr1,firewall=1
+ostype: l26
+scsi0: pool-ssd:vm-102-disk-0,iothread=1,size=50G
+sockets: 2
+
+--- Snapshots
+VM 100: `-> s01_installation_ok         2026-10-19 14:58:55     OS installe, IP fixe, avant configuration
+VM 101: `-> s01_installation_ok         2026-10-19 14:58:56     OS installe, IP fixe, avant configuration
+VM 102: `-> s01_installation_ok         2026-10-19 14:58:57     OS installe, IP fixe, avant configuration
+
+--- Pont du labo (vmbr1) et interfaces attachees
+vmbr1            UP             192.168.50.1/24 fe80::f8f6:eeff:fe8e:c341/64 
+17: fwpr100p0@fwln100i0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 master vmbr1 state forwarding priority 32 cost 2 
+21: fwpr101p0@fwln101i0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 master vmbr1 state forwarding priority 32 cost 2 
+25: fwpr102p0@fwln102i0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 master vmbr1 state forwarding priority 32 cost 2 
+
+--- NAT / isolation (nftables)
+table ip infraready_nat {
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+		ip saddr 192.168.50.0/24 oifname "vmbr0" masquerade
+	}
+
+	chain forward {
+		type filter hook forward priority filter; policy accept;
+		ip saddr 192.168.50.0/24 ip daddr 192.168.0.0/24 ct state new drop
+	}
+}

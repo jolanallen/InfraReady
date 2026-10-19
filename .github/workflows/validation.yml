@@ -1,0 +1,79 @@
+name: Validation
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fichiers:
+    name: Arborescence attendue
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Vérifier la présence des livrables
+        run: |
+          set -e
+          for f in README.md ansible/ansible.cfg ansible/inventory/hosts.yml \
+                   ansible/playbooks/linux_base.yml ansible/playbooks/windows_base.yml \
+                   monitoring/prometheus/prometheus.yml monitoring/prometheus/rules/infraready.rules.yml \
+                   monitoring/grafana/dashboards/infraready.json; do
+            test -f "$f" && echo "OK  $f" || { echo "::error file=$f::fichier manquant"; exit 1; }
+          done
+
+  yaml-ansible:
+    name: YAML + Ansible (syntaxe et lint)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Installer les outils
+        run: pip install "ansible-core>=2.17,<2.18" "ansible-lint>=24,<25" yamllint
+      - name: Collections Ansible
+        run: ansible-galaxy collection install -r ansible/requirements.yml
+      - name: yamllint
+        run: yamllint --strict .
+      - name: ansible-playbook --syntax-check
+        working-directory: ansible
+        run: |
+          echo "ci-dummy" > ~/.vault_pass_infraready   # aucune donnée chiffrée n'est lue au syntax-check
+          for p in playbooks/*.yml; do
+            echo "== $p"; ansible-playbook --syntax-check -i localhost, "$p"
+          done
+      - name: ansible-lint
+        working-directory: ansible
+        run: ansible-lint playbooks/
+
+  monitoring:
+    name: Prometheus + Grafana
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: promtool check config / rules
+        run: |
+          docker run --rm -v "$PWD/monitoring/prometheus:/cfg:ro" --entrypoint promtool \
+            prom/prometheus:v2.53.4 check config /cfg/prometheus.yml
+      - name: Dashboard Grafana = JSON valide
+        run: jq -e '.title and (.panels | length > 0)' monitoring/grafana/dashboards/infraready.json
+
+  secrets:
+    name: Aucun secret en clair
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks (historique complet)
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.24.3 git /repo --redact -v
+      - name: Fichiers vault obligatoirement chiffrés
+        run: |
+          set -e
+          for f in $(find ansible -name 'vault*.yml'); do
+            head -1 "$f" | grep -q '^\$ANSIBLE_VAULT;' || { echo "::error file=$f::vault non chiffré"; exit 1; }
+            echo "OK chiffré: $f"
+          done

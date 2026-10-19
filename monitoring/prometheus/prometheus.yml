@@ -1,0 +1,25 @@
+# Prometheus InfraReady — déployé sur OPS01 dans /etc/prometheus/
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - rules/infraready.rules.yml
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+        labels: {host: ops01}
+
+  - job_name: linux
+    static_configs:
+      - targets: ["192.168.50.20:9100"]
+        labels: {host: linux01, os: linux}
+      - targets: ["localhost:9100"]
+        labels: {host: ops01, os: linux}
+
+  - job_name: windows
+    static_configs:
+      - targets: ["192.168.50.10:9182"]
+        labels: {host: win-dc01, os: windows}

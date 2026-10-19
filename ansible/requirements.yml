@@ -1,0 +1,6 @@
+collections:
+  - name: ansible.windows
+  - name: ansible.posix
+  - name: community.general
+  - name: community.windows
+  - name: microsoft.ad

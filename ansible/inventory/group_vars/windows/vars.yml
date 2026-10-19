@@ -1,0 +1,7 @@
+ansible_connection: winrm
+ansible_port: 5985
+ansible_winrm_scheme: http
+ansible_winrm_transport: ntlm          # NTLM chiffre le message même sur HTTP
+ansible_winrm_server_cert_validation: ignore
+ansible_user: Administrator
+ansible_password: "{{ vault_win_admin_password }}"

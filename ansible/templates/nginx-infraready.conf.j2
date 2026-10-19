@@ -1,0 +1,10 @@
+# Géré par Ansible (linux_base.yml)
+server {
+    listen 80 default_server;
+    server_name {{ inventory_hostname }}.{{ ad_domain }} {{ ansible_host }};
+    root {{ web_root }};
+    index index.html;
+    access_log /var/log/nginx/infraready_access.log;
+    error_log  /var/log/nginx/infraready_error.log;
+    location / { try_files $uri $uri/ =404; }
+}

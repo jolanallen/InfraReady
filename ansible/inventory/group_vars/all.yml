@@ -1,0 +1,7 @@
+lab_subnet: 192.168.50.0/24
+lab_gateway: 192.168.50.1
+ad_domain: infraready.test
+ad_netbios: INFRAREADY
+dc_ip: 192.168.50.10
+ops_ip: 192.168.50.30
+timezone: Europe/Paris

@@ -1,0 +1,25 @@
+# Preuve : P-02-linux01-ip-connectivite-isolation
+# Hôte : linux01 — 2026-10-19 14:59:54 CEST
+# Commande(s) :
+#   echo "== $(hostname) : adressage"; ip -br -4 addr show ens18; ip route show default; echo; echo "== Connectivité labo"; for t in 192.168.50.1 192.168.50.10 192.168.50.20 192.168.50.30; do ping -c2 -W1 -q $t >/dev/null && echo "OK    $t" || echo "ECHEC $t"; done; echo; echo "== Internet via NAT"; ping -c2 -W2 -q 1.1.1.1 >/dev/null && echo "OK    1.1.1.1"; curl -s -o /dev/null -w "HTTP %{http_code} archive.ubuntu.com\n" http://archive.ubuntu.com/ubuntu/; echo; echo "== Isolation : réseau domestique 192.168.0.0/24 doit être bloqué"; ping -c2 -W1 -q 192.168.0.254 >/dev/null && echo "NON ISOLE 192.168.0.254" || echo "BLOQUE (attendu) 192.168.0.254"
+
+== linux01 : adressage
+ens18            UP             192.168.50.20/24 
+default via 192.168.50.1 dev ens18 proto static 
+
+== Connectivité labo
+OK    192.168.50.1
+OK    192.168.50.10
+OK    192.168.50.20
+OK    192.168.50.30
+
+== Internet via NAT
+OK    1.1.1.1
+HTTP 200 archive.ubuntu.com
+
+== Isolation : réseau domestique 192.168.0.0/24 doit être bloqué
+BLOQUE (attendu) 192.168.0.254
+
+== Contre-test depuis l'hôte Proxmox (hors labo) : ping 192.168.0.254
+2 packets transmitted, 2 received, 0% packet loss
+-> la passerelle répond à l'hôte : le blocage depuis le labo vient bien de la règle nftables (forward drop).
