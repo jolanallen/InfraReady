@@ -1,0 +1,16 @@
+# Preuve : P-04c-win-dc01-ip-dns
+# WIN-DC01 via WinRM depuis OPS01 (ansible win_powershell) — 2026-10-19 15:39:41 CEST
+# Script : scripts/verif-dns-depuis-dc.ps1
+
+== Adressage
+
+
+        InterfaceAlias IPv4          Passerelle   DNS
+        -------------- ----          ----------   ---
+        Ethernet       192.168.50.10 192.168.50.1 ::1,127.0.0.1
+== Connectivité et résolution
+linux01.infraready.test      192.168.50.20    ping=True
+ops01.infraready.test        192.168.50.30    ping=True
+win-dc01.infraready.test     192.168.50.10    ping=True
+www.ubuntu.com               91.189.91.45     ping=True
+== Inverse : linux01.infraready.test

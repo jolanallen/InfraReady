@@ -1,0 +1,32 @@
+# Preuve : P-04-linux01-resolution-dns-domaine
+# Hôte : linux01 — 2026-10-19 15:42:53 CEST
+# Commande(s) :
+#   echo "== $(hostname) : serveur DNS et domaine de recherche"; resolvectl dns ens18; resolvectl domain ens18
+#   echo; echo "== Résolution directe (A) via le DC"
+#   for n in infraready.test win-dc01.infraready.test linux01.infraready.test ops01.infraready.test win-dc01 www.ubuntu.com; do r=$(getent ahostsv4 $n | awk "NR==1{print \$1}"); [ -n "$r" ] && printf "OK    %-28s %s\n" $n $r || printf "ECHEC %s\n" $n; done
+#   echo; echo "== Résolution inverse (PTR)"; resolvectl flush-caches; for ip in 192.168.50.10 192.168.50.20 192.168.50.30; do printf "%-15s -> %s\n" $ip "$(resolvectl query $ip 2>/dev/null | awk "NR==1{print \$2}")"; done
+#   echo; echo "== Enregistrement SRV du contrôleur de domaine"; resolvectl query -t SRV _ldap._tcp.dc._msdcs.infraready.test 2>&1 | head -1
+#   echo; echo "== Ping par nom court (domaine de recherche)"; ping -c1 -W1 win-dc01 | head -2 | tail -1
+
+== linux01 : serveur DNS et domaine de recherche
+Link 2 (ens18): 192.168.50.10
+Link 2 (ens18): infraready.test
+
+== Résolution directe (A) via le DC
+OK    infraready.test              192.168.50.10
+OK    win-dc01.infraready.test     192.168.50.10
+OK    linux01.infraready.test      192.168.50.20
+OK    ops01.infraready.test        192.168.50.30
+OK    win-dc01                     192.168.50.10
+OK    www.ubuntu.com               91.189.91.44
+
+== Résolution inverse (PTR)
+192.168.50.10   -> win-dc01.infraready.test
+192.168.50.20   -> linux01.infraready.test
+192.168.50.30   -> ops01.infraready.test
+
+== Enregistrement SRV du contrôleur de domaine
+_ldap._tcp.dc._msdcs.infraready.test IN SRV 0 100 389 win-dc01.infraready.test -- link: ens18
+
+== Ping par nom court (domaine de recherche)
+64 bytes from win-dc01.infraready.test (192.168.50.10): icmp_seq=1 ttl=128 time=0.144 ms

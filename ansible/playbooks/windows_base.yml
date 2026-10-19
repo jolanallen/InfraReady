@@ -136,14 +136,14 @@
         state: present
       loop: "{{ dns_records }}"
 
-    - name: Enregistrements PTR des serveurs Linux
+    - name: Enregistrements PTR (serveurs Linux + contrôleur de domaine)
       community.windows.win_dns_record:
         zone: 50.168.192.in-addr.arpa
         name: "{{ item.ip.split('.')[-1] }}"
         type: PTR
         value: "{{ item.name }}.{{ ad_domain }}"
         state: present
-      loop: "{{ dns_records }}"
+      loop: "{{ dns_records + [{'name': 'win-dc01', 'ip': dc_ip}] }}"
 
     # --- Supervision ---------------------------------------------------------
     - name: Télécharger windows_exporter {{ windows_exporter_version }}
