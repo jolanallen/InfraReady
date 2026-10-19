@@ -1,0 +1,90 @@
+# Preuve : P-42b-win-dc01-diagnostic-kb5007651-historique-wu
+# Exécuté sur OPS01 (utilisateur ansible) contre WIN-DC01 — 2026-10-19 19:24 CEST
+# Commande(s) :
+#   ansible windows -m script -a /tmp/etat-wu.ps1   (script PowerShell : Get-MpComputerStatus, Microsoft.Update.Session.QueryHistory,
+#   clés de redémarrage CBS/WU, Get-Service, Get-ADDomain, Resolve-DnsName, Get-WinEvent WindowsUpdateClient)
+# Lecture : KB5007651 (plateforme Windows Security 10.0.29628.1000) est « Installation Successful » 3 fois de suite
+#   (15:47, 16:06, 16:07 UTC = 17:47, 18:06, 18:07 heure locale) et toujours re-proposée : boucle côté Windows Update,
+#   pas d'échec réel. La plateforme Defender est bien en 4.18.26090.9, aucun redémarrage en attente, AD/DNS OK.
+#   Les dates de QueryHistory sont en UTC, celles du journal Système en heure locale (CEST).
+
+=== Date / dernier démarrage / build ===
+2026-10-19 19:24:03
+19/10/2026 18:04:17
+UBR : 33650
+=== Plateforme Defender ===
+
+
+AMServiceVersion          : 4.18.26090.9
+AMProductVersion          : 4.18.26090.9
+AMEngineVersion           : 1.1.26090.9
+AntivirusSignatureVersion : 1.461.107.0
+
+
+
+
+=== Historique Windows Update (15 derniers) ===
+
+Date                ResultCode HResult    Title
+----                ---------- -------    -----
+19/10/2026 17:23:23          2 0x00000000 Security Intelligence Update for Microsoft Defender Antivirus - KB2267602 (Version 1.461.107.0) - Current Channel
+                                          (Broad)
+19/10/2026 16:07:41          2 0x00000000 Update for Windows Security platform - KB5007651 (Version 10.0.29628.1000)
+19/10/2026 16:06:57          2 0x00000000 Update for Microsoft Defender Antivirus antimalware platform - KB4052623 (Version 4.18.26090.9) - Current Channel
+                                          (Broad)
+19/10/2026 16:06:20          2 0x00000000 Update for Windows Security platform - KB5007651 (Version 10.0.29628.1000)
+19/10/2026 15:49:36          2 0x00000000 Security Intelligence Update for Microsoft Defender Antivirus - KB2267602 (Version 1.461.106.0) - Current Channel
+                                          (Broad)
+19/10/2026 15:48:53          2 0x00000000 Windows Malicious Software Removal Tool x64 - v5.146 (KB890830)
+19/10/2026 15:47:14          2 0x00000000 Update for Windows Security platform - KB5007651 (Version 10.0.29628.1000)
+19/10/2026 15:47:12          2 0x00000000 2026-10 Security Update (KB5126646) (26100.33650)
+19/10/2026 15:47:12          2 0x00000000 2026-10 .NET Framework Security Update (KB5127690)
+19/10/2026 15:11:47          4 0x80240034 2026-10 Security Update (KB5126646) (26100.33650)
+19/10/2026 12:58:33          2 0x00000000 9NRZT3Q9R3DL-Microsoft.WindowsAppRuntime.2
+19/10/2026 12:58:06          2 0x00000000 9NRZT3Q9R3DL-Microsoft.WindowsAppRuntime.2
+
+
+
+=== Redémarrage en attente ? ===
+CBS  : False
+WU   : False
+=== Services critiques / AD / DNS ===
+Microsoft.PowerShell.Commands.Internal.Format.FormatStartData
+Microsoft.PowerShell.Commands.Internal.Format.GroupStartData
+Microsoft.PowerShell.Commands.Internal.Format.FormatEntryData
+Microsoft.PowerShell.Commands.Internal.Format.FormatEntryData
+Microsoft.PowerShell.Commands.Internal.Format.FormatEntryData
+Microsoft.PowerShell.Commands.Internal.Format.FormatEntryData
+Microsoft.PowerShell.Commands.Internal.Format.FormatEntryData
+Microsoft.PowerShell.Commands.Internal.Format.GroupEndData
+Microsoft.PowerShell.Commands.Internal.Format.FormatEndData
+infraready.test
+
+Name                     IPAddress
+----                     ---------
+WIN-DC01.infraready.test 192.168.50.10
+
+
+
+=== Journaux Windows Update (System, WindowsUpdateClient, 10 derniers) ===
+
+TimeCreated         Id Message
+-----------         -- -------
+19/10/2026 19:23:23 19 Installation Successful: Windows successfully installed the following update: Security Intelligence Update for Microsoft Defender
+                       Antivirus
+19/10/2026 19:23:13 43 Installation Started: Windows has started installing the following update: Security Intelligence Update for Microsoft Defender Antivirus
+                       - K
+19/10/2026 19:23:13 44 Windows Update started downloading an update.
+19/10/2026 18:07:41 19 Installation Successful: Windows successfully installed the following update: Update for Windows Security platform - KB5007651 (Version
+                       10.0
+19/10/2026 18:07:40 43 Installation Started: Windows has started installing the following update: Update for Windows Security platform - KB5007651 (Version
+                       10.0.29
+19/10/2026 18:06:57 19 Installation Successful: Windows successfully installed the following update: Update for Microsoft Defender Antivirus antimalware
+                       platform -
+19/10/2026 18:06:20 43 Installation Started: Windows has started installing the following update: Update for Microsoft Defender Antivirus antimalware platform
+                       - KB
+19/10/2026 18:06:20 19 Installation Successful: Windows successfully installed the following update: Update for Windows Security platform - KB5007651 (Version
+                       10.0
+19/10/2026 18:06:19 43 Installation Started: Windows has started installing the following update: Update for Windows Security platform - KB5007651 (Version
+                       10.0.29
+19/10/2026 18:06:19 44 Windows Update started downloading an update.

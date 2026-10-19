@@ -1,0 +1,257 @@
+# Preuve : P-42c-windows-maintenance-installation-complete-apres-exclusion
+# Exécuté sur OPS01 (utilisateur ansible, ~/infraready/ansible) — 2026-10-19 19:21 et 19:22 CEST
+# Correction appliquée avant : reject_list: [KB5007651] dans playbooks/windows_maintenance.yml (recherche et installation).
+# Commande(s) :
+#   1) ansible-playbook playbooks/windows_maintenance.yml                           (recherche seule)
+#   2) ansible-playbook playbooks/windows_maintenance.yml -e maintenance_apply=true  (installation, sans redémarrage)
+#   3) cat ~/infraready-logs/maintenance-win-dc01-<date>.txt                        (rapport généré par le passage 2)
+# Résultat : KB5007651 exclue ; 1 mise à jour restante (signatures Defender 1.461.107.0) installée, redémarrage requis=False,
+#   services critiques, Get-ADDomain et DNS OK après maintenance, failed=0 sur les deux passages.
+
+===== 1) Recherche seule =====
+
+PLAY [Maintenance Windows] *****************************************************
+
+TASK [Gathering Facts] *********************************************************
+Monday 19 October 2026  19:21:10 +0200 (0:00:00.025)       0:00:00.025 ******** 
+ok: [win-dc01]
+
+TASK [Occupation des volumes] **************************************************
+Monday 19 October 2026  19:21:13 +0200 (0:00:03.298)       0:00:03.324 ******** 
+ok: [win-dc01]
+
+TASK [Espace disque suffisant avant mise à jour] *******************************
+Monday 19 October 2026  19:21:20 +0200 (0:00:07.021)       0:00:10.346 ******** 
+ok: [win-dc01]
+
+TASK [Services critiques avant maintenance] ************************************
+Monday 19 October 2026  19:21:20 +0200 (0:00:00.040)       0:00:10.386 ******** 
+ok: [win-dc01] => (item=NTDS)
+ok: [win-dc01] => (item=DNS)
+ok: [win-dc01] => (item=Netlogon)
+ok: [win-dc01] => (item=kdc)
+ok: [win-dc01] => (item=windows_exporter)
+
+TASK [Les services critiques sont démarrés avant maintenance] ******************
+Monday 19 October 2026  19:21:29 +0200 (0:00:08.508)       0:00:18.895 ******** 
+ok: [win-dc01] => (item=NTDS)
+ok: [win-dc01] => (item=DNS)
+ok: [win-dc01] => (item=Netlogon)
+ok: [win-dc01] => (item=kdc)
+ok: [win-dc01] => (item=windows_exporter)
+
+TASK [Aucun redémarrage déjà en attente (clés de registre CBS / Windows Update)] ***
+Monday 19 October 2026  19:21:29 +0200 (0:00:00.047)       0:00:18.942 ******** 
+ok: [win-dc01]
+
+TASK [Pas de redémarrage en attente avant de commencer] ************************
+Monday 19 October 2026  19:21:31 +0200 (0:00:02.091)       0:00:21.034 ******** 
+ok: [win-dc01]
+
+TASK [Recherche des mises à jour disponibles (sans installation)] **************
+Monday 19 October 2026  19:21:31 +0200 (0:00:00.025)       0:00:21.059 ******** 
+ok: [win-dc01]
+
+TASK [Mises à jour trouvées] ***************************************************
+Monday 19 October 2026  19:21:41 +0200 (0:00:10.198)       0:00:31.258 ******** 
+ok: [win-dc01] => 
+    msg: '1 mise(s) à jour : [''Security Intelligence Update for Microsoft Defender Antivirus
+        - KB2267602 (Version 1.461.107.0) - Current Channel (Broad)'']'
+
+TASK [Installation des mises à jour (uniquement avec -e maintenance_apply=true)] ***
+Monday 19 October 2026  19:21:41 +0200 (0:00:00.037)       0:00:31.295 ******** 
+skipping: [win-dc01]
+
+TASK [Services critiques après maintenance] ************************************
+Monday 19 October 2026  19:21:41 +0200 (0:00:00.030)       0:00:31.325 ******** 
+ok: [win-dc01] => (item=NTDS)
+ok: [win-dc01] => (item=DNS)
+ok: [win-dc01] => (item=Netlogon)
+ok: [win-dc01] => (item=kdc)
+ok: [win-dc01] => (item=windows_exporter)
+
+TASK [Les services critiques sont démarrés après maintenance] ******************
+Monday 19 October 2026  19:21:50 +0200 (0:00:08.403)       0:00:39.729 ******** 
+ok: [win-dc01] => (item=NTDS)
+ok: [win-dc01] => (item=DNS)
+ok: [win-dc01] => (item=Netlogon)
+ok: [win-dc01] => (item=kdc)
+ok: [win-dc01] => (item=windows_exporter)
+
+TASK [Le domaine répond (Get-ADDomain) et la résolution DNS fonctionne] ********
+Monday 19 October 2026  19:21:50 +0200 (0:00:00.046)       0:00:39.775 ******** 
+ok: [win-dc01]
+
+TASK [Historique Windows Update récent] ****************************************
+Monday 19 October 2026  19:21:53 +0200 (0:00:02.730)       0:00:42.506 ******** 
+ok: [win-dc01]
+
+TASK [Dossier des rapports sur le nœud de contrôle] ****************************
+Monday 19 October 2026  19:21:55 +0200 (0:00:02.079)       0:00:44.586 ******** 
+ok: [win-dc01 -> localhost]
+
+TASK [Rapport de maintenance] **************************************************
+Monday 19 October 2026  19:21:55 +0200 (0:00:00.288)       0:00:44.874 ******** 
+changed: [win-dc01 -> localhost]
+
+TASK [Résumé] ******************************************************************
+Monday 19 October 2026  19:21:55 +0200 (0:00:00.546)       0:00:45.421 ******** 
+ok: [win-dc01] => 
+    msg: 'win-dc01 : volumes 37.2 % max, 1 MAJ disponibles, appliquées=False'
+
+PLAY RECAP *********************************************************************
+win-dc01                   : ok=16   changed=1    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+
+Monday 19 October 2026  19:21:55 +0200 (0:00:00.039)       0:00:45.461 ******** 
+Recherche des mises à jour disponibles (sans installation) ------------- 10.20s
+Services critiques avant maintenance ------------------------------------ 8.51s
+Services critiques après maintenance ------------------------------------ 8.40s
+Occupation des volumes -------------------------------------------------- 7.02s
+Gathering Facts --------------------------------------------------------- 3.30s
+Le domaine répond (Get-ADDomain) et la résolution DNS fonctionne -------- 2.73s
+Aucun redémarrage déjà en attente (clés de registre CBS / Windows Update) --- 2.09s
+Historique Windows Update récent ---------------------------------------- 2.08s
+Rapport de maintenance -------------------------------------------------- 0.55s
+Dossier des rapports sur le nœud de contrôle ---------------------------- 0.29s
+Les services critiques sont démarrés avant maintenance ------------------ 0.05s
+Les services critiques sont démarrés après maintenance ------------------ 0.05s
+Espace disque suffisant avant mise à jour ------------------------------- 0.04s
+Résumé ------------------------------------------------------------------ 0.04s
+Mises à jour trouvées --------------------------------------------------- 0.04s
+Installation des mises à jour (uniquement avec -e maintenance_apply=true) --- 0.03s
+Pas de redémarrage en attente avant de commencer ------------------------ 0.03s
+
+===== 2) Installation (sans redémarrage) =====
+
+PLAY [Maintenance Windows] *****************************************************
+
+TASK [Gathering Facts] *********************************************************
+Monday 19 October 2026  19:22:40 +0200 (0:00:00.025)       0:00:00.025 ******** 
+ok: [win-dc01]
+
+TASK [Occupation des volumes] **************************************************
+Monday 19 October 2026  19:22:42 +0200 (0:00:02.670)       0:00:02.696 ******** 
+ok: [win-dc01]
+
+TASK [Espace disque suffisant avant mise à jour] *******************************
+Monday 19 October 2026  19:22:46 +0200 (0:00:03.769)       0:00:06.465 ******** 
+ok: [win-dc01]
+
+TASK [Services critiques avant maintenance] ************************************
+Monday 19 October 2026  19:22:46 +0200 (0:00:00.039)       0:00:06.505 ******** 
+ok: [win-dc01] => (item=NTDS)
+ok: [win-dc01] => (item=DNS)
+ok: [win-dc01] => (item=Netlogon)
+ok: [win-dc01] => (item=kdc)
+ok: [win-dc01] => (item=windows_exporter)
+
+TASK [Les services critiques sont démarrés avant maintenance] ******************
+Monday 19 October 2026  19:22:55 +0200 (0:00:08.513)       0:00:15.018 ******** 
+ok: [win-dc01] => (item=NTDS)
+ok: [win-dc01] => (item=DNS)
+ok: [win-dc01] => (item=Netlogon)
+ok: [win-dc01] => (item=kdc)
+ok: [win-dc01] => (item=windows_exporter)
+
+TASK [Aucun redémarrage déjà en attente (clés de registre CBS / Windows Update)] ***
+Monday 19 October 2026  19:22:55 +0200 (0:00:00.046)       0:00:15.064 ******** 
+ok: [win-dc01]
+
+TASK [Pas de redémarrage en attente avant de commencer] ************************
+Monday 19 October 2026  19:22:57 +0200 (0:00:02.046)       0:00:17.111 ******** 
+ok: [win-dc01]
+
+TASK [Recherche des mises à jour disponibles (sans installation)] **************
+Monday 19 October 2026  19:22:57 +0200 (0:00:00.024)       0:00:17.135 ******** 
+ok: [win-dc01]
+
+TASK [Mises à jour trouvées] ***************************************************
+Monday 19 October 2026  19:23:04 +0200 (0:00:07.739)       0:00:24.875 ******** 
+ok: [win-dc01] => 
+    msg: '1 mise(s) à jour : [''Security Intelligence Update for Microsoft Defender Antivirus
+        - KB2267602 (Version 1.461.107.0) - Current Channel (Broad)'']'
+
+TASK [Installation des mises à jour (uniquement avec -e maintenance_apply=true)] ***
+Monday 19 October 2026  19:23:05 +0200 (0:00:00.039)       0:00:24.914 ******** 
+changed: [win-dc01]
+
+TASK [Services critiques après maintenance] ************************************
+Monday 19 October 2026  19:23:26 +0200 (0:00:21.203)       0:00:46.118 ******** 
+ok: [win-dc01] => (item=NTDS)
+ok: [win-dc01] => (item=DNS)
+ok: [win-dc01] => (item=Netlogon)
+ok: [win-dc01] => (item=kdc)
+ok: [win-dc01] => (item=windows_exporter)
+
+TASK [Les services critiques sont démarrés après maintenance] ******************
+Monday 19 October 2026  19:23:35 +0200 (0:00:09.058)       0:00:55.177 ******** 
+ok: [win-dc01] => (item=NTDS)
+ok: [win-dc01] => (item=DNS)
+ok: [win-dc01] => (item=Netlogon)
+ok: [win-dc01] => (item=kdc)
+ok: [win-dc01] => (item=windows_exporter)
+
+TASK [Le domaine répond (Get-ADDomain) et la résolution DNS fonctionne] ********
+Monday 19 October 2026  19:23:35 +0200 (0:00:00.045)       0:00:55.222 ******** 
+ok: [win-dc01]
+
+TASK [Historique Windows Update récent] ****************************************
+Monday 19 October 2026  19:23:39 +0200 (0:00:03.755)       0:00:58.978 ******** 
+ok: [win-dc01]
+
+TASK [Dossier des rapports sur le nœud de contrôle] ****************************
+Monday 19 October 2026  19:23:41 +0200 (0:00:02.142)       0:01:01.121 ******** 
+ok: [win-dc01 -> localhost]
+
+TASK [Rapport de maintenance] **************************************************
+Monday 19 October 2026  19:23:41 +0200 (0:00:00.292)       0:01:01.414 ******** 
+changed: [win-dc01 -> localhost]
+
+TASK [Résumé] ******************************************************************
+Monday 19 October 2026  19:23:42 +0200 (0:00:00.550)       0:01:01.964 ******** 
+ok: [win-dc01] => 
+    msg: 'win-dc01 : volumes 37.2 % max, 1 MAJ disponibles, appliquées=true'
+
+PLAY RECAP *********************************************************************
+win-dc01                   : ok=17   changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+Monday 19 October 2026  19:23:42 +0200 (0:00:00.041)       0:01:02.005 ******** 
+Installation des mises à jour (uniquement avec -e maintenance_apply=true) -- 21.20s
+Services critiques après maintenance ------------------------------------ 9.06s
+Services critiques avant maintenance ------------------------------------ 8.51s
+Recherche des mises à jour disponibles (sans installation) -------------- 7.74s
+Occupation des volumes -------------------------------------------------- 3.77s
+Le domaine répond (Get-ADDomain) et la résolution DNS fonctionne -------- 3.76s
+Gathering Facts --------------------------------------------------------- 2.67s
+Historique Windows Update récent ---------------------------------------- 2.14s
+Aucun redémarrage déjà en attente (clés de registre CBS / Windows Update) --- 2.05s
+Rapport de maintenance -------------------------------------------------- 0.55s
+Dossier des rapports sur le nœud de contrôle ---------------------------- 0.29s
+Les services critiques sont démarrés avant maintenance ------------------ 0.05s
+Les services critiques sont démarrés après maintenance ------------------ 0.05s
+Résumé ------------------------------------------------------------------ 0.04s
+Espace disque suffisant avant mise à jour ------------------------------- 0.04s
+Mises à jour trouvées --------------------------------------------------- 0.04s
+Pas de redémarrage en attente avant de commencer ------------------------ 0.02s
+
+===== 3) Rapport généré =====
+Rapport de maintenance InfraReady — win-dc01 (192.168.50.10)
+Date      : 2026-10-19T17:22:42Z
+Système   : Microsoft Windows Server 2025 Standard Evaluation (10.0.26100.0)
+Volumes   : C:=37.2% (30.7 Go libres) 
+Services  : NTDS, DNS, Netlogon, kdc, windows_exporter -> OK
+Recherche : 1 mise(s) à jour disponible(s)
+  - Security Intelligence Update for Microsoft Defender Antivirus - KB2267602 (Version 1.461.107.0) - Current Channel (Broad)
+Installation : 1 installée(s), redémarrage requis=False
+Contrôle AD : Domaine infraready.test OK — DNS -> 192.168.50.10
+--- Historique Windows Update (10 derniers) ---
+2026-10-19 17:23  code=2  Security Intelligence Update for Microsoft Defender Antivirus - KB2267602 (Version 1.461.107.0) - Current Channel (Broad)
+2026-10-19 16:07  code=2  Update for Windows Security platform - KB5007651 (Version 10.0.29628.1000)
+2026-10-19 16:06  code=2  Update for Microsoft Defender Antivirus antimalware platform - KB4052623 (Version 4.18.26090.9) - Current Channel (Broad)
+2026-10-19 16:06  code=2  Update for Windows Security platform - KB5007651 (Version 10.0.29628.1000)
+2026-10-19 15:49  code=2  Security Intelligence Update for Microsoft Defender Antivirus - KB2267602 (Version 1.461.106.0) - Current Channel (Broad)
+2026-10-19 15:48  code=2  Windows Malicious Software Removal Tool x64 - v5.146 (KB890830)
+2026-10-19 15:47  code=2  Update for Windows Security platform - KB5007651 (Version 10.0.29628.1000)
+2026-10-19 15:47  code=2  2026-10 Security Update (KB5126646) (26100.33650)
+2026-10-19 15:47  code=2  2026-10 .NET Framework Security Update (KB5127690)
+2026-10-19 15:11  code=4  2026-10 Security Update (KB5126646) (26100.33650)

@@ -377,35 +377,51 @@ Retour arrière disponible : snapshot `s03_avant_ansible` (WIN-DC01 et LINUX01).
 > [!abstract] Objectif
 > Formaliser et tester une maintenance sûre et traçable sur les deux OS.
 
-**Responsable :** [Nom] · **Dates :** [Date(s)] · **Statut :** À faire
+**Responsable :** [Nom] · **Dates :** 19/10/2026 · **Statut :** Terminé
 
 ### Travaux réalisés / checklist
 
-- [ ] Écrire une procédure de maintenance standard.
-- [ ] Automatiser les mises à jour Linux.
-- [ ] Documenter et tester les mises à jour Windows.
-- [ ] Vérifier l'espace disque et l'état des services.
-- [ ] Documenter les précautions avant redémarrage et changement majeur.
-- [ ] Conserver une trace des exécutions et résultats.
+- [x] Écrire une procédure de maintenance standard (`docs/procedure-maintenance.md`).
+- [x] Automatiser les mises à jour Linux (`linux_maintenance.yml` + `unattended-upgrades` quotidien).
+- [x] Documenter et tester les mises à jour Windows (`windows_maintenance.yml` : recherche, installation, redémarrage, post-contrôles).
+- [x] Vérifier l'espace disque et l'état des services (pré- et post-contrôles automatiques).
+- [x] Documenter les précautions avant redémarrage et changement majeur.
+- [x] Conserver une trace des exécutions et résultats (`ansible.log` + un rapport par serveur).
 
 ### Procédure et configuration
 
-[À compléter : pré-contrôles, snapshot, procédure et fenêtre de maintenance, ordre des opérations, retour arrière.]
+La procédure complète est dans **`docs/procedure-maintenance.md`** (fenêtre, ordre LINUX01 → OPS01 → WIN-DC01 en dernier, précautions, retour arrière). Elle est outillée par deux playbooks qui **refusent de continuer** si un pré-contrôle échoue :
 
-[Commandes et interfaces réellement utilisées : `apt`, PowerShell/Windows Update, `df -h`, `Get-Volume`, `systemctl`, `Get-Service`…]
+| Étape | Linux (`linux_maintenance.yml`, un serveur à la fois) | Windows (`windows_maintenance.yml`) |
+| --- | --- | --- |
+| 0. Retour arrière | Snapshot Proxmox `s04_avant_maintenance_e` (LINUX01, OPS01) | Snapshot `s04_avant_maj_windows` (WIN-DC01) |
+| 1. Pré-contrôles | Chaque système de fichiers < 85 % ; services attendus actifs (`ssh`, `nginx`, exporters, `prometheus`, `grafana-server`) | Volumes fixes < 85 % ; services NTDS, DNS, Netlogon, kdc, windows_exporter démarrés ; **aucun redémarrage déjà en attente** (clés CBS / Windows Update) |
+| 2. Mises à jour | `unattended-upgrades` installé et configuré (sécurité quotidienne, pas de redémarrage auto) ; `apt upgrade` (jamais de suppression) ; `autoremove` | Recherche Windows Update (sécurité, critiques, cumulatives, définitions) ; installation **uniquement** avec `-e maintenance_apply=true` |
+| 3. Redémarrage | Seulement si `/var/run/reboot-required` existe **et** `-e allow_reboot=true` | Seulement avec `-e allow_reboot=true` (géré par `win_updates`, 30 min max) |
+| 4. Post-contrôles | Services de nouveau actifs ; site web HTTP 200 (LINUX01) | Services critiques démarrés ; `Get-ADDomain` + résolution DNS ; historique Windows Update |
+| 5. Trace | `~/infraready-logs/maintenance-<hôte>-<date>.txt` sur OPS01 + `ansible.log` | idem + `C:\Windows\Temp\infraready-windowsupdate.log` |
+
+**Commandes et interfaces réellement utilisées** : `ansible-playbook playbooks/linux_maintenance.yml`, `ansible-playbook playbooks/windows_maintenance.yml [-e maintenance_apply=true -e allow_reboot=true]`, `qm snapshot`, modules `apt`, `win_updates`, `service_facts`, `win_service_info`, faits `ansible_mounts`, `Get-Volume`, `Get-Service`, `Get-ADDomain`, `Resolve-DnsName`, `unattended-upgrade --dry-run`, `systemctl list-timers`.
 
 ### Tests et preuves
 
 | Vérification | Attendu | Résultat observé | Preuve |
 | --- | --- | --- | --- |
-| Mise à jour Linux | Procédure automatisée vérifiable | [Résultat réel] | [P-4x] |
-| Mise à jour Windows | Procédure exécutée et documentée | [Résultat réel] | [P-4x] |
-| Capacité disque | État relevé et interprété | [Résultat réel] | [P-4x] |
-| État des services | Services critiques contrôlés | [Résultat réel] | [P-4x] |
+| Mise à jour Linux | Procédure automatisée vérifiable | LINUX01 : déjà à jour (phase C) ; OPS01 : paquets mis à jour ; aucun redémarrage requis ; `unattended-upgrades` actif (minuteries `apt-daily` 23:27 et `apt-daily-upgrade` 06:39), dry-run OK | [P-40](docs/preuves/P-40-linux-maintenance-standard.txt), [P-43](docs/preuves/P-43-linux01-mises-a-jour-automatiques-unattended.txt) |
+| Mise à jour Windows | Procédure exécutée et documentée | Recherche : **5 mises à jour** ; installation en 1 h 13 avec redémarrage du DC (18:04) : cumulative `KB5126646` (build 26100.33650), .NET `KB5127690`, MSRT, plateforme et signatures Defender ; la tâche échoue sur `KB5007651` (boucle Windows Update, voir Difficultés) ; après exclusion, passage complet `failed=0`, dernière signature Defender installée sans redémarrage, services/AD/DNS OK | [P-41](docs/preuves/P-41-windows-maintenance-recherche-maj.txt), [P-42](docs/preuves/P-42-windows-maintenance-installation-maj.txt), [P-42b](docs/preuves/P-42b-win-dc01-diagnostic-kb5007651-historique-wu.txt), [P-42c](docs/preuves/P-42c-windows-maintenance-installation-complete-apres-exclusion.txt) |
+| Capacité disque | État relevé et interprété | LINUX01 `/` 29,1 %, `/boot` 11,4 %, `/data` 5,3 % ; OPS01 `/` 26,1 % ; WIN-DC01 `C:` 24,2 % avant (37,1 Go libres) puis **37,2 %** après la cumulative (30,7 Go libres : WinSxS + fichiers de désinstallation) → tous < 85 %, marge suffisante | [P-40b](docs/preuves/P-40b-rapports-maintenance-generes.txt), [P-42c](docs/preuves/P-42c-windows-maintenance-installation-complete-apres-exclusion.txt) |
+| État des services | Services critiques contrôlés | Avant et après : ssh/nginx/node_exporter (LINUX01), ssh/prometheus/grafana/node_exporter (OPS01), NTDS/DNS/Netlogon/kdc/windows_exporter (WIN-DC01) tous actifs ; site HTTP 200 | [P-40](docs/preuves/P-40-linux-maintenance-standard.txt), [P-40b](docs/preuves/P-40b-rapports-maintenance-generes.txt) |
 
 ### Difficultés / décision / retour arrière
 
-[À compléter]
+| Problème | Cause | Correction | Résultat |
+| --- | --- | --- | --- |
+| 1er passage Windows : « un volume dépasse 85 % » alors que `C:` est à 24 % | Le lecteur CD vide (ISO éjectée) apparaît comme un volume `E:` de 0 octet → 100 % | Filtre sur les disques fixes de taille > 0 (`DriveType -eq 'Fixed'`) | Pré-contrôle correct ([P-41a](docs/preuves/P-41a-windows-maintenance-1er-essai-lecteur-cd.txt) → [P-41](docs/preuves/P-41-windows-maintenance-recherche-maj.txt)) |
+| Ordre des phases | La maintenance d'OPS01 contrôle `prometheus` et `grafana-server` | Phase F exécutée avant la maintenance d'OPS01 | Pré-contrôles cohérents |
+| Installation Windows : `failed=1` après 1 h 13 alors que 5 mises à jour sont installées et que le DC a redémarré | `KB5007651` (plateforme Windows Security) est marquée « Installation Successful » trois fois de suite (17:47, 18:06, 18:07) mais toujours re-proposée par Windows Update ; `win_updates` détecte la boucle et arrête la tâche, donc les post-contrôles n'ont pas tourné | Diagnostic avec `QueryHistory`, le journal Système (`WindowsUpdateClient`) et `Get-MpComputerStatus` (plateforme bien en 4.18.26090.9) ; ajout de `reject_list: [KB5007651]` dans le playbook, à suivre manuellement | Passage complet `failed=0`, post-contrôles OK ([P-42](docs/preuves/P-42-windows-maintenance-installation-maj.txt) → [P-42b](docs/preuves/P-42b-win-dc01-diagnostic-kb5007651-historique-wu.txt) → [P-42c](docs/preuves/P-42c-windows-maintenance-installation-complete-apres-exclusion.txt)) |
+| Rapport Windows : l'historique Windows Update est écrit sur une seule ligne avec des `\n` littéraux | `join('\n')` dans un gabarit Jinja ne produit pas de retour à la ligne | Boucle `{% for %}` dans le gabarit du rapport | Rapport lisible au passage suivant |
+
+Retour arrière disponible : snapshots `s04_avant_maintenance_e` (LINUX01, OPS01) et `s04_avant_maj_windows` (WIN-DC01).
 
 ---
 
@@ -648,6 +664,9 @@ Retour arrière disponible : snapshot `s02_avant_monitoring` (OPS01).
 | P-40b | 19/10/2026 | Rapports de maintenance générés (`~/infraready-logs/`) | [P-40b](docs/preuves/P-40b-rapports-maintenance-generes.txt) |
 | P-41a | 19/10/2026 | Maintenance Windows — 1er essai : lecteur CD vu comme volume plein | [P-41a](docs/preuves/P-41a-windows-maintenance-1er-essai-lecteur-cd.txt) |
 | P-41 | 19/10/2026 | Maintenance Windows — recherche des mises à jour (5 trouvées) | [P-41](docs/preuves/P-41-windows-maintenance-recherche-maj.txt) |
+| P-42 | 19/10/2026 | Maintenance Windows — installation (5 MAJ, redémarrage du DC, boucle KB5007651) | [P-42](docs/preuves/P-42-windows-maintenance-installation-maj.txt) |
+| P-42b | 19/10/2026 | Diagnostic WIN-DC01 : historique WU, journal Système, plateforme Defender | [P-42b](docs/preuves/P-42b-win-dc01-diagnostic-kb5007651-historique-wu.txt) |
+| P-42c | 19/10/2026 | Maintenance Windows — passage complet après exclusion de KB5007651 | [P-42c](docs/preuves/P-42c-windows-maintenance-installation-complete-apres-exclusion.txt) |
 | P-43 | 19/10/2026 | unattended-upgrades : configuration, minuteries, simulation | [P-43](docs/preuves/P-43-linux01-mises-a-jour-automatiques-unattended.txt) |
 | P-50a | 19/10/2026 | Monitoring — 1er essai : échec de connexion admin Grafana | [P-50a](docs/preuves/P-50a-ops01-grafana-1er-essai-echec-mot-de-passe-ini.txt) |
 | P-50 | 19/10/2026 | Playbook Prometheus + Grafana (cibles up, admin OK) | [P-50](docs/preuves/P-50-ops01-prometheus-grafana-installation.txt) |
@@ -668,7 +687,7 @@ Retour arrière disponible : snapshot `s02_avant_monitoring` (OPS01).
 	- **Proxmox VE 9.1 au lieu de VMware Workstation** — à faire valider par le formateur. Avantages : snapshots, ajout de disque à chaud, installations pilotables en ligne de commande, ressources suffisantes.
 	- Ressources légèrement supérieures au plan (vCPU) ; disque Windows en IDE (choix initial conservé).
 	- Ubuntu 24.04.**5** (dernière révision de la 24.04 LTS).
-- **Fonctionnalités inachevées :** phase E (installation Windows Update en cours), phase H ; commits du second membre du binôme.
+- **Fonctionnalités inachevées :** phase H ; commits du second membre du binôme ; `KB5007651` exclue de l'installation automatique (boucle Windows Update) et à suivre manuellement.
 - **Bilan du binôme :** [À compléter]
 
 ---
@@ -721,6 +740,10 @@ InfraReady/
 | 19/10/2026 15:24 | [Nom] | `apt upgrade` LINUX01 (20 paquets) | Code retour 0 | P-23 / `s02_avant_maj_c` |
 | 19/10/2026 15:28 | [Nom] | Playbooks Linux et Windows (2 passages) | changed=0 au 2ᵉ passage | P-31 à P-34 / `s03_avant_ansible` |
 | 19/10/2026 | [Nom] | DNS des VM Linux → DC, PTR du DC | A/PTR/SRV résolus | P-04, P-35 / `/root/50-cloud-init.yaml.bak-dns` |
+| 19/10/2026 16:30 | [Nom] | Prometheus, exporters, Grafana sur OPS01 | Cibles UP, dashboard, alerte testée | P-50 à P-55 / `s04_avant_maintenance_e` |
+| 19/10/2026 16:48 | [Nom] | Maintenance Linux (LINUX01, OPS01), `unattended-upgrades` | Post-contrôles OK, reboot non requis | P-40, P-43 / `s04_avant_maintenance_e` |
+| 19/10/2026 16:54 | [Nom] | Windows Update sur WIN-DC01 (5 MAJ, redémarrage 18:04) | `failed=1` (boucle KB5007651) puis passage complet OK | P-42 à P-42c / `s04_avant_maj_windows` |
+| 19/10/2026 19:21 | [Nom] | `reject_list: [KB5007651]` + gabarit du rapport Windows | `failed=0`, rapport lisible | P-42c / — |
 
 **Annexes** : sorties complètes dans `docs/preuves/`, modèles d'installation dans `lab/`, configurations dans `ansible/` et `monitoring/`.
 

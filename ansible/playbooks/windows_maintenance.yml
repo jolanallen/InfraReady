@@ -12,6 +12,9 @@
     disk_max_percent: 85
     services_critiques: [NTDS, DNS, Netlogon, kdc, windows_exporter]
     wu_categories: [SecurityUpdates, CriticalUpdates, UpdateRollups, DefinitionUpdates]
+    # KB5007651 (plateforme Windows Security) est réinstallée en boucle par Windows Update alors qu'elle
+    # est déjà en place (P-42 / P-42b) : exclue de l'installation automatique, à suivre manuellement.
+    wu_reject_list: [KB5007651]
     rapport_dir: "{{ lookup('ansible.builtin.env', 'HOME') }}/infraready-logs"
 
   tasks:
@@ -67,6 +70,7 @@
     - name: Recherche des mises à jour disponibles (sans installation)
       ansible.windows.win_updates:
         category_names: "{{ wu_categories }}"
+        reject_list: "{{ wu_reject_list }}"
         state: searched
         log_path: C:\Windows\Temp\infraready-windowsupdate.log
       register: wu_search
@@ -78,6 +82,7 @@
     - name: Installation des mises à jour (uniquement avec -e maintenance_apply=true)
       ansible.windows.win_updates:
         category_names: "{{ wu_categories }}"
+        reject_list: "{{ wu_reject_list }}"
         state: installed
         reboot: "{{ allow_reboot | bool }}"
         reboot_timeout: 1800
@@ -148,7 +153,8 @@
           {% endif %}
           Contrôle AD : {{ ad_check.output[0] }}
           --- Historique Windows Update (10 derniers) ---
-          {{ wu_history.output | join('\n') }}
+          {% for h in wu_history.output %}{{ h }}
+          {% endfor %}
       delegate_to: localhost
 
     - name: Résumé

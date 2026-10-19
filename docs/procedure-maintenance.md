@@ -41,6 +41,8 @@ ansible-playbook playbooks/windows_maintenance.yml -e maintenance_apply=true -e 
 
 - Catégories : mises à jour de sécurité, critiques, cumulatives, définitions.
 - Journal détaillé côté Windows : `C:\Windows\Temp\infraready-windowsupdate.log`.
+- Mises à jour exclues (`wu_reject_list`) : `KB5007651` (plateforme Windows Security), réinstallée en boucle par Windows Update bien qu'installée (preuves P-42, P-42b) ; à vérifier manuellement avec `Get-MpComputerStatus` et à retirer de la liste quand Microsoft aura corrigé le problème.
+- Une installation cumulative dure environ 1 h sur le DC du labo (téléchargement + redémarrage) : prévoir la fenêtre en conséquence.
 
 ## 4. Précautions avant redémarrage ou changement majeur
 
