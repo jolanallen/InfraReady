@@ -1,0 +1,134 @@
+# Preuve : P-34-playbook-windows-2e-passage-idempotence
+# Exécuté sur OPS01 (utilisateur ansible, ~/infraready/ansible) — 2026-10-19 15:30:44 CEST
+# Commande(s) :
+#   ansible-playbook playbooks/windows_base.yml
+
+
+PLAY [WIN-DC01 - configuration de base] ****************************************
+
+TASK [Gathering Facts] *********************************************************
+Monday 19 October 2026  15:30:47 +0200 (0:00:00.026)       0:00:00.026 ******** 
+ok: [win-dc01]
+
+TASK [Fuseau horaire] **********************************************************
+Monday 19 October 2026  15:30:52 +0200 (0:00:05.077)       0:00:05.103 ******** 
+ok: [win-dc01]
+
+TASK [OU racine InfraReady] ****************************************************
+Monday 19 October 2026  15:30:55 +0200 (0:00:02.882)       0:00:07.985 ******** 
+ok: [win-dc01]
+
+TASK [OU Utilisateurs et Groupes] **********************************************
+Monday 19 October 2026  15:30:59 +0200 (0:00:04.147)       0:00:12.133 ******** 
+ok: [win-dc01] => (item=Utilisateurs)
+ok: [win-dc01] => (item=Groupes)
+
+TASK [Groupes de sécurité globaux] *********************************************
+Monday 19 October 2026  15:31:07 +0200 (0:00:07.926)       0:00:20.060 ******** 
+ok: [win-dc01] => (item=GG_Support_IT)
+ok: [win-dc01] => (item=GG_Comptabilite)
+
+TASK [Comptes utilisateurs de test] ********************************************
+Monday 19 October 2026  15:31:15 +0200 (0:00:08.056)       0:00:28.116 ******** 
+ok: [win-dc01] => (item=None)
+ok: [win-dc01] => (item=None)
+ok: [win-dc01] => (item=None)
+ok: [win-dc01] => (item=None)
+ok: [win-dc01]
+
+TASK [Dossier partagé Comptabilité] ********************************************
+Monday 19 October 2026  15:31:28 +0200 (0:00:13.053)       0:00:41.170 ******** 
+ok: [win-dc01]
+
+TASK [NTFS - désactiver l'héritage (copie des ACE existantes)] *****************
+Monday 19 October 2026  15:31:30 +0200 (0:00:01.398)       0:00:42.568 ******** 
+ok: [win-dc01]
+
+TASK [NTFS - retirer Users (BUILTIN) hérité] ***********************************
+Monday 19 October 2026  15:31:31 +0200 (0:00:01.744)       0:00:44.313 ******** 
+ok: [win-dc01]
+
+TASK [NTFS - Comptabilité en modification, Support IT en lecture] **************
+Monday 19 October 2026  15:31:33 +0200 (0:00:02.016)       0:00:46.330 ******** 
+ok: [win-dc01] => (item={'group': 'GG_Comptabilite', 'rights': 'Modify'})
+ok: [win-dc01] => (item={'group': 'GG_Support_IT', 'rights': 'ReadAndExecute'})
+
+TASK [Partage SMB \\WIN-DC01\Compta] *******************************************
+Monday 19 October 2026  15:31:37 +0200 (0:00:03.616)       0:00:49.946 ******** 
+ok: [win-dc01]
+
+TASK [Zone DNS inverse 50.168.192.in-addr.arpa] ********************************
+Monday 19 October 2026  15:31:39 +0200 (0:00:01.982)       0:00:51.928 ******** 
+ok: [win-dc01]
+
+TASK [Enregistrements A des serveurs Linux] ************************************
+Monday 19 October 2026  15:31:42 +0200 (0:00:02.830)       0:00:54.759 ******** 
+ok: [win-dc01] => (item={'name': 'linux01', 'ip': '192.168.50.20'})
+ok: [win-dc01] => (item={'name': 'ops01', 'ip': '192.168.50.30'})
+
+TASK [Enregistrements PTR des serveurs Linux] **********************************
+Monday 19 October 2026  15:31:48 +0200 (0:00:05.890)       0:01:00.650 ******** 
+ok: [win-dc01] => (item={'name': 'linux01', 'ip': '192.168.50.20'})
+ok: [win-dc01] => (item={'name': 'ops01', 'ip': '192.168.50.30'})
+
+TASK [Télécharger windows_exporter 0.31.8] *************************************
+Monday 19 October 2026  15:31:53 +0200 (0:00:05.744)       0:01:06.395 ******** 
+ok: [win-dc01]
+
+TASK [Installer windows_exporter (collecteurs CPU, mémoire, disques, système, services)] ***
+Monday 19 October 2026  15:31:56 +0200 (0:00:02.157)       0:01:08.552 ******** 
+ok: [win-dc01]
+
+TASK [Service windows_exporter démarré] ****************************************
+Monday 19 October 2026  15:31:58 +0200 (0:00:02.109)       0:01:10.661 ******** 
+ok: [win-dc01]
+
+TASK [Pare-feu - port 9182 ouvert pour OPS01 uniquement] ***********************
+Monday 19 October 2026  15:32:00 +0200 (0:00:02.157)       0:01:12.819 ******** 
+ok: [win-dc01]
+
+TASK [Services critiques du contrôleur de domaine] *****************************
+Monday 19 October 2026  15:32:01 +0200 (0:00:01.512)       0:01:14.331 ******** 
+ok: [win-dc01] => (item=NTDS)
+ok: [win-dc01] => (item=DNS)
+ok: [win-dc01] => (item=Netlogon)
+ok: [win-dc01] => (item=kdc)
+ok: [win-dc01] => (item=windows_exporter)
+
+TASK [Tous les services critiques sont en cours d'exécution] *******************
+Monday 19 October 2026  15:32:11 +0200 (0:00:09.660)       0:01:23.992 ******** 
+ok: [win-dc01] => (item=NTDS)
+ok: [win-dc01] => (item=DNS)
+ok: [win-dc01] => (item=Netlogon)
+ok: [win-dc01] => (item=kdc)
+ok: [win-dc01] => (item=windows_exporter)
+
+TASK [windows_exporter répond depuis OPS01] ************************************
+Monday 19 October 2026  15:32:11 +0200 (0:00:00.045)       0:01:24.038 ******** 
+ok: [win-dc01 -> localhost]
+
+PLAY RECAP *********************************************************************
+win-dc01                   : ok=21   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+Monday 19 October 2026  15:32:12 +0200 (0:00:00.474)       0:01:24.512 ******** 
+=============================================================================== 
+Comptes utilisateurs de test ------------------------------------------- 13.05s
+Services critiques du contrôleur de domaine ----------------------------- 9.66s
+Groupes de sécurité globaux --------------------------------------------- 8.06s
+OU Utilisateurs et Groupes ---------------------------------------------- 7.93s
+Enregistrements A des serveurs Linux ------------------------------------ 5.89s
+Enregistrements PTR des serveurs Linux ---------------------------------- 5.74s
+Gathering Facts --------------------------------------------------------- 5.08s
+OU racine InfraReady ---------------------------------------------------- 4.15s
+NTFS - Comptabilité en modification, Support IT en lecture -------------- 3.62s
+Fuseau horaire ---------------------------------------------------------- 2.88s
+Zone DNS inverse 50.168.192.in-addr.arpa -------------------------------- 2.83s
+Service windows_exporter démarré ---------------------------------------- 2.16s
+Télécharger windows_exporter 0.31.8 ------------------------------------- 2.16s
+Installer windows_exporter (collecteurs CPU, mémoire, disques, système, services) --- 2.11s
+NTFS - retirer Users (BUILTIN) hérité ----------------------------------- 2.02s
+Partage SMB \\WIN-DC01\Compta ------------------------------------------- 1.98s
+NTFS - désactiver l'héritage (copie des ACE existantes) ----------------- 1.74s
+Pare-feu - port 9182 ouvert pour OPS01 uniquement ----------------------- 1.51s
+Dossier partagé Comptabilité -------------------------------------------- 1.40s
+windows_exporter répond depuis OPS01 ------------------------------------ 0.47s

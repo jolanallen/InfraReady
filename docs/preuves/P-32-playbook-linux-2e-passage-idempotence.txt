@@ -1,0 +1,132 @@
+# Preuve : P-32-playbook-linux-2e-passage-idempotence
+# Exécuté sur OPS01 (utilisateur ansible, ~/infraready/ansible) — 2026-10-19 15:27:13 CEST
+# Commande(s) :
+#   ansible-playbook playbooks/linux_base.yml
+
+
+PLAY [LINUX01 - configuration de base] *****************************************
+
+TASK [Gathering Facts] *********************************************************
+Monday 19 October 2026  15:27:16 +0200 (0:00:00.007)       0:00:00.007 ******** 
+ok: [linux01]
+
+TASK [Fuseau horaire] **********************************************************
+Monday 19 October 2026  15:27:17 +0200 (0:00:01.046)       0:00:01.054 ******** 
+ok: [linux01]
+
+TASK [Paquets de base] *********************************************************
+Monday 19 October 2026  15:27:17 +0200 (0:00:00.369)       0:00:01.424 ******** 
+ok: [linux01]
+
+TASK [Groupes du labo] *********************************************************
+Monday 19 October 2026  15:27:18 +0200 (0:00:00.929)       0:00:02.354 ******** 
+ok: [linux01] => (item=webadmins)
+ok: [linux01] => (item=auditeurs)
+
+TASK [Utilisateurs du labo (sans mot de passe, connexion par su/sudo uniquement)] ***
+Monday 19 October 2026  15:27:19 +0200 (0:00:00.467)       0:00:02.821 ******** 
+ok: [linux01] => (item=alice)
+ok: [linux01] => (item=bruno)
+ok: [linux01] => (item=chloe)
+
+TASK [Racine du site - écriture réservée à webadmins (setgid)] *****************
+Monday 19 October 2026  15:27:20 +0200 (0:00:00.823)       0:00:03.645 ******** 
+ok: [linux01]
+
+TASK [Page d'accueil du site] **************************************************
+Monday 19 October 2026  15:27:20 +0200 (0:00:00.291)       0:00:03.936 ******** 
+ok: [linux01]
+
+TASK [Virtual host nginx] ******************************************************
+Monday 19 October 2026  15:27:20 +0200 (0:00:00.511)       0:00:04.448 ******** 
+ok: [linux01]
+
+TASK [Activer le site InfraReady] **********************************************
+Monday 19 October 2026  15:27:21 +0200 (0:00:00.438)       0:00:04.887 ******** 
+ok: [linux01]
+
+TASK [Désactiver le site par défaut] *******************************************
+Monday 19 October 2026  15:27:21 +0200 (0:00:00.210)       0:00:05.097 ******** 
+ok: [linux01]
+
+TASK [Services actifs au démarrage] ********************************************
+Monday 19 October 2026  15:27:21 +0200 (0:00:00.201)       0:00:05.299 ******** 
+ok: [linux01] => (item=nginx)
+ok: [linux01] => (item=prometheus-node-exporter)
+
+TASK [Récupérer l'UUID du système de fichiers DATA] ****************************
+Monday 19 October 2026  15:27:22 +0200 (0:00:00.904)       0:00:06.203 ******** 
+ok: [linux01]
+
+TASK [Lire l'UUID] *************************************************************
+Monday 19 October 2026  15:27:22 +0200 (0:00:00.299)       0:00:06.503 ******** 
+ok: [linux01]
+
+TASK [Monter /data (fstab)] ****************************************************
+Monday 19 October 2026  15:27:23 +0200 (0:00:00.221)       0:00:06.724 ******** 
+ok: [linux01]
+
+TASK [Dossier des rapports - lecture pour auditeurs uniquement] ****************
+Monday 19 October 2026  15:27:23 +0200 (0:00:00.354)       0:00:07.079 ******** 
+ok: [linux01]
+
+TASK [UFW - SSH depuis le sous-réseau du labo] *********************************
+Monday 19 October 2026  15:27:23 +0200 (0:00:00.200)       0:00:07.279 ******** 
+ok: [linux01]
+
+TASK [UFW - HTTP depuis le sous-réseau du labo] ********************************
+Monday 19 October 2026  15:27:24 +0200 (0:00:00.585)       0:00:07.865 ******** 
+ok: [linux01]
+
+TASK [UFW - node_exporter depuis OPS01 uniquement] *****************************
+Monday 19 October 2026  15:27:24 +0200 (0:00:00.506)       0:00:08.371 ******** 
+ok: [linux01]
+
+TASK [UFW - politique par défaut et activation] ********************************
+Monday 19 October 2026  15:27:25 +0200 (0:00:00.496)       0:00:08.868 ******** 
+ok: [linux01]
+
+TASK [Le site répond en HTTP 200] **********************************************
+Monday 19 October 2026  15:27:27 +0200 (0:00:01.904)       0:00:10.772 ******** 
+ok: [linux01 -> localhost]
+
+TASK [node_exporter expose des métriques] **************************************
+Monday 19 October 2026  15:27:27 +0200 (0:00:00.404)       0:00:11.176 ******** 
+ok: [linux01 -> localhost]
+
+PLAY RECAP *********************************************************************
+linux01                    : ok=21   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+Monday 19 October 2026  15:27:27 +0200 (0:00:00.365)       0:00:11.542 ******** 
+=============================================================================== 
+UFW - politique par défaut et activation -------------------------------- 1.90s
+Gathering Facts --------------------------------------------------------- 1.05s
+Paquets de base --------------------------------------------------------- 0.93s
+Services actifs au démarrage -------------------------------------------- 0.90s
+Utilisateurs du labo (sans mot de passe, connexion par su/sudo uniquement) --- 0.82s
+UFW - SSH depuis le sous-réseau du labo --------------------------------- 0.59s
+Page d'accueil du site -------------------------------------------------- 0.51s
+UFW - HTTP depuis le sous-réseau du labo -------------------------------- 0.51s
+UFW - node_exporter depuis OPS01 uniquement ----------------------------- 0.50s
+Groupes du labo --------------------------------------------------------- 0.47s
+Virtual host nginx ------------------------------------------------------ 0.44s
+Le site répond en HTTP 200 ---------------------------------------------- 0.40s
+Fuseau horaire ---------------------------------------------------------- 0.37s
+node_exporter expose des métriques -------------------------------------- 0.37s
+Monter /data (fstab) ---------------------------------------------------- 0.35s
+Récupérer l'UUID du système de fichiers DATA ---------------------------- 0.30s
+Racine du site - écriture réservée à webadmins (setgid) ----------------- 0.29s
+Lire l'UUID ------------------------------------------------------------- 0.22s
+Activer le site InfraReady ---------------------------------------------- 0.21s
+Désactiver le site par défaut ------------------------------------------- 0.20s
+Status: active
+Logging: on (low)
+Default: deny (incoming), allow (outgoing), disabled (routed)
+New profiles: skip
+
+To                         Action      From
+--                         ------      ----
+22/tcp                     ALLOW IN    192.168.50.0/24           
+80/tcp                     ALLOW IN    192.168.50.0/24           
+9100/tcp                   ALLOW IN    192.168.50.30             
+
