@@ -17,7 +17,7 @@
         state: present
       register: adds_feature
 
-    - name: Créer la forêt {{ ad_domain }} (redémarre le serveur)
+    - name: Créer la forêt et redémarrer le serveur - {{ ad_domain }}
       microsoft.ad.domain:
         dns_domain_name: "{{ ad_domain }}"
         domain_netbios_name: "{{ ad_netbios }}"

@@ -1,0 +1,21 @@
+# Preuve : P-37 — PTR du DC : le DC gère son enregistrement, le playbook ne le réécrit plus
+# OPS01 (ansible) — 2026-10-19 16:20:29 CEST
+
+== 1. Le DC réenregistre lui-même ses enregistrements DNS (Register-DnsClient)
+    - Réenregistrement DNS du DC forcé à 16:20:47
+
+== 2. État de la zone inverse juste après (enregistrement dynamique du DC = horodaté)
+
+
+        HostName Cible                     TimeToLive Timestamp
+        -------- -----                     ---------- ---------
+        10       WIN-DC01.infraready.test. 00:20:00
+        20       linux01.infraready.test.  01:00:00
+        30       ops01.infraready.test.    01:00:00
+Enregistrement dynamique DNS du DC activé : True
+
+== 3. Playbook (version corrigée) : attendu changed=0
+win-dc01                   : ok=22   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+== 4. Second passage : attendu changed=0
+win-dc01                   : ok=22   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   

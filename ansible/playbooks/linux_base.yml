@@ -57,7 +57,7 @@
 
     - name: Page d'accueil du site
       ansible.builtin.template:
-        src: ../templates/index.html.j2
+        src: index.html.j2
         dest: "{{ web_root }}/index.html"
         owner: root
         group: webadmins
@@ -65,7 +65,7 @@
 
     - name: Virtual host nginx
       ansible.builtin.template:
-        src: ../templates/nginx-infraready.conf.j2
+        src: nginx-infraready.conf.j2
         dest: /etc/nginx/sites-available/infraready
         mode: "0644"
       notify: Recharger nginx
@@ -103,7 +103,7 @@
           register: data_uuid
           changed_when: false
 
-        - name: Monter {{ data_mount }} (fstab)
+        - name: Monter le disque de données via fstab - {{ data_mount }}
           ansible.posix.mount:
             path: "{{ data_mount }}"
             src: "UUID={{ data_uuid.stdout }}"
@@ -155,7 +155,7 @@
       delegate_to: localhost
       become: false
 
-    - name: node_exporter expose des métriques
+    - name: Les métriques node_exporter sont exposées
       ansible.builtin.uri:
         url: "http://{{ ansible_host }}:9100/metrics"
         status_code: 200

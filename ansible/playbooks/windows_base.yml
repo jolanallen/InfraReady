@@ -22,6 +22,9 @@
       - { name: linux01, ip: 192.168.50.20 }
       - { name: ops01, ip: 192.168.50.30 }
     windows_exporter_version: "{{ lookup('ansible.builtin.env', 'WINDOWS_EXPORTER_VERSION') | default('0.31.8', true) }}"
+    windows_exporter_msi: "windows_exporter-{{ windows_exporter_version }}-amd64.msi"
+    windows_exporter_url: >-
+      https://github.com/prometheus-community/windows_exporter/releases/download/v{{ windows_exporter_version }}/{{ windows_exporter_msi }}
 
   tasks:
     - name: Fuseau horaire
@@ -136,19 +139,32 @@
         state: present
       loop: "{{ dns_records }}"
 
-    - name: Enregistrements PTR (serveurs Linux + contrôleur de domaine)
+    - name: Enregistrements PTR des serveurs Linux (ils ne s'enregistrent pas eux-mêmes dans le DNS AD)
       community.windows.win_dns_record:
         zone: 50.168.192.in-addr.arpa
         name: "{{ item.ip.split('.')[-1] }}"
         type: PTR
         value: "{{ item.name }}.{{ ad_domain }}"
         state: present
-      loop: "{{ dns_records + [{'name': 'win-dc01', 'ip': dc_ip}] }}"
+      loop: "{{ dns_records }}"
+
+    # Le DC gère ses propres enregistrements (mise à jour dynamique sécurisée). Si le playbook gérait aussi
+    # le PTR du DC, les deux se réécriraient à tour de rôle (P-36/P-37). On ne déclenche l'enregistrement
+    # que si le PTR manque (cas d'une zone inverse créée après la promotion).
+    - name: PTR du contrôleur de domaine - déclencher son enregistrement dynamique s'il manque
+      ansible.windows.win_powershell:
+        script: |
+          $ptr = Get-DnsServerResourceRecord -ZoneName 50.168.192.in-addr.arpa -Name {{ dc_ip.split('.')[-1] }} -RRType Ptr -ErrorAction SilentlyContinue
+          if ($ptr) { $Ansible.Changed = $false; return "déjà présent : $($ptr.RecordData.PtrDomainName)" }
+          Register-DnsClient
+          Start-Sleep -Seconds 15
+          $Ansible.Changed = $true
+          "enregistrement déclenché"
 
     # --- Supervision ---------------------------------------------------------
     - name: Télécharger windows_exporter {{ windows_exporter_version }}
       ansible.windows.win_get_url:
-        url: "https://github.com/prometheus-community/windows_exporter/releases/download/v{{ windows_exporter_version }}/windows_exporter-{{ windows_exporter_version }}-amd64.msi"
+        url: "{{ windows_exporter_url }}"
         dest: C:\Windows\Temp\windows_exporter-{{ windows_exporter_version }}.msi
         force: false
 
@@ -192,7 +208,7 @@
       loop_control:
         label: "{{ item.item }}"
 
-    - name: windows_exporter répond depuis OPS01
+    - name: Le service windows_exporter répond depuis OPS01
       ansible.builtin.uri:
         url: "http://{{ ansible_host }}:9182/metrics"
         status_code: 200

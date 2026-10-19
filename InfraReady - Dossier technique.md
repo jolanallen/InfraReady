@@ -148,7 +148,7 @@ Les fichiers de réponse contenant de vrais mots de passe ont été **supprimés
 | Carte réseau `e1000` sur WIN-DC01 | Pilote non garanti sur Windows Server 2025 | Passage en `e1000e` (même adresse MAC) | Réseau fonctionnel dès l'installation |
 | L'installeur Ubuntu demande « Continue with autoinstall? » | Mot-clé `autoinstall` absent de la ligne de commande du noyau | Réponse `yes` envoyée par `qm sendkey` | Installation sans autre intervention |
 | Pas d'`iptables` sur l'hôte Proxmox 9 | Système basé sur nftables | Règles écrites en nftables, table dédiée | NAT + isolation fonctionnelles |
-| Le DC n'avait pas d'enregistrement PTR | Zone inverse créée **après** la promotion du DC | Ajout du PTR du DC dans `windows_base.yml` | PTR .10 résolu ([P-35](docs/preuves/P-35-playbook-windows-correction-ptr-dc.txt)) |
+| Le DC n'avait pas d'enregistrement PTR | Zone inverse créée **après** la promotion du DC | `windows_base.yml` déclenche l'enregistrement dynamique du DC (`Register-DnsClient`) si son PTR manque (voir phase D) | PTR .10 résolu ([P-35](docs/preuves/P-35-playbook-windows-correction-ptr-dc.txt), [P-37](docs/preuves/P-37-playbook-windows-ptr-dc-stable.txt)) |
 | Mot de passe `sudo` de l'hôte visible dans l'en-tête d'une preuve | Le script de capture recopiait la commande complète | Preuve nettoyée, script corrigé (affiche `sudo`), vérification systématique avant chaque commit | Aucun secret dans le dépôt |
 
 Retour arrière disponible : snapshot `s01_installation_ok` (3 VM) et `interfaces.bak-infraready` sur l'hôte.
@@ -364,7 +364,9 @@ Retour arrière disponible : snapshot `s02_avant_maj_c` (inclut le disque de tes
 | --- | --- | --- | --- |
 | windows_exporter 0.31.9 disponible | Version publiée 9 jours plus tôt | Choix de **0.31.8** (stable depuis 3 mois) | Version figée, surchargeable par variable d'environnement |
 | L'option MSI `ADDLOCAL=FirewallException` ouvre 9182 à tout le monde | Comportement de l'installeur | Option retirée, règle dédiée limitée à OPS01 | Port 9182 exposé à OPS01 seulement |
-| PTR du DC absent (vu en phase A) | Zone inverse créée après la promotion | PTR ajouté au playbook ; relance (changed=1) puis idempotence (changed=0) | [P-35](docs/preuves/P-35-playbook-windows-correction-ptr-dc.txt), [P-34](docs/preuves/P-34-playbook-windows-2e-passage-idempotence.txt) |
+| PTR du DC absent (vu en phase A) | Zone inverse créée après la promotion | 1ʳᵉ correction : PTR du DC ajouté à la liste gérée par le playbook (changed=1 puis 0) | [P-35](docs/preuves/P-35-playbook-windows-correction-ptr-dc.txt) |
+| Playbook de nouveau `changed=1` plus tard, sur ce même PTR | **Cause confirmée** : le DC enregistre lui-même son PTR par mise à jour dynamique (TTL 20 min, horodaté) ; le playbook le réécrivait en statique (TTL 1 h) → chacun écrasait l'autre à tour de rôle | Le playbook ne gère plus le PTR du DC : il ne déclenche `Register-DnsClient` que si le PTR manque. Seuls les hôtes Linux (qui ne s'enregistrent pas) restent gérés en statique | `changed=0` sur 2 passages, y compris juste après un réenregistrement forcé du DC ([P-36b](docs/preuves/P-36b-ptr-dc-apres-reenregistrement-dynamique.txt), [P-37](docs/preuves/P-37-playbook-windows-ptr-dc-stable.txt)) |
+| 1ʳᵉ exécution du workflow GitHub Actions en échec | Dashboard Grafana pas encore écrit, une ligne > 160 caractères, 7 remarques `ansible-lint` (chemins relatifs, noms de tâches) | Dashboard créé, playbooks corrigés, mêmes outils installés localement (ansible-core 2.16 + collections aux versions d'OPS01) pour valider avant de pousser | yamllint, syntax-check et ansible-lint (profil `production`) OK en local ; playbooks rejoués : `changed=0` |
 
 Retour arrière disponible : snapshot `s03_avant_ansible` (WIN-DC01 et LINUX01).
 
@@ -586,6 +588,9 @@ Fichiers déjà écrits : `monitoring/prometheus/prometheus.yml` (jobs `promethe
 | P-33 | 19/10/2026 | Playbook Windows — 1er passage | [P-33](docs/preuves/P-33-playbook-windows-1er-passage.txt) |
 | P-34 | 19/10/2026 | Playbook Windows — 2e passage (idempotence) | [P-34](docs/preuves/P-34-playbook-windows-2e-passage-idempotence.txt) |
 | P-35 | 19/10/2026 | Playbook Windows — correction PTR du DC | [P-35](docs/preuves/P-35-playbook-windows-correction-ptr-dc.txt) |
+| P-36 | 19/10/2026 | Diagnostic : enregistrements de la zone inverse (statique/dynamique) | [P-36](docs/preuves/P-36-diagnostic-ptr-dc-statique-vs-dynamique.txt) |
+| P-36b | 19/10/2026 | Zone inverse après réenregistrement du DC | [P-36b](docs/preuves/P-36b-ptr-dc-apres-reenregistrement-dynamique.txt) |
+| P-37 | 19/10/2026 | Playbook Windows stable après réenregistrement du DC (changed=0 ×2) | [P-37](docs/preuves/P-37-playbook-windows-ptr-dc-stable.txt) |
 
 ---
 

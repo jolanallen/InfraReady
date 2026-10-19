@@ -1,0 +1,12 @@
+# Preuve : P-36-diagnostic-ptr-dc-statique-vs-dynamique
+# WIN-DC01 via WinRM depuis OPS01 (ansible win_powershell) — 2026-10-19 16:15:32 CEST
+# Script : scripts/verif-ptr-zone-inverse.ps1
+
+
+
+        HostName Cible                     TimeToLive Timestamp
+        -------- -----                     ---------- ---------
+        10       WIN-DC01.infraready.test. 01:00:00
+        20       linux01.infraready.test.  01:00:00
+        30       ops01.infraready.test.    01:00:00
+Enregistrement dynamique DNS du DC activé : True

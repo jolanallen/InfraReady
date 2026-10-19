@@ -1,6 +1,12 @@
+# Versions identiques à celles installées sur OPS01 (paquet Ubuntu 24.04 « ansible » 9.2.0)
 collections:
   - name: ansible.windows
+    version: "2.2.0"
   - name: ansible.posix
+    version: "1.5.4"
   - name: community.general
+    version: "8.3.0"
   - name: community.windows
+    version: "2.1.0"
   - name: microsoft.ad
+    version: "1.4.1"

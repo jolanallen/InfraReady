@@ -1,0 +1,177 @@
+{
+  "uid": "infraready-serveurs",
+  "title": "InfraReady — Serveurs",
+  "description": "CPU, mémoire, stockage et disponibilité de WIN-DC01, LINUX01 et OPS01 (Prometheus : node_exporter + windows_exporter)",
+  "tags": ["infraready"],
+  "timezone": "browser",
+  "editable": true,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Disponibilité des serveurs",
+      "gridPos": { "h": 5, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-infraready" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (host) (up{job=~\"linux|windows\"})",
+          "legendFormat": "{{host}}",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "HORS LIGNE", "color": "red", "index": 0 }, "1": { "text": "EN LIGNE", "color": "green", "index": 1 } } }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "CPU (%)",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-infraready" },
+      "targets": [
+        {
+          "refId": "Linux",
+          "expr": "100 - avg by (host) (rate(node_cpu_seconds_total{mode=\"idle\"}[2m])) * 100",
+          "legendFormat": "{{host}}"
+        },
+        {
+          "refId": "Windows",
+          "expr": "100 - avg by (host) (rate(windows_cpu_time_total{mode=\"idle\"}[2m])) * 100",
+          "legendFormat": "{{host}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": { "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 80 }, { "color": "red", "value": 95 }] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Mémoire utilisée (%)",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-infraready" },
+      "targets": [
+        {
+          "refId": "Linux",
+          "expr": "(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100",
+          "legendFormat": "{{host}}"
+        },
+        {
+          "refId": "Windows",
+          "expr": "(1 - windows_memory_available_bytes / windows_memory_physical_total_bytes) * 100",
+          "legendFormat": "{{host}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": { "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 80 }, { "color": "red", "value": 90 }] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 4,
+      "type": "bargauge",
+      "title": "Stockage utilisé (%) par volume",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-infraready" },
+      "targets": [
+        {
+          "refId": "Linux",
+          "expr": "(1 - node_filesystem_avail_bytes{fstype=~\"ext4|xfs\"} / node_filesystem_size_bytes{fstype=~\"ext4|xfs\"}) * 100",
+          "legendFormat": "{{host}} {{mountpoint}}",
+          "instant": true
+        },
+        {
+          "refId": "Windows",
+          "expr": "(1 - windows_logical_disk_free_bytes{volume=~\"[A-Z]:\"} / windows_logical_disk_size_bytes{volume=~\"[A-Z]:\"}) * 100",
+          "legendFormat": "{{host}} {{volume}}",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "namePlacement": "left"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "decimals": 1,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 70 }, { "color": "red", "value": 85 }] }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Alertes Prometheus actives",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-infraready" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ALERTS{alertstate=\"firing\"}",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true },
+            "indexByName": { "alertname": 0, "severity": 1, "host": 2, "alertstate": 3 },
+            "renameByName": { "alertname": "Alerte", "severity": "Sévérité", "host": "Hôte", "alertstate": "État" }
+          }
+        }
+      ],
+      "options": { "showHeader": true, "cellHeight": "sm" },
+      "fieldConfig": { "defaults": {}, "overrides": [] }
+    }
+  ]
+}

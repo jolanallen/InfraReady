@@ -33,7 +33,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Installer les outils
-        run: pip install "ansible-core>=2.17,<2.18" "ansible-lint>=24,<25" yamllint
+        run: pip install "ansible-core>=2.16,<2.17" "ansible-lint>=24,<25" yamllint
       - name: Collections Ansible
         run: ansible-galaxy collection install -r ansible/requirements.yml
       - name: yamllint
