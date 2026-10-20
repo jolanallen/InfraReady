@@ -1,26 +1,44 @@
 {
   "uid": "infraready-serveurs",
   "title": "InfraReady — Serveurs",
-  "description": "CPU, mémoire, stockage et disponibilité de WIN-DC01, LINUX01 et OPS01 (Prometheus : node_exporter + windows_exporter)",
+  "description": "CPU, mémoire, stockage, uptime et disponibilité de WIN-DC01, LINUX01 et OPS01 (Prometheus : node_exporter + windows_exporter)",
   "tags": ["infraready"],
   "timezone": "browser",
   "editable": true,
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "30s",
   "time": { "from": "now-1h", "to": "now" },
-  "templating": { "list": [] },
+  "templating": {
+    "list": [
+      {
+        "name": "host",
+        "label": "Hôte",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus-infraready" },
+        "query": "label_values(up{job=~\"linux|windows\"}, host)",
+        "definition": "label_values(up{job=~\"linux|windows\"}, host)",
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "selected": true, "text": ["Tous"], "value": ["$__all"] },
+        "refresh": 2,
+        "sort": 1,
+        "options": []
+      }
+    ]
+  },
   "panels": [
     {
       "id": 1,
       "type": "stat",
       "title": "Disponibilité des serveurs",
-      "gridPos": { "h": 5, "w": 24, "x": 0, "y": 0 },
+      "gridPos": { "h": 5, "w": 12, "x": 0, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "prometheus-infraready" },
       "targets": [
         {
           "refId": "A",
-          "expr": "max by (host) (up{job=~\"linux|windows\"})",
+          "expr": "max by (host) (up{job=~\"linux|windows\", host=~\"$host\"})",
           "legendFormat": "{{host}}",
           "instant": true
         }
@@ -43,6 +61,43 @@
       }
     },
     {
+      "id": 6,
+      "type": "stat",
+      "title": "Uptime",
+      "description": "Durée depuis le dernier démarrage (node_boot_time_seconds sur Linux, windows_system_boot_time_timestamp sur Windows)",
+      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-infraready" },
+      "targets": [
+        {
+          "refId": "Linux",
+          "expr": "time() - node_boot_time_seconds{host=~\"$host\"}",
+          "legendFormat": "{{host}}",
+          "instant": true
+        },
+        {
+          "refId": "Windows",
+          "expr": "time() - windows_system_boot_time_timestamp{host=~\"$host\"}",
+          "legendFormat": "{{host}}",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "fixed", "fixedColor": "blue" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
+        },
+        "overrides": []
+      }
+    },
+    {
       "id": 2,
       "type": "timeseries",
       "title": "CPU (%)",
@@ -51,12 +106,12 @@
       "targets": [
         {
           "refId": "Linux",
-          "expr": "100 - avg by (host) (rate(node_cpu_seconds_total{mode=\"idle\"}[2m])) * 100",
+          "expr": "100 - avg by (host) (rate(node_cpu_seconds_total{mode=\"idle\", host=~\"$host\"}[2m])) * 100",
           "legendFormat": "{{host}}"
         },
         {
           "refId": "Windows",
-          "expr": "100 - avg by (host) (rate(windows_cpu_time_total{mode=\"idle\"}[2m])) * 100",
+          "expr": "100 - avg by (host) (rate(windows_cpu_time_total{mode=\"idle\", host=~\"$host\"}[2m])) * 100",
           "legendFormat": "{{host}}"
         }
       ],
@@ -84,12 +139,12 @@
       "targets": [
         {
           "refId": "Linux",
-          "expr": "(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100",
+          "expr": "(1 - node_memory_MemAvailable_bytes{host=~\"$host\"} / node_memory_MemTotal_bytes{host=~\"$host\"}) * 100",
           "legendFormat": "{{host}}"
         },
         {
           "refId": "Windows",
-          "expr": "(1 - windows_memory_available_bytes / windows_memory_physical_total_bytes) * 100",
+          "expr": "(1 - windows_memory_available_bytes{host=~\"$host\"} / windows_memory_physical_total_bytes{host=~\"$host\"}) * 100",
           "legendFormat": "{{host}}"
         }
       ],
@@ -117,13 +172,13 @@
       "targets": [
         {
           "refId": "Linux",
-          "expr": "(1 - node_filesystem_avail_bytes{fstype=~\"ext4|xfs\"} / node_filesystem_size_bytes{fstype=~\"ext4|xfs\"}) * 100",
+          "expr": "(1 - node_filesystem_avail_bytes{fstype=~\"ext4|xfs\", host=~\"$host\"} / node_filesystem_size_bytes{fstype=~\"ext4|xfs\", host=~\"$host\"}) * 100",
           "legendFormat": "{{host}} {{mountpoint}}",
           "instant": true
         },
         {
           "refId": "Windows",
-          "expr": "(1 - windows_logical_disk_free_bytes{volume=~\"[A-Z]:\"} / windows_logical_disk_size_bytes{volume=~\"[A-Z]:\"}) * 100",
+          "expr": "(1 - windows_logical_disk_free_bytes{volume=~\"[A-Z]:\", host=~\"$host\"} / windows_logical_disk_size_bytes{volume=~\"[A-Z]:\", host=~\"$host\"}) * 100",
           "legendFormat": "{{host}} {{volume}}",
           "instant": true
         }
@@ -155,7 +210,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "ALERTS{alertstate=\"firing\"}",
+          "expr": "ALERTS{alertstate=\"firing\", host=~\"$host\"}",
           "format": "table",
           "instant": true
         }
