@@ -17,18 +17,12 @@
 
   tasks:
     # --- Pré-contrôles ------------------------------------------------------------
-    - name: Occupation des systèmes de fichiers
-      ansible.builtin.set_fact:
-        disques: >-
-          {{ ansible_mounts | selectattr('fstype', 'in', ['ext4', 'xfs'])
-             | map('combine', {'pct': 0}) | list }}
-
     - name: Calcul du pourcentage utilisé par montage
       ansible.builtin.set_fact:
         disques_pct: >-
           {{ disques_pct | default([])
              + [{'mount': item.mount, 'pct': (100 - item.size_available * 100 / item.size_total) | round(1)}] }}
-      loop: "{{ disques }}"
+      loop: "{{ ansible_mounts | selectattr('fstype', 'in', ['ext4', 'xfs']) | list }}"
       loop_control:
         label: "{{ item.mount }}"
 
