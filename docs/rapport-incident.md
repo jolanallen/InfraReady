@@ -9,7 +9,7 @@
 | Gravité | Moyenne (service applicatif du labo, pas de perte de données) |
 | Type | Erreur de configuration lors d'un changement (mise en production simulée) |
 | Reproduit volontairement | Oui — incident contrôlé et réversible (sauvegarde préalable, configuration de référence dans Ansible) |
-| Responsable | [Nom] |
+| Responsable | MIR Mahan / Jolan Allen |
 
 ## 1. Symptôme
 

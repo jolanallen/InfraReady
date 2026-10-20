@@ -2,8 +2,8 @@
 title: InfraReady — Dossier technique
 type: livrable
 status: en cours
-version: v0.2
-updated: 2026-10-19
+version: v0.3
+updated: 2026-10-20
 tags:
   - infraready
   - projet-fil-rouge
@@ -17,11 +17,11 @@ tags:
 
 | Champ | Valeur |
 | --- | --- |
-| **Binôme** | [Nom 1] / [Nom 2] |
-| **Classe** | [Groupe] |
-| **Lien GitHub** | https://github.com/Nothypaa/InfraReady (privé) |
-| **Date / version** | 19/10/2026 — v0.2 |
-| **Statut du projet** | En cours — phases A à D réalisées, E à H à faire |
+| **Binôme** | MIR Mahan / Jolan Allen (chef de projet) |
+| **Classe** | B3 Cybersécurité |
+| **Lien GitHub** | https://github.com/jolanallen/InfraReady |
+| **Date / version** | 20/10/2026 — v0.3 |
+| **Statut du projet** | Phases A à H réalisées — finalisation avant remise (bilan, PDF, oral) |
 
 ---
 
@@ -32,7 +32,7 @@ tags:
 	- Laboratoire de 3 serveurs (1 Windows Server 2025, 2 Ubuntu Server 24.04 LTS), isolé du réseau personnel.
 	- Administration reproductible (Ansible), supervision (Prometheus/Grafana), dépôt versionné et validé par CI.
 	- Aucune donnée réelle : comptes, groupes et données sont fictifs.
-- **Répartition du binôme :** [À compléter]
+- **Répartition du binôme :** Jolan Allen, chef de projet (planification, coordination, suivi et dépôt de remise). Les phases A à H ont été réalisées conjointement par MIR Mahan et Jolan Allen.
 - **Conventions de preuves :** numérotation par phase — A = P-0x, B = P-1x, C = P-2x, D = P-3x, E = P-4x, F = P-5x, G = P-6x, H = P-7x. Les sorties sont capturées automatiquement avec l'heure et la commande exécutée.
 
 ---
@@ -95,7 +95,7 @@ flowchart LR
 > [!abstract] Objectif
 > Mettre en service les VM, les noms, les adresses et la connectivité du laboratoire.
 
-**Responsable :** [Nom] · **Dates :** 19/10/2026 · **Statut :** Fait
+**Responsable :** MIR Mahan / Jolan Allen · **Dates :** 19/10/2026 · **Statut :** Fait
 
 ### Travaux réalisés / checklist
 
@@ -160,7 +160,7 @@ Retour arrière disponible : snapshot `s01_installation_ok` (3 VM) et `interface
 > [!abstract] Objectif
 > Rendre l'annuaire et le DNS opérationnels, documenter comptes, groupes et journaux.
 
-**Responsable :** [Nom] · **Dates :** 19/10/2026 · **Statut :** Fait
+**Responsable :** MIR Mahan / Jolan Allen · **Dates :** 19/10/2026 · **Statut :** Fait
 
 ### Travaux réalisés / checklist
 
@@ -239,7 +239,7 @@ Retour arrière disponible : snapshots `s02_avant_adds` et `s03_avant_ansible` d
 > [!abstract] Objectif
 > Gérer identités, permissions, services, stockage, mises à jour et journaux sur Ubuntu.
 
-**Responsable :** [Nom] · **Dates :** 19/10/2026 · **Statut :** Fait
+**Responsable :** MIR Mahan / Jolan Allen · **Dates :** 19/10/2026 · **Statut :** Fait
 
 ### Travaux réalisés / checklist
 
@@ -305,7 +305,7 @@ Retour arrière disponible : snapshot `s02_avant_maj_c` (inclut le disque de tes
 > [!abstract] Objectif
 > Fournir des playbooks Linux et Windows reproductibles et idéalement idempotents.
 
-**Responsable :** [Nom] · **Dates :** 19/10/2026 · **Statut :** Fait
+**Responsable :** MIR Mahan / Jolan Allen · **Dates :** 19/10/2026 · **Statut :** Fait
 
 ### Travaux réalisés / checklist
 
@@ -377,7 +377,7 @@ Retour arrière disponible : snapshot `s03_avant_ansible` (WIN-DC01 et LINUX01).
 > [!abstract] Objectif
 > Formaliser et tester une maintenance sûre et traçable sur les deux OS.
 
-**Responsable :** [Nom] · **Dates :** 19/10/2026 · **Statut :** Fait
+**Responsable :** MIR Mahan / Jolan Allen · **Dates :** 19/10/2026 · **Statut :** Fait
 
 ### Travaux réalisés / checklist
 
@@ -430,7 +430,7 @@ Retour arrière disponible : snapshots `s04_avant_maintenance_e` (LINUX01, OPS01
 > [!abstract] Objectif
 > Collecter et visualiser les métriques réelles des serveurs et présenter une alerte.
 
-**Responsable :** [Nom] · **Dates :** 19/10/2026 · **Statut :** Fait
+**Responsable :** MIR Mahan / Jolan Allen · **Dates :** 19/10/2026 · **Statut :** Fait
 
 ### Travaux réalisés / checklist
 
@@ -521,11 +521,11 @@ Retour arrière disponible : snapshot `s02_avant_monitoring` (OPS01).
 > [!abstract] Objectif
 > Versionner les livrables et valider le dépôt automatiquement via GitHub Actions.
 
-**Responsable :** [Nom] · **Dates :** 19/10/2026 · **Statut :** Fait (pipeline vert) — il manque les commits du second membre
+**Responsable :** MIR Mahan / Jolan Allen · **Dates :** 19/10/2026 · **Statut :** Fait (pipeline vert) — il manque les commits du second membre
 
 ### Travaux réalisés / checklist
 
-- [x] Créer un dépôt GitHub adapté au binôme (privé, collaborateur `jolanallen` invité en écriture).
+- [x] Créer un dépôt GitHub adapté au binôme : dépôt de remise `jolanallen/InfraReady`, créé par le chef de projet ; historique initial et premiers runs CI sur `Nothypaa/InfraReady` (privé), poussé tel quel vers le dépôt de remise.
 - [x] Organiser playbooks, scripts, variables, monitoring et docs (voir arborescence en annexe).
 - [ ] Utiliser des commits descriptifs des deux membres.
 - [x] Créer `.github/workflows/validation.yml`.
@@ -536,17 +536,17 @@ Retour arrière disponible : snapshot `s02_avant_monitoring` (OPS01).
 
 ### Procédure et configuration
 
-- **Dépôt** : https://github.com/Nothypaa/InfraReady — branche `main`.
+- **Dépôt de remise** : https://github.com/jolanallen/InfraReady — branche `main` (dépôt de travail initial : `Nothypaa/InfraReady`, privé).
 - **Jobs** : `fichiers`, `yaml-ansible`, `monitoring`, `secrets` (voir `.github/workflows/validation.yml`).
 
 - **Validation locale avant push** : les mêmes outils que la CI (ansible-core 2.16, ansible-lint 24, yamllint, collections aux versions d'OPS01) sont installés sur le poste pour corriger avant de pousser.
-- **Run réussi** : https://github.com/Nothypaa/InfraReady/actions/runs/39268575079 (4 jobs `success`).
+- **Run réussi** : https://github.com/Nothypaa/InfraReady/actions/runs/39268575079 (4 jobs `success`, sur le dépôt de travail initial).
 
 ### Tests et preuves
 
 | Vérification | Attendu | Résultat observé | Preuve |
 | --- | --- | --- | --- |
-| Dépôt et arborescence | Fichiers attendus présents | Voir arborescence (annexe) ; job `Arborescence attendue` : success | [Lien](https://github.com/Nothypaa/InfraReady), [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
+| Dépôt et arborescence | Fichiers attendus présents | Voir arborescence (annexe) ; job `Arborescence attendue` : success | [Lien](https://github.com/jolanallen/InfraReady), [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
 | Contributions | Contributions du binôme traçables | Pour l'instant un seul auteur (`git shortlog`) — **à compléter par le second membre** | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
 | Workflow automatique | Push / PR déclenche la validation | Chaque `push` sur `main` a lancé un run (événement `push`) | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
 | Pipeline vert | Exécution terminée avec succès | Run 39268575079 : `Arborescence attendue`, `YAML + Ansible`, `Prometheus + Grafana`, `Aucun secret en clair` → success | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
@@ -565,7 +565,7 @@ Retour arrière disponible : snapshot `s02_avant_monitoring` (OPS01).
 > [!abstract] Objectif
 > Reproduire un incident simple, contrôlé, réversible et justifier le retour à la normale.
 
-**Responsable :** [Nom] · **Dates :** 19/10/2026 · **Statut :** Fait
+**Responsable :** MIR Mahan / Jolan Allen · **Dates :** 19/10/2026 · **Statut :** Fait
 
 ### Travaux réalisés / checklist
 
@@ -757,23 +757,23 @@ InfraReady/
 
 | Date | Auteur | Modification | Validation | Preuve / rollback |
 | --- | --- | --- | --- | --- |
-| 19/10/2026 14:42 | [Nom] | Pont `vmbr1` + NAT/isolation nftables sur l'hôte | `ifreload -a`, ping/isolation OK | P-01, P-02 / `interfaces.bak-infraready` |
-| 19/10/2026 14:47 | [Nom] | Installations automatiques des 3 VM | 3 VM joignables | P-01, P-03 / — |
-| 19/10/2026 14:58 | [Nom] | Snapshot de base | `qm listsnapshot` | `s01_installation_ok` |
-| 19/10/2026 15:05 | [Nom] | AD DS + forêt infraready.test | dcdiag fonctionnel OK | P-10, P-12b / `s02_avant_adds` |
-| 19/10/2026 15:14 | [Nom] | OU, groupes, comptes AD | Membres conformes | P-11 / `s02_avant_adds` |
-| 19/10/2026 15:20 | [Nom] | NTP externe sur le DC | Stratum 2 | P-12b / — |
-| 19/10/2026 15:23 | [Nom] | Comptes Linux, nginx, disque `/data` | Tests de droits OK | P-20 à P-22 / `s02_avant_maj_c` |
-| 19/10/2026 15:24 | [Nom] | `apt upgrade` LINUX01 (20 paquets) | Code retour 0 | P-23 / `s02_avant_maj_c` |
-| 19/10/2026 15:28 | [Nom] | Playbooks Linux et Windows (2 passages) | changed=0 au 2ᵉ passage | P-31 à P-34 / `s03_avant_ansible` |
-| 19/10/2026 | [Nom] | DNS des VM Linux → DC, PTR du DC | A/PTR/SRV résolus | P-04, P-35 / `/root/50-cloud-init.yaml.bak-dns` |
-| 19/10/2026 16:30 | [Nom] | Prometheus, exporters, Grafana sur OPS01 | Cibles UP, dashboard, alerte testée | P-50 à P-55 / `s04_avant_maintenance_e` |
-| 19/10/2026 16:48 | [Nom] | Maintenance Linux (LINUX01, OPS01), `unattended-upgrades` | Post-contrôles OK, reboot non requis | P-40, P-43 / `s04_avant_maintenance_e` |
-| 19/10/2026 16:54 | [Nom] | Windows Update sur WIN-DC01 (5 MAJ, redémarrage 18:04) | `failed=1` (boucle KB5007651) puis passage complet OK | P-42 à P-42c / `s04_avant_maj_windows` |
-| 19/10/2026 19:21 | [Nom] | `reject_list: [KB5007651]` + gabarit du rapport Windows | `failed=0`, rapport lisible | P-42c / — |
-| 19/10/2026 19:27 | [Nom] | Incident contrôlé : `root` nginx modifié sur LINUX01 | 404 constaté depuis OPS01 | P-70 / `/root/infraready.nginx.bak-incident-h` |
-| 19/10/2026 19:30 | [Nom] | `flush_handlers` avant les vérifications dans `linux_base.yml` ; rejeu sur LINUX01 | HTTP 200, `changed=0` au 2ᵉ passage | P-72, P-73 / — |
-| 19/10/2026 19:37 | [Nom] | Snapshot final des 3 VM | `qm listsnapshot` | P-05 / `s05_phases_a_h_terminees` |
+| 19/10/2026 14:42 | MIR Mahan / Jolan Allen | Pont `vmbr1` + NAT/isolation nftables sur l'hôte | `ifreload -a`, ping/isolation OK | P-01, P-02 / `interfaces.bak-infraready` |
+| 19/10/2026 14:47 | MIR Mahan / Jolan Allen | Installations automatiques des 3 VM | 3 VM joignables | P-01, P-03 / — |
+| 19/10/2026 14:58 | MIR Mahan / Jolan Allen | Snapshot de base | `qm listsnapshot` | `s01_installation_ok` |
+| 19/10/2026 15:05 | MIR Mahan / Jolan Allen | AD DS + forêt infraready.test | dcdiag fonctionnel OK | P-10, P-12b / `s02_avant_adds` |
+| 19/10/2026 15:14 | MIR Mahan / Jolan Allen | OU, groupes, comptes AD | Membres conformes | P-11 / `s02_avant_adds` |
+| 19/10/2026 15:20 | MIR Mahan / Jolan Allen | NTP externe sur le DC | Stratum 2 | P-12b / — |
+| 19/10/2026 15:23 | MIR Mahan / Jolan Allen | Comptes Linux, nginx, disque `/data` | Tests de droits OK | P-20 à P-22 / `s02_avant_maj_c` |
+| 19/10/2026 15:24 | MIR Mahan / Jolan Allen | `apt upgrade` LINUX01 (20 paquets) | Code retour 0 | P-23 / `s02_avant_maj_c` |
+| 19/10/2026 15:28 | MIR Mahan / Jolan Allen | Playbooks Linux et Windows (2 passages) | changed=0 au 2ᵉ passage | P-31 à P-34 / `s03_avant_ansible` |
+| 19/10/2026 | MIR Mahan / Jolan Allen | DNS des VM Linux → DC, PTR du DC | A/PTR/SRV résolus | P-04, P-35 / `/root/50-cloud-init.yaml.bak-dns` |
+| 19/10/2026 16:30 | MIR Mahan / Jolan Allen | Prometheus, exporters, Grafana sur OPS01 | Cibles UP, dashboard, alerte testée | P-50 à P-55 / `s04_avant_maintenance_e` |
+| 19/10/2026 16:48 | MIR Mahan / Jolan Allen | Maintenance Linux (LINUX01, OPS01), `unattended-upgrades` | Post-contrôles OK, reboot non requis | P-40, P-43 / `s04_avant_maintenance_e` |
+| 19/10/2026 16:54 | MIR Mahan / Jolan Allen | Windows Update sur WIN-DC01 (5 MAJ, redémarrage 18:04) | `failed=1` (boucle KB5007651) puis passage complet OK | P-42 à P-42c / `s04_avant_maj_windows` |
+| 19/10/2026 19:21 | MIR Mahan / Jolan Allen | `reject_list: [KB5007651]` + gabarit du rapport Windows | `failed=0`, rapport lisible | P-42c / — |
+| 19/10/2026 19:27 | MIR Mahan / Jolan Allen | Incident contrôlé : `root` nginx modifié sur LINUX01 | 404 constaté depuis OPS01 | P-70 / `/root/infraready.nginx.bak-incident-h` |
+| 19/10/2026 19:30 | MIR Mahan / Jolan Allen | `flush_handlers` avant les vérifications dans `linux_base.yml` ; rejeu sur LINUX01 | HTTP 200, `changed=0` au 2ᵉ passage | P-72, P-73 / — |
+| 19/10/2026 19:37 | MIR Mahan / Jolan Allen | Snapshot final des 3 VM | `qm listsnapshot` | P-05 / `s05_phases_a_h_terminees` |
 
 **Annexes** : sorties complètes dans `docs/preuves/`, modèles d'installation dans `lab/`, configurations dans `ansible/` et `monitoring/`.
 
