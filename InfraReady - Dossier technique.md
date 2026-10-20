@@ -541,7 +541,7 @@ Retour arrière disponible : snapshot `s02_avant_monitoring` (OPS01).
 - **Jobs** : `fichiers`, `yaml-ansible`, `monitoring`, `secrets` (voir `.github/workflows/validation.yml`).
 
 - **Validation locale avant push** : les mêmes outils que la CI (ansible-core 2.16, ansible-lint 24, yamllint, collections aux versions d'OPS01) sont installés sur le poste pour corriger avant de pousser.
-- **Runs** : https://github.com/jolanallen/InfraReady/actions (identifiant et lien du run vert dans P-60).
+- **Run réussi** : https://github.com/jolanallen/InfraReady/actions/runs/39401095014 (4 jobs `success`).
 
 ### Tests et preuves
 
@@ -550,7 +550,7 @@ Retour arrière disponible : snapshot `s02_avant_monitoring` (OPS01).
 | Dépôt et arborescence | Fichiers attendus présents | Voir arborescence (annexe) ; job `Arborescence attendue` : success | [Lien](https://github.com/jolanallen/InfraReady), [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
 | Contributions | Contributions du binôme traçables | Pour l'instant un seul auteur (`git shortlog`) — **à compléter par le second membre** | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
 | Workflow automatique | Push / PR déclenche la validation | Chaque `push` sur `main` a lancé un run (événement `push`) | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
-| Pipeline vert | Exécution terminée avec succès | Dernier run sur `jolanallen/InfraReady` : `Arborescence attendue`, `YAML + Ansible`, `Prometheus + Grafana`, `Aucun secret en clair` → success | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
+| Pipeline vert | Exécution terminée avec succès | Run 39401095014 sur `jolanallen/InfraReady` : `Arborescence attendue`, `YAML + Ansible`, `Prometheus + Grafana`, `Aucun secret en clair` → success | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
 
 ### Difficultés / décision / retour arrière
 

@@ -1,0 +1,22 @@
+# Preuve : P-60 — GitHub Actions sur le dépôt du binôme (run vert)
+# Dépôt : https://github.com/jolanallen/InfraReady — 2026-10-20 11:31:27 CEST
+# Commandes : gh run list / gh run view 39401095014 -R jolanallen/InfraReady ; git shortlog -sn
+
+run 39401095014 | 2026-10-20T09:29:55Z | événement=push branche=main commit=75839b5 | success | https://github.com/jolanallen/InfraReady/actions/runs/39401095014
+run 39390115969 | 2026-10-20T07:58:37Z | événement=push branche=main commit=f8e2458 | success | https://github.com/jolanallen/InfraReady/actions/runs/39390115969
+
+== Jobs du run 39401095014
+  Arborescence attendue : success (2026-10-20T09:29:57Z -> 2026-10-20T09:30:01Z)
+  Prometheus + Grafana : success (2026-10-20T09:29:57Z -> 2026-10-20T09:30:13Z)
+  YAML + Ansible (syntaxe et lint) : success (2026-10-20T09:29:57Z -> 2026-10-20T09:31:22Z)
+  Aucun secret en clair : success (2026-10-20T09:29:58Z -> 2026-10-20T09:30:08Z)
+
+== Déclencheurs du workflow (.github/workflows/validation.yml)
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+
+== Auteurs des commits (git shortlog -sn)
+    15	Nothypaa

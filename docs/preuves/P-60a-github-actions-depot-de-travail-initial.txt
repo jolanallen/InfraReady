@@ -24,3 +24,5 @@ on:
 
 == Auteurs des commits (git shortlog -sn)
      8	Nothypaa
+
+# Note du 20/10/2026 : historique migré vers https://github.com/jolanallen/InfraReady (messages de commit réécrits), les identifiants 7999034 et a89b1d4 ci-dessus correspondent aux commits d'origine. Run équivalent sur le dépôt du binôme : P-60.
