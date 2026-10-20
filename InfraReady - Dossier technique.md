@@ -824,7 +824,31 @@ Retour arrière : snapshot Proxmox `s07_avant_seance4` des 3 VM pris avant la s�
 	- Ressources légèrement supérieures au plan (vCPU) ; disque Windows en IDE (choix initial conservé).
 	- Ubuntu 24.04.**5** (dernière révision de la 24.04 LTS).
 - **Fonctionnalités inachevées / pistes :** commits des autres membres de l'équipe ; `KB5007651` exclue de l'installation automatique (boucle Windows Update) et à suivre manuellement ; pas de sonde HTTP du site dans Prometheus (`blackbox_exporter` à ajouter) ; snapshot Proxmox non pris avant l'incident H (sauvegarde fichier jugée suffisante pour un changement d'une ligne, réversible).
-- **Bilan de l'équipe :** [À compléter]
+- **Bilan de l'équipe :** [À compléter — synthèse commune en 3 à 5 lignes]
+
+> [!todo] Bilans individuels (questions du support, section 7 « Bilan de fin de séance ») — à rédiger par chaque membre
+>
+> **MIR Mahan**
+> 1. Opération que je sais maintenant réaliser et vérifier : [À compléter]
+> 2. Commande qui m'a apporté la preuve la plus utile, et pourquoi : [À compléter]
+> 3. Difficulté rencontrée et comment je l'ai isolée : [À compléter]
+> 4. Risque identifié (stockage, automatisation, sécurité) : [À compléter]
+> 5. Un autre membre peut-il reproduire la procédure à partir du dossier ? Que faudrait-il clarifier ? : [À compléter]
+>
+> **Jolan Allen (chef de projet)**
+> 1. Opération que je sais maintenant réaliser et vérifier : [À compléter]
+> 2. Commande qui m'a apporté la preuve la plus utile, et pourquoi : [À compléter]
+> 3. Difficulté rencontrée et comment je l'ai isolée : [À compléter]
+> 4. Risque identifié (stockage, automatisation, sécurité) : [À compléter]
+> 5. Un autre membre peut-il reproduire la procédure à partir du dossier ? Que faudrait-il clarifier ? : [À compléter]
+>
+> **Kenzi Bendjelloul**
+> 1. Opération que je sais maintenant réaliser et vérifier : [À compléter]
+> 2. Commande qui m'a apporté la preuve la plus utile, et pourquoi : [À compléter]
+> 3. Difficulté rencontrée et comment je l'ai isolée : [À compléter]
+> 4. Risque identifié (stockage, automatisation, sécurité) : [À compléter]
+> 5. Un autre membre peut-il reproduire la procédure à partir du dossier ? Que faudrait-il clarifier ? : [À compléter]
+
 
 ---
 
