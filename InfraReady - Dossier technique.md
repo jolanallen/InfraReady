@@ -17,7 +17,7 @@ tags:
 
 | Champ | Valeur |
 | --- | --- |
-| **Binôme** | MIR Mahan / Jolan Allen (chef de projet) |
+| **Équipe** | MIR Mahan / Jolan Allen (chef de projet) / Kenzi Bendjelloul |
 | **Classe** | B3 Cybersécurité |
 | **Lien GitHub** | https://github.com/jolanallen/InfraReady |
 | **Date / version** | 20/10/2026 — v0.3 |
@@ -32,7 +32,7 @@ tags:
 	- Laboratoire de 3 serveurs (1 Windows Server 2025, 2 Ubuntu Server 24.04 LTS), isolé du réseau personnel.
 	- Administration reproductible (Ansible), supervision (Prometheus/Grafana), dépôt versionné et validé par CI.
 	- Aucune donnée réelle : comptes, groupes et données sont fictifs.
-- **Répartition du binôme :** Jolan Allen, chef de projet (planification, coordination, suivi et dépôt de remise). Les phases A à H ont été réalisées conjointement par MIR Mahan et Jolan Allen.
+- **Répartition de l'équipe :** Jolan Allen, chef de projet (planification, coordination, suivi et dépôt de remise) ; Kenzi Bendjelloul, partie Ansible (phase D) ; les autres phases ont été réalisées conjointement par MIR Mahan et Jolan Allen.
 - **Conventions de preuves :** numérotation par phase — A = P-0x, B = P-1x, C = P-2x, D = P-3x, E = P-4x, F = P-5x, G = P-6x, H = P-7x. Les sorties sont capturées automatiquement avec l'heure et la commande exécutée.
 
 ---
@@ -305,7 +305,7 @@ Retour arrière disponible : snapshot `s02_avant_maj_c` (inclut le disque de tes
 > [!abstract] Objectif
 > Fournir des playbooks Linux et Windows reproductibles et idéalement idempotents.
 
-**Responsable :** MIR Mahan / Jolan Allen · **Dates :** 19/10/2026 · **Statut :** Fait
+**Responsable :** Kenzi Bendjelloul · **Dates :** 19/10/2026 · **Statut :** Fait
 
 ### Travaux réalisés / checklist
 
@@ -767,7 +767,7 @@ InfraReady/
 | 19/10/2026 15:20 | MIR Mahan / Jolan Allen | NTP externe sur le DC | Stratum 2 | P-12b / — |
 | 19/10/2026 15:23 | MIR Mahan / Jolan Allen | Comptes Linux, nginx, disque `/data` | Tests de droits OK | P-20 à P-22 / `s02_avant_maj_c` |
 | 19/10/2026 15:24 | MIR Mahan / Jolan Allen | `apt upgrade` LINUX01 (20 paquets) | Code retour 0 | P-23 / `s02_avant_maj_c` |
-| 19/10/2026 15:28 | MIR Mahan / Jolan Allen | Playbooks Linux et Windows (2 passages) | changed=0 au 2ᵉ passage | P-31 à P-34 / `s03_avant_ansible` |
+| 19/10/2026 15:28 | Kenzi Bendjelloul | Playbooks Linux et Windows (2 passages) | changed=0 au 2ᵉ passage | P-31 à P-34 / `s03_avant_ansible` |
 | 19/10/2026 | MIR Mahan / Jolan Allen | DNS des VM Linux → DC, PTR du DC | A/PTR/SRV résolus | P-04, P-35 / `/root/50-cloud-init.yaml.bak-dns` |
 | 19/10/2026 16:30 | MIR Mahan / Jolan Allen | Prometheus, exporters, Grafana sur OPS01 | Cibles UP, dashboard, alerte testée | P-50 à P-55 / `s04_avant_maintenance_e` |
 | 19/10/2026 16:48 | MIR Mahan / Jolan Allen | Maintenance Linux (LINUX01, OPS01), `unattended-upgrades` | Post-contrôles OK, reboot non requis | P-40, P-43 / `s04_avant_maintenance_e` |
