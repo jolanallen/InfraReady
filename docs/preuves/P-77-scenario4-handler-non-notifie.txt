@@ -1,0 +1,140 @@
+# Preuve : P-77-scenario4-handler-non-notifie
+# Séance 4, 7.4 — scénario 4 : un fichier de configuration change sans que le handler « Recharger nginx » soit notifié
+# Date : 2026-10-20 13:02:56 CEST — laboratoire InfraReady (Proxmox), snapshot préalable s07_avant_seance4
+# Commandes : chaque commande est affichée précédée de « $ » ; playbook utilisé : playbooks/linux_base.yml (cible : linux01 uniquement)
+# Adaptation au projet : la page d'accueil est statique et n'a pas de notify (un rechargement est inutile pour la servir) ;
+#   le scénario porte donc sur la tâche « Virtual host nginx », dont la modification exige réellement un rechargement.
+#   Marqueur observable : en-tête HTTP X-InfraReady-Scenario ajouté au modèle du serveur virtuel.
+
+######## État initial (LINUX01)
+[linux01, root via sudo — 13:02:59]
+$ curl -sSI http://127.0.0.1/ | grep -i -E "^HTTP|X-InfraReady" ; true
+HTTP/1.1 200 OK
+$ sudo systemctl show nginx -p ActiveEnterTimestamp
+ActiveEnterTimestamp=Tue 2026-10-20 10:40:27 CEST
+
+######## Étape A — introduire le défaut (OPS01) : notify retiré de la tâche, puis nouveau contenu du modèle
+[ops01, utilisateur ansible, ~/infraready/ansible — 13:03:02]
+$ sed -i "/- name: Virtual host nginx/,/notify:/{/notify: Recharger nginx/d}" playbooks/linux_base.yml
+$ sed -i "s|^    index index.html;|    index index.html;\n    add_header X-InfraReady-Scenario \"4\" always;|" playbooks/templates/nginx-infraready.conf.j2
+$ diff playbooks/linux_base.yml.etat-initial playbooks/linux_base.yml
+73d72
+<       notify: Recharger nginx
+(code de sortie : 1)
+$ diff playbooks/templates/nginx-infraready.conf.j2.etat-initial playbooks/templates/nginx-infraready.conf.j2
+6a7
+>     add_header X-InfraReady-Scenario "4" always;
+(code de sortie : 1)
+$ date "+début de l exécution : %H:%M:%S" ; ansible-playbook playbooks/linux_base.yml | sed -n "/Virtual host/,/^\$/p;/RUNNING HANDLER/,/^\$/p;/PLAY RECAP/,\$p"
+début de l exécution : 13:03:02
+[WARNING]: Skipping callback plugin '', unable to load
+TASK [Virtual host nginx] ******************************************************
+changed: [linux01]
+
+PLAY RECAP *********************************************************************
+linux01                    : ok=22   changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+
+######## Étape B — diagnostiquer : fichier sur disque vs configuration chargée (LINUX01)
+[linux01, root via sudo — 13:03:19]
+$ sudo grep -n X-InfraReady /etc/nginx/sites-available/infraready
+7:    add_header X-InfraReady-Scenario "4" always;
+$ sudo nginx -t
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+$ curl -sSI http://127.0.0.1/ | grep -i -E "^HTTP|X-InfraReady" ; echo "(aucun en-tête X-InfraReady : la configuration chargée est l ancienne)"
+HTTP/1.1 200 OK
+(aucun en-tête X-InfraReady : la configuration chargée est l ancienne)
+$ sudo journalctl -u nginx --since "-3 min" --no-pager | grep -i -E "reload" || echo "aucun rechargement de nginx dans les 3 dernières minutes"
+aucun rechargement de nginx dans les 3 dernières minutes
+[ops01, utilisateur ansible, ~/infraready/ansible — 13:03:21]
+$ grep -n -A 6 "name: Virtual host nginx" playbooks/linux_base.yml
+68:    - name: Virtual host nginx
+69-      ansible.builtin.template:
+70-        src: nginx-infraready.conf.j2
+71-        dest: /etc/nginx/sites-available/infraready
+72-        mode: "0644"
+73-
+74-    - name: Activer le site InfraReady
+$ grep -n -A 4 "handlers:" playbooks/linux_base.yml
+184:  handlers:
+185-    - name: Recharger nginx
+186-      ansible.builtin.service:
+187-        name: nginx
+188-        state: reloaded
+$ ansible-playbook playbooks/linux_base.yml --list-tasks | grep -n -i -E "virtual|handler|recharger" ; true
+12:      Virtual host nginx	TAGS: []
+Vérifications : la tâche de déploiement a signalé changed ; le handler « Recharger nginx » existe au bon niveau
+(section handlers du play) ; la directive notify est ABSENTE de la tâche ; le handler n'a pas été exécuté (pas de
+RUNNING HANDLER, aucun rechargement dans le journal). Le fichier sur disque contient le nouvel en-tête, nginx ne
+l'applique pas : cause confirmée = notification absente.
+
+######## Étape C — corriger : rétablir notify (OPS01)
+[ops01, utilisateur ansible, ~/infraready/ansible — 13:03:24]
+$ cp playbooks/linux_base.yml.etat-initial playbooks/linux_base.yml && diff playbooks/linux_base.yml.etat-initial playbooks/linux_base.yml && echo "playbook identique à l état initial (notify rétabli)"
+playbook identique à l état initial (notify rétabli)
+$ ansible-playbook playbooks/linux_base.yml --syntax-check
+
+playbook: playbooks/linux_base.yml
+$ ansible-playbook playbooks/linux_base.yml | sed -n "/Virtual host/,/^\$/p;/RUNNING HANDLER/,/^\$/p;/PLAY RECAP/,\$p"
+[WARNING]: Skipping callback plugin '', unable to load
+TASK [Virtual host nginx] ******************************************************
+ok: [linux01]
+
+PLAY RECAP *********************************************************************
+linux01                    : ok=22   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+Piège observé : la tâche signale ok (le fichier est déjà à jour depuis l'étape A) et ne notifie donc pas le handler ;
+la configuration chargée reste l'ancienne. Rétablir notify ne suffit pas : il faut une nouvelle modification.
+
+######## Test de la notification : nouvelle modification du modèle (valeur de l'en-tête 4 -> 4-corrige)
+[ops01, utilisateur ansible, ~/infraready/ansible — 13:03:40]
+$ sed -i "s|X-InfraReady-Scenario \"4\"|X-InfraReady-Scenario \"4-corrige\"|" playbooks/templates/nginx-infraready.conf.j2
+$ ansible-playbook playbooks/linux_base.yml | sed -n "/Virtual host/,/^\$/p;/RUNNING HANDLER/,/^\$/p;/PLAY RECAP/,\$p"
+[WARNING]: Skipping callback plugin '', unable to load
+TASK [Virtual host nginx] ******************************************************
+changed: [linux01]
+
+RUNNING HANDLER [Recharger nginx] **********************************************
+changed: [linux01]
+
+PLAY RECAP *********************************************************************
+linux01                    : ok=23   changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+[linux01, root via sudo — 13:03:56]
+$ curl -sSI http://127.0.0.1/ | grep -i -E "^HTTP|X-InfraReady"
+HTTP/1.1 200 OK
+X-InfraReady-Scenario: 4-corrige
+$ sudo journalctl -u nginx --since "-2 min" --no-pager | grep -i reload
+Oct 20 13:03:52 linux01 systemd[1]: Reloading nginx.service - A high performance web server and a reverse proxy server...
+Oct 20 13:03:52 linux01 systemd[1]: Reloaded nginx.service - A high performance web server and a reverse proxy server.
+
+######## Restauration de l'état initial du modèle (le rechargement est cette fois notifié) et contrôle final
+[ops01, utilisateur ansible, ~/infraready/ansible — 13:03:59]
+$ cp playbooks/templates/nginx-infraready.conf.j2.etat-initial playbooks/templates/nginx-infraready.conf.j2 && echo "modèle restauré"
+modèle restauré
+$ ansible-playbook playbooks/linux_base.yml | sed -n "/Virtual host/,/^\$/p;/RUNNING HANDLER/,/^\$/p;/PLAY RECAP/,\$p"
+[WARNING]: Skipping callback plugin '', unable to load
+TASK [Virtual host nginx] ******************************************************
+changed: [linux01]
+
+RUNNING HANDLER [Recharger nginx] **********************************************
+changed: [linux01]
+
+PLAY RECAP *********************************************************************
+linux01                    : ok=23   changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+$ ansible-playbook playbooks/linux_base.yml | sed -n "/PLAY RECAP/,\$p"
+[WARNING]: Skipping callback plugin '', unable to load
+PLAY RECAP *********************************************************************
+linux01                    : ok=22   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+[linux01, root via sudo — 13:04:28]
+$ curl -sSI http://127.0.0.1/ | grep -i -E "^HTTP|X-InfraReady" ; echo "(plus d en-tête de scénario)"
+HTTP/1.1 200 OK
+(plus d en-tête de scénario)
+$ sudo grep -c X-InfraReady /etc/nginx/sites-available/infraready
+0
+(code de sortie : 1)
+$ sudo systemctl is-active nginx
+active

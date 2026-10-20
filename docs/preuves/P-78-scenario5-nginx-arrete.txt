@@ -1,0 +1,87 @@
+# Preuve : P-78-scenario5-nginx-arrete
+# Séance 4, 7.4 — scénario 5 : nginx arrêté ; distinguer un défaut du service d'un défaut du playbook ou du modèle
+# Date : 2026-10-20 13:04:52 CEST — laboratoire InfraReady (Proxmox), snapshot préalable s07_avant_seance4
+# Commandes : chaque commande est affichée précédée de « $ » ; playbook utilisé : playbooks/linux_base.yml (cible : linux01 uniquement)
+# Service choisi : nginx sur LINUX01 (service de démonstration, non critique ; démarrage automatique NON désactivé).
+
+######## Étape A — introduire le défaut (LINUX01)
+[linux01, root via sudo — 13:04:56]
+$ hostname
+linux01
+$ sudo systemctl is-active nginx ; sudo systemctl is-enabled nginx
+active
+enabled
+$ runuser -u infraadmin -- /tmp/check-nginx.sh; echo "code de sortie du script : $?"
+OK : nginx actif, http://127.0.0.1/ répond 200 et contient « InfraReady »
+code de sortie du script : 0
+$ sudo systemctl stop nginx
+
+######## Étape B — observer (LINUX01)
+[linux01, root via sudo — 13:04:59]
+$ sudo systemctl is-active nginx
+inactive
+(code de sortie : 3)
+$ sudo systemctl status nginx --no-pager | head -6
+○ nginx.service - A high performance web server and a reverse proxy server
+     Loaded: loaded (/usr/lib/systemd/system/nginx.service; enabled; preset: enabled)
+     Active: inactive (dead) since Tue 2026-10-20 13:04:57 CEST; 2s ago
+   Duration: 2h 24min 29.446s
+       Docs: man:nginx(8)
+    Process: 1483 ExecStartPre=/usr/sbin/nginx -t -q -g daemon on; master_process on; (code=exited, status=0/SUCCESS)
+$ sudo journalctl -u nginx -n 30 --no-pager | tail -4
+Oct 20 13:04:12 linux01 systemd[1]: Reloaded nginx.service - A high performance web server and a reverse proxy server.
+Oct 20 13:04:56 linux01 systemd[1]: Stopping nginx.service - A high performance web server and a reverse proxy server...
+Oct 20 13:04:57 linux01 systemd[1]: nginx.service: Deactivated successfully.
+Oct 20 13:04:57 linux01 systemd[1]: Stopped nginx.service - A high performance web server and a reverse proxy server.
+$ curl --max-time 3 -sS -o /tmp/ir-page.html -w "Code HTTP : %{http_code}\n" http://127.0.0.1/; echo "code de sortie de curl : $?"
+curl: (7) Failed to connect to 127.0.0.1 port 80 after 0 ms: Couldn't connect to server
+Code HTTP : 000
+code de sortie de curl : 7
+$ runuser -u infraadmin -- /tmp/check-nginx.sh; echo "code de sortie du script : $?"
+ECHEC : le service nginx n'est pas actif (inactive)
+code de sortie du script : 1
+Le code HTTP 000 signifie qu'aucune connexion n'a été établie (pas de réponse du serveur), curl renvoie 7.
+
+######## Étape B (suite) — vérifier séparément la communication Ansible (OPS01)
+[ops01, utilisateur ansible, ~/infraready/ansible — 13:05:02]
+$ ansible linux01 -m ansible.builtin.ping
+[WARNING]: Skipping callback plugin '', unable to load
+linux01 | SUCCESS => 
+    ansible_facts:
+        discovered_interpreter_python: /usr/bin/python3
+    changed: false
+    ping: pong
+$ ansible-playbook playbooks/linux_base.yml --syntax-check
+
+playbook: playbooks/linux_base.yml
+Ansible joint LINUX01 et la syntaxe est valide : ces deux contrôles portent sur d'autres couches et ne prouvent pas que
+nginx est actif. Cause confirmée : le service est arrêté (inactive, arrêt propre dans le journal), configuration intacte.
+
+######## Étape C — corriger (LINUX01) : tester la configuration, démarrer, contrôler
+[linux01, root via sudo — 13:05:06]
+$ sudo nginx -t
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+$ sudo systemctl start nginx
+$ sudo systemctl is-active nginx
+active
+$ curl -fsS http://127.0.0.1/ -o /tmp/ir-page.html && grep -n "<p>" /tmp/ir-page.html | head -1
+6:  <p>Site InfraReady déployé par Ansible depuis OPS01</p>
+$ runuser -u infraadmin -- /tmp/check-nginx.sh; echo "code de sortie du script : $?"
+OK : nginx actif, http://127.0.0.1/ répond 200 et contient « InfraReady »
+code de sortie du script : 0
+$ rm -f /tmp/ir-page.html /tmp/check-nginx.sh
+
+######## Contrôle de non-régression (OPS01) : le playbook ne doit rien changer
+[ops01, utilisateur ansible, ~/infraready/ansible — 13:05:09]
+$ ansible-playbook playbooks/linux_base.yml | sed -n "/Services actifs/,/^\$/p;/PLAY RECAP/,\$p"
+[WARNING]: Skipping callback plugin '', unable to load
+TASK [Services actifs au démarrage] ********************************************
+ok: [linux01] => (item=nginx)
+ok: [linux01] => (item=prometheus-node-exporter)
+
+PLAY RECAP *********************************************************************
+linux01                    : ok=22   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+Remarque : un simple passage du playbook aurait aussi redémarré nginx (tâche « Services actifs au démarrage », state: started) ;
+la correction manuelle a été préférée ici pour démontrer le diagnostic du service lui-même, comme demandé.

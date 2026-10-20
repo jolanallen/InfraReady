@@ -1,0 +1,250 @@
+# Preuve : P-74-scenario1-variable-incorrecte
+# Séance 4, 7.4 — scénario 1 : une valeur de variable incorrecte produit un contenu erroné (le service reste sain)
+# Date : 2026-10-20 12:58:39 CEST — laboratoire InfraReady (Proxmox), snapshot préalable s07_avant_seance4
+# Commandes : chaque commande est affichée précédée de « $ » ; playbook utilisé : playbooks/linux_base.yml (cible : linux01 uniquement)
+
+######## Préparation commune — inventaire, cible, communication, syntaxe (OPS01)
+[ops01, utilisateur ansible, ~/infraready/ansible — 12:58:42]
+$ ansible-inventory --graph
+@all:
+  |--@ungrouped:
+  |--@linux:
+  |  |--linux01
+  |  |--ops01
+  |--@windows:
+  |  |--win-dc01
+  |--@monitoring:
+  |  |--ops01
+$ ansible-playbook playbooks/linux_base.yml --list-hosts
+
+playbook: playbooks/linux_base.yml
+
+  play #1 (linux01): LINUX01 - configuration de base	TAGS: []
+    pattern: ['linux01']
+    hosts (1):
+      linux01
+$ ansible linux01 -m ansible.builtin.ping
+[WARNING]: Skipping callback plugin '', unable to load
+linux01 | SUCCESS => 
+    ansible_facts:
+        discovered_interpreter_python: /usr/bin/python3
+    changed: false
+    ping: pong
+$ ansible-playbook playbooks/linux_base.yml --syntax-check
+
+playbook: playbooks/linux_base.yml
+
+######## État initial (LINUX01)
+[linux01, root via sudo — 12:58:47]
+$ sudo systemctl is-active nginx
+active
+$ sudo nginx -t
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+$ curl -sS -o /tmp/ir-page.html -w "Code HTTP : %{http_code}\n" http://127.0.0.1/
+Code HTTP : 200
+$ cat /tmp/ir-page.html
+<!doctype html>
+<html lang="fr">
+<head><meta charset="utf-8"><title>InfraReady - linux01</title></head>
+<body>
+  <h1>InfraReady</h1>
+  <p>Site InfraReady déployé par Ansible depuis OPS01</p>
+  <p>Serveur : linux01 (192.168.50.20)</p>
+  <p>Contenu géré par le groupe <code>webadmins</code> et déployé par Ansible.</p>
+</body>
+</html>
+
+######## Sauvegarde des fichiers du projet puis étape A — introduire le défaut (OPS01)
+[ops01, utilisateur ansible, ~/infraready/ansible — 12:58:50]
+$ cp playbooks/linux_base.yml playbooks/linux_base.yml.etat-initial
+$ cp playbooks/templates/index.html.j2 playbooks/templates/index.html.j2.etat-initial
+$ cp playbooks/templates/nginx-infraready.conf.j2 playbooks/templates/nginx-infraready.conf.j2.etat-initial
+$ sed -i "s/^    site_message: .*/    site_message: \"MESSAGE-INCORRECT-SCENARIO-1\"/" playbooks/linux_base.yml
+$ diff playbooks/linux_base.yml.etat-initial playbooks/linux_base.yml
+17c17
+<     site_message: "Site InfraReady déployé par Ansible depuis OPS01"
+---
+>     site_message: "MESSAGE-INCORRECT-SCENARIO-1"
+(code de sortie : 1)
+$ ansible-playbook playbooks/linux_base.yml
+[WARNING]: Skipping callback plugin '', unable to load
+
+PLAY [LINUX01 - configuration de base] *****************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [linux01]
+
+TASK [Fuseau horaire] **********************************************************
+ok: [linux01]
+
+TASK [Paquets de base] *********************************************************
+ok: [linux01]
+
+TASK [Groupes du labo] *********************************************************
+ok: [linux01] => (item=webadmins)
+ok: [linux01] => (item=auditeurs)
+
+TASK [Utilisateurs du labo (sans mot de passe, connexion par su/sudo uniquement)] ***
+ok: [linux01] => (item=alice)
+ok: [linux01] => (item=bruno)
+ok: [linux01] => (item=chloe)
+
+TASK [Racine du site - écriture réservée à webadmins (setgid)] *****************
+ok: [linux01]
+
+TASK [Page d'accueil du site] **************************************************
+changed: [linux01]
+
+TASK [Virtual host nginx] ******************************************************
+ok: [linux01]
+
+TASK [Activer le site InfraReady] **********************************************
+ok: [linux01]
+
+TASK [Désactiver le site par défaut] *******************************************
+ok: [linux01]
+
+TASK [Services actifs au démarrage] ********************************************
+ok: [linux01] => (item=nginx)
+ok: [linux01] => (item=prometheus-node-exporter)
+
+TASK [Récupérer l'UUID du système de fichiers DATA] ****************************
+ok: [linux01]
+
+TASK [Lire l'UUID] *************************************************************
+ok: [linux01]
+
+TASK [Monter le disque de données via fstab - /data] ***************************
+ok: [linux01]
+
+TASK [Dossier des rapports - lecture pour auditeurs uniquement] ****************
+ok: [linux01]
+
+TASK [UFW - SSH depuis le sous-réseau du labo] *********************************
+ok: [linux01]
+
+TASK [UFW - HTTP depuis le sous-réseau du labo] ********************************
+ok: [linux01]
+
+TASK [UFW - node_exporter depuis OPS01 uniquement] *****************************
+ok: [linux01]
+
+TASK [UFW - politique par défaut et activation] ********************************
+ok: [linux01]
+
+TASK [Appliquer les rechargements en attente avant les vérifications] **********
+
+TASK [Le site répond en HTTP 200] **********************************************
+ok: [linux01 -> localhost]
+
+TASK [Le message attendu est publié] *******************************************
+ok: [linux01] => 
+    changed: false
+    msg: Le contenu attendu est publié.
+
+TASK [Les métriques node_exporter sont exposées] *******************************
+ok: [linux01 -> localhost]
+
+PLAY RECAP *********************************************************************
+linux01                    : ok=22   changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+
+######## Étape B — observer le symptôme (LINUX01)
+[linux01, root via sudo — 12:59:06]
+$ sudo systemctl is-active nginx
+active
+$ curl -sS -o /tmp/ir-page.html -w "Code HTTP : %{http_code}\n" http://127.0.0.1/
+Code HTTP : 200
+$ grep -n MESSAGE-INCORRECT-SCENARIO-1 /tmp/ir-page.html
+6:  <p>MESSAGE-INCORRECT-SCENARIO-1</p>
+$ sudo grep -n MESSAGE-INCORRECT-SCENARIO-1 /var/www/infraready/index.html
+6:  <p>MESSAGE-INCORRECT-SCENARIO-1</p>
+
+######## Étape C — diagnostiquer (OPS01)
+[ops01, utilisateur ansible, ~/infraready/ansible — 12:59:08]
+$ grep -n -A 2 -B 2 site_message playbooks/linux_base.yml
+15-    web_root: /var/www/infraready
+16-    # Message publié sur la page d'accueil et vérifié en fin de play (séance 4, scénarios 1, 2, 6)
+17:    site_message: "MESSAGE-INCORRECT-SCENARIO-1"
+18-    data_label: DATA
+19-    data_mount: /data
+--
+171-      ansible.builtin.assert:
+172-        that:
+173:          - site_message in page_check.content
+174-        fail_msg: "Le message attendu est absent de la page."
+175-        success_msg: "Le contenu attendu est publié."
+$ grep -n -A 2 -B 2 site_message playbooks/templates/index.html.j2
+4-<body>
+5-  <h1>InfraReady</h1>
+6:  <p>{{ site_message }}</p>
+7-  <p>Serveur : {{ ansible_hostname }} ({{ ansible_host }})</p>
+8-  <p>Contenu géré par le groupe <code>webadmins</code> et déployé par Ansible.</p>
+Réponses : 1) service actif : oui ; 2) réponse HTTP : oui, 200 ; 3) fichier déployé conforme au modèle : oui ;
+4) valeur effective conforme au message attendu : NON. Cause confirmée : la valeur de site_message est incorrecte
+(ligne de vars du playbook). Le contrôle « Le message attendu est publié » réussit quand même, car il compare la page
+à la même variable : il prouve la cohérence déploiement/page, pas que la valeur est la bonne.
+
+######## Étape D — corriger : restaurer la valeur, contrôler, simuler, déployer (OPS01)
+[ops01, utilisateur ansible, ~/infraready/ansible — 12:59:11]
+$ cp playbooks/linux_base.yml.etat-initial playbooks/linux_base.yml
+$ diff playbooks/linux_base.yml.etat-initial playbooks/linux_base.yml && echo "linux_base.yml identique à l état initial"
+linux_base.yml identique à l état initial
+$ ansible-playbook playbooks/linux_base.yml --syntax-check
+
+playbook: playbooks/linux_base.yml
+$ ansible-playbook playbooks/linux_base.yml --list-hosts
+
+playbook: playbooks/linux_base.yml
+
+  play #1 (linux01): LINUX01 - configuration de base	TAGS: []
+    pattern: ['linux01']
+    hosts (1):
+      linux01
+$ ansible-playbook playbooks/linux_base.yml --check --diff | sed -n "/Page d.accueil/,/^\$/p;/PLAY RECAP/,\$p"
+[WARNING]: Skipping callback plugin '', unable to load
+TASK [Page d'accueil du site] **************************************************
+--- before: /var/www/infraready/index.html
++++ after: /home/ansible/.ansible/tmp/ansible-local-6732_0unwgsy/tmp4amjd11u/index.html.j2
+@@ -3,7 +3,7 @@
+ <head><meta charset="utf-8"><title>InfraReady - linux01</title></head>
+ <body>
+   <h1>InfraReady</h1>
+-  <p>MESSAGE-INCORRECT-SCENARIO-1</p>
++  <p>Site InfraReady déployé par Ansible depuis OPS01</p>
+   <p>Serveur : linux01 (192.168.50.20)</p>
+   <p>Contenu géré par le groupe <code>webadmins</code> et déployé par Ansible.</p>
+ </body>
+
+PLAY RECAP *********************************************************************
+linux01                    : ok=20   changed=1    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+
+$ ansible-playbook playbooks/linux_base.yml | sed -n "/Page d.accueil/,/^\$/p;/contenu attendu/,/^\$/p;/PLAY RECAP/,\$p"
+[WARNING]: Skipping callback plugin '', unable to load
+TASK [Page d'accueil du site] **************************************************
+changed: [linux01]
+
+    msg: Le contenu attendu est publié.
+
+PLAY RECAP *********************************************************************
+linux01                    : ok=22   changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+
+######## Vérification de la résolution (LINUX01)
+[linux01, root via sudo — 12:59:40]
+$ curl -fsS http://127.0.0.1/ -o /tmp/ir-page.html && echo "HTTP OK"
+HTTP OK
+$ grep -n MESSAGE-INCORRECT-SCENARIO-1 /tmp/ir-page.html
+(code de sortie : 1)
+$ grep -n "Site InfraReady déployé par Ansible depuis OPS01" /tmp/ir-page.html
+6:  <p>Site InfraReady déployé par Ansible depuis OPS01</p>
+$ rm -f /tmp/ir-page.html
+
+######## Analyse
+- Faits : nginx actif, HTTP 200, page servie = fichier déployé = MESSAGE-INCORRECT-SCENARIO-1 ; le playbook s'est terminé sans erreur.
+- Cause confirmée : valeur de site_message incorrecte dans les vars de linux_base.yml (seul fichier modifié, diff ci-dessus).
+- Limite du mode --check observée à l'étape D : la simulation annonce le changement de la page (diff -/+) puis l'assertion
+  échoue (failed=1), car en simulation la page n'est pas réellement déployée et le contrôle compare la nouvelle valeur à
+  l'ancienne page. L'exécution réelle qui suit réussit (failed=0). La simulation ne remplace pas l'exécution ni les contrôles.
+- Retour à l'état initial : linux_base.yml identique à la sauvegarde .etat-initial (diff vide), message attendu servi.

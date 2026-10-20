@@ -1,0 +1,75 @@
+# Preuve : P-26-linux01-processus-services-journaux
+# Séance 4, étapes 2 et 5 (Linux) — état initial, processus, mémoire, disque, services actifs, journaux nginx (lecture seule)
+# Date : 2026-10-20 13:10:50 CEST — laboratoire InfraReady (Proxmox), snapshot préalable s07_avant_seance4
+# Commandes : chaque commande est affichée précédée de « $ » ; playbook utilisé : playbooks/linux_base.yml (cible : linux01 uniquement)
+[linux01, root via sudo — 13:10:56]
+$ hostnamectl | grep -E "Static hostname|Operating System|Kernel"
+ Static hostname: linux01
+Operating System: Ubuntu 24.04.5 LTS
+          Kernel: Linux 6.8.0-147-generic
+$ ip -br address
+lo               UNKNOWN        127.0.0.1/8 ::1/128 
+ens18            UP             192.168.50.20/24 fe80::be24:11ff:fe7a:ca61/64 
+$ ip route
+default via 192.168.50.1 dev ens18 proto static 
+192.168.50.0/24 dev ens18 proto kernel scope link src 192.168.50.20 
+$ ps aux --sort=-%cpu | head -8
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root       35704 50.0  0.1  17292  7828 ?        Ss   13:10   0:00 /usr/lib/systemd/systemd-hostnamed
+infraad+   35630 10.1  0.2  20316 11472 ?        Ss   13:10   0:00 /usr/lib/systemd/systemd --user
+root       35626  0.4  0.2  14740 10468 ?        Ss   13:10   0:00 sshd: infraadmin [priv]
+prometh+     826  0.2  0.5 1613044 22540 ?       Ssl  10:40   0:25 /usr/bin/prometheus-node-exporter
+ansible     8586  0.2  0.2  15572  8580 ?        S    12:55   0:02 sshd: ansible@notty
+message+     802  0.1  0.1   9964  5828 ?        Ss   10:40   0:10 @dbus-daemon --system --address=systemd: --nofork --nopidfile --systemd-activation --syslog-only
+root           1  0.0  0.3  22312 13580 ?        Ss   10:40   0:07 /sbin/init
+$ free -h
+               total        used        free      shared  buff/cache   available
+Mem:           3.8Gi       467Mi       2.9Gi       1.1Mi       712Mi       3.4Gi
+Swap:          3.8Gi          0B       3.8Gi
+$ df -hT -x tmpfs -x efivarfs
+Filesystem                        Type  Size  Used Avail Use% Mounted on
+/dev/mapper/ubuntu--vg-ubuntu--lv ext4   28G  6.6G   20G  26% /
+/dev/sdb                          ext4  9.8G   32K  9.3G   1% /data
+/dev/sda2                         ext4  2.0G  104M  1.7G   6% /boot
+$ systemctl --type=service --state=running --no-pager --no-legend | awk "{print \$1}"
+cron.service
+dbus.service
+getty@tty1.service
+ModemManager.service
+multipathd.service
+nginx.service
+polkit.service
+prometheus-node-exporter.service
+qemu-guest-agent.service
+rsyslog.service
+ssh.service
+systemd-hostnamed.service
+systemd-journald.service
+systemd-logind.service
+systemd-networkd.service
+systemd-resolved.service
+systemd-timesyncd.service
+systemd-udevd.service
+udisks2.service
+unattended-upgrades.service
+upower.service
+user@1000.service
+user@1001.service
+$ systemctl status nginx --no-pager -n 0 | head -8
+● nginx.service - A high performance web server and a reverse proxy server
+     Loaded: loaded (/usr/lib/systemd/system/nginx.service; enabled; preset: enabled)
+     Active: active (running) since Tue 2026-10-20 13:05:06 CEST; 5min ago
+       Docs: man:nginx(8)
+    Process: 23097 ExecStartPre=/usr/sbin/nginx -t -q -g daemon on; master_process on; (code=exited, status=0/SUCCESS)
+    Process: 23099 ExecStart=/usr/sbin/nginx -g daemon on; master_process on; (code=exited, status=0/SUCCESS)
+   Main PID: 23100 (nginx)
+      Tasks: 5 (limit: 4600)
+$ systemctl is-active nginx
+active
+$ journalctl -u nginx --since "30 minutes ago" --no-pager | tail -6
+Oct 20 13:04:12 linux01 systemd[1]: Reloaded nginx.service - A high performance web server and a reverse proxy server.
+Oct 20 13:04:56 linux01 systemd[1]: Stopping nginx.service - A high performance web server and a reverse proxy server...
+Oct 20 13:04:57 linux01 systemd[1]: nginx.service: Deactivated successfully.
+Oct 20 13:04:57 linux01 systemd[1]: Stopped nginx.service - A high performance web server and a reverse proxy server.
+Oct 20 13:05:06 linux01 systemd[1]: Starting nginx.service - A high performance web server and a reverse proxy server...
+Oct 20 13:05:06 linux01 systemd[1]: Started nginx.service - A high performance web server and a reverse proxy server.

@@ -1,0 +1,37 @@
+# Preuve : P-25-script-check-nginx-trois-situations
+# Séance 4, étape 6 — script Bash de vérification en lecture seule (scripts/check-nginx.sh), testé dans 3 situations
+# Exécuté en tant qu'infraadmin (sans sudo) — 2026-10-20 12:52:53 CEST
+# Codes attendus : 0 = contrôle positif, 1 = contrôle négatif, 2 = erreur d'exécution / prérequis absent
+
+######## Situation 1 — état normal (LINUX01)
+$ hostname ; id -un
+linux01
+infraadmin
+$ ./check-nginx.sh ; echo "code de sortie : $?"
+OK : nginx actif, http://127.0.0.1/ répond 200 et contient « InfraReady »
+code de sortie : 0
+$ ./check-nginx.sh nginx http://127.0.0.1/ "Site InfraReady déployé par Ansible depuis OPS01" ; echo "code de sortie : $?"
+OK : nginx actif, http://127.0.0.1/ répond 200 et contient « Site InfraReady déployé par Ansible depuis OPS01 »
+code de sortie : 0
+
+######## Situation 2 — condition de test non satisfaite (LINUX01)
+$ hostname ; id -un
+linux01
+infraadmin
+$ ./check-nginx.sh nginx http://127.0.0.1/ "TEXTE-ABSENT-DE-LA-PAGE" ; echo "code de sortie : $?"
+ECHEC : HTTP 200 mais le texte « TEXTE-ABSENT-DE-LA-PAGE » est absent de la page
+code de sortie : 1
+$ ./check-nginx.sh nginx http://127.0.0.1:8081/ ; echo "code de sortie : $?"   # port sans service
+ECHEC : http://127.0.0.1:8081/ injoignable (curl: (7) Failed to connect to 127.0.0.1 port 8081 after 0 ms: Couldn't connect to server)
+code de sortie : 1
+(le cas « service arrêté » est démontré avec ce même script au scénario 5, P-78)
+
+######## Situation 3 — erreur d'exécution : service absent de l'hôte (OPS01, nginx non installé)
+$ hostname ; id -un
+ops01
+infraadmin
+$ systemctl list-unit-files nginx.service --no-legend | wc -l
+0
+$ ./check-nginx.sh ; echo "code de sortie : $?"
+ERREUR : service nginx inconnu sur ops01 (prérequis absent)
+code de sortie : 2

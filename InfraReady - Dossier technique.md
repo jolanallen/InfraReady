@@ -2,7 +2,7 @@
 title: InfraReady — Dossier technique
 type: livrable
 status: en cours
-version: v0.3
+version: v0.4
 updated: 2026-10-20
 tags:
   - infraready
@@ -20,8 +20,8 @@ tags:
 | **Équipe** | MIR Mahan / Jolan Allen (chef de projet) / Kenzi Bendjelloul |
 | **Classe** | B3 Cybersécurité |
 | **Lien GitHub** | https://github.com/jolanallen/InfraReady |
-| **Date / version** | 20/10/2026 — v0.3 |
-| **Statut du projet** | Phases A à H réalisées — finalisation avant remise (bilan, PDF, oral) |
+| **Date / version** | 20/10/2026 — v0.4 |
+| **Statut du projet** | Phases A à H et TP de la séance 4 réalisés — finalisation avant remise (bilans, PDF, oral) |
 
 ---
 
@@ -521,13 +521,13 @@ Retour arrière disponible : snapshot `s02_avant_monitoring` (OPS01).
 > [!abstract] Objectif
 > Versionner les livrables et valider le dépôt automatiquement via GitHub Actions.
 
-**Responsable :** MIR Mahan / Jolan Allen · **Dates :** 19/10/2026 · **Statut :** Fait (pipeline vert) — il manque les commits du second membre
+**Responsable :** MIR Mahan / Jolan Allen · **Dates :** 19/10/2026 · **Statut :** Fait (pipeline vert) — il manque les commits des autres membres
 
 ### Travaux réalisés / checklist
 
-- [x] Créer un dépôt GitHub adapté au binôme : `jolanallen/InfraReady`, créé par le chef de projet.
+- [x] Créer un dépôt GitHub adapté à l'équipe : `jolanallen/InfraReady`, créé par le chef de projet.
 - [x] Organiser playbooks, scripts, variables, monitoring et docs (voir arborescence en annexe).
-- [ ] Utiliser des commits descriptifs des deux membres.
+- [ ] Utiliser des commits descriptifs de tous les membres.
 - [x] Créer `.github/workflows/validation.yml`.
 - [x] Déclencher des validations à chaque push ou pull request (`on: push, pull_request, workflow_dispatch`).
 - [x] Inclure des contrôles pertinents : fichiers attendus, `yamllint`, `ansible-playbook --syntax-check`, `ansible-lint`, `promtool check config`, JSON du dashboard, **gitleaks** sur tout l'historique, vault obligatoirement chiffré.
@@ -537,7 +537,7 @@ Retour arrière disponible : snapshot `s02_avant_monitoring` (OPS01).
 ### Procédure et configuration
 
 - **Dépôt** : https://github.com/jolanallen/InfraReady — branche `main`.
-- **Migration** : le travail a commencé le 19/10/2026 sur un dépôt de travail privé ; l'historique complet a été migré le 20/10/2026 vers le dépôt du binôme, où le workflow a été rejoué (P-60). Le 1er run en échec date du dépôt de travail (P-60a).
+- **Migration** : le travail a commencé le 19/10/2026 sur un dépôt de travail privé ; l'historique complet a été migré le 20/10/2026 vers le dépôt de l'équipe, où le workflow a été rejoué (P-60). Le 1er run en échec date du dépôt de travail (P-60a).
 - **Jobs** : `fichiers`, `yaml-ansible`, `monitoring`, `secrets` (voir `.github/workflows/validation.yml`).
 
 - **Validation locale avant push** : les mêmes outils que la CI (ansible-core 2.16, ansible-lint 24, yamllint, collections aux versions d'OPS01) sont installés sur le poste pour corriger avant de pousser.
@@ -548,7 +548,7 @@ Retour arrière disponible : snapshot `s02_avant_monitoring` (OPS01).
 | Vérification | Attendu | Résultat observé | Preuve |
 | --- | --- | --- | --- |
 | Dépôt et arborescence | Fichiers attendus présents | Voir arborescence (annexe) ; job `Arborescence attendue` : success | [Lien](https://github.com/jolanallen/InfraReady), [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
-| Contributions | Contributions du binôme traçables | Pour l'instant un seul auteur (`git shortlog`) — **à compléter par le second membre** | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
+| Contributions | Contributions de l'équipe traçables | Pour l'instant un seul auteur (`git shortlog`) — **à compléter par les autres membres** | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
 | Workflow automatique | Push / PR déclenche la validation | Chaque `push` sur `main` a lancé un run (événement `push`) | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
 | Pipeline vert | Exécution terminée avec succès | Run 39401095014 sur `jolanallen/InfraReady` : `Arborescence attendue`, `YAML + Ansible`, `Prometheus + Grafana`, `Aucun secret en clair` → success | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
 
@@ -557,7 +557,7 @@ Retour arrière disponible : snapshot `s02_avant_monitoring` (OPS01).
 | Problème | Cause | Correction | Résultat |
 | --- | --- | --- | --- |
 | `git push` refusé : « refusing to allow an OAuth App to create or update workflow … without `workflow` scope » | Le jeton GitHub CLI n'a pas le droit `workflow`, obligatoire pour modifier `.github/workflows/` | `gh auth refresh -h github.com -s workflow` | Push accepté, 6 commits publiés |
-| 1er run en échec (3 jobs sur 4) | Dashboard Grafana absent, ligne > 160 caractères, 7 remarques `ansible-lint` | Dashboard écrit, playbooks corrigés et rejoués (`changed=0`), validation locale avant push | 2ᵉ run vert ([P-60a](docs/preuves/P-60a-github-actions-depot-de-travail-initial.txt)), puis vert sur le dépôt du binôme ([P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt)) |
+| 1er run en échec (3 jobs sur 4) | Dashboard Grafana absent, ligne > 160 caractères, 7 remarques `ansible-lint` | Dashboard écrit, playbooks corrigés et rejoués (`changed=0`), validation locale avant push | 2ᵉ run vert ([P-60a](docs/preuves/P-60a-github-actions-depot-de-travail-initial.txt)), puis vert sur le dépôt de l'équipe ([P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt)) |
 
 ---
 
@@ -614,13 +614,106 @@ flowchart LR
 | --- | --- | --- | --- |
 | 1ᵉʳ essai de correction : le playbook restaure le fichier (`changed=1`) mais le site reste en 404, et le 2ᵉ passage (`changed=0`) ne change rien | La vérification « HTTP 200 » échoue avant la fin du play ; Ansible n'exécute les handlers qu'en fin de play, donc le rechargement nginx notifié est perdu | `ansible.builtin.meta: flush_handlers` placé avant les vérifications dans `linux_base.yml` | Un seul passage suffit : fichier + rechargement + tests ([P-72a](docs/preuves/P-72a-incident-nginx-correction-1er-essai-handler-non-execute.txt) → [P-72](docs/preuves/P-72-incident-nginx-correction-playbook-corrige.txt)) |
 | Journal d'erreur nginx vide malgré l'incident | `try_files … =404` renvoie 404 sans écrire dans `error.log` | Lire la configuration chargée (`nginx -T`) et le journal systemd | Cause trouvée en moins d'une minute |
-| Le site n'est pas supervisé en HTTP (seul `up` du node_exporter l'est) : l'incident n'a déclenché aucune alerte | Pas de sonde HTTP dans Prometheus | Piste d'amélioration : `blackbox_exporter` + alerte `SiteWebHS` | Noté en section 13 |
+| Le site n'est pas supervisé en HTTP (seul `up` du node_exporter l'est) : l'incident n'a déclenché aucune alerte | Pas de sonde HTTP dans Prometheus | Piste d'amélioration : `blackbox_exporter` + alerte `SiteWebHS` | Noté en section 14 |
 
 Retour arrière disponible : `/root/infraready.nginx.bak-incident-h` sur LINUX01, et la configuration de référence du dépôt (`templates/nginx-infraready.conf.j2`).
 
 ---
 
-## 11. Sécurité et limites d'intervention
+## 11. Séance 4 — Stockage, processus, scripts et scénarios de panne
+
+> [!abstract] Objectif
+> Appliquer au laboratoire le TP guidé de la séance 4 (support pédagogique n° 4 « Stockage et processus ») : disque de test identifié et monté de façon persistante, processus et services observés sans perturbation, scripts de vérification à codes de sortie, playbook commenté rejoué deux fois, puis les six scénarios de panne contrôlée (7.4) avec la procédure commune de diagnostic (7.5).
+
+**Responsable :** MIR Mahan / Jolan Allen / Kenzi Bendjelloul · **Dates :** 19–20/10/2026 · **Statut :** Fait — bilans individuels et revue croisée à compléter par chaque membre
+
+### Travaux réalisés / checklist
+
+- [x] Identifier un disque virtuel dédié avant de le modifier (numéro de série, comparaison hyperviseur / `lsblk`) — réalisé en phase C.
+- [x] Créer, monter par UUID et vérifier un espace de données de test, droits compris — réalisé en phase C.
+- [x] Examiner processus, services et journaux sur Linux et Windows, sans arrêter de service critique.
+- [x] Écrire deux scripts de vérification en lecture seule (Bash, PowerShell) et les tester dans trois situations.
+- [x] Rejouer le playbook commenté deux fois, contrôler syntaxe, cible et simulation `--check --diff`.
+- [x] Dérouler les six scénarios de panne contrôlée, un seul actif à la fois, avec retour à l'état initial vérifié.
+- [x] Consigner les erreurs, les décisions et les mesures de retour arrière.
+- [ ] Bilan individuel (section 7 et fiche 10.5 du support) — un par membre.
+- [ ] Revue croisée (fiche 10.4, annexe C) : un membre suit la procédure depuis ce dossier sans explication orale.
+
+### Correspondance avec le support
+
+| Étape / livrable du support | Réalisation dans InfraReady | Preuve |
+| --- | --- | --- |
+| Étapes 1 à 4, exercices A et B : disque identifié, formaté, monté de façon persistante, droits | Disque de 10 Go ajouté à LINUX01, identifié par son numéro de série `INFRA-DATA01` (et non par `/dev/sdb`), ext4 `DATA`, monté sur `/data` par UUID (`nofail`), démontage/remontage via `fstab`, droits par groupe | [P-22](docs/preuves/P-22-linux01-disque-test-montage.txt) |
+| Étapes 2 et 5 (Linux) : état initial, processus, mémoire, disque, services, journaux | `hostnamectl`, `ip -br address`, `ps aux --sort=-%cpu`, `free -h`, `df -hT`, `systemctl --state=running`, `journalctl -u nginx` | [P-21](docs/preuves/P-21-linux01-service-nginx-processus.txt), [P-24](docs/preuves/P-24-linux01-analyse-journaux.txt), [P-26](docs/preuves/P-26-linux01-processus-services-journaux.txt) |
+| Étapes 2 et 5 (Windows) | `Get-NetIPConfiguration`, `Get-Service`, `Get-Process` trié par CPU, `Get-WinEvent -LogName System` ; aucun service arrêté | [P-14](docs/preuves/P-14-win-dc01-processus-services-script-dnsclient.txt) |
+| Étape 6 : scripts de vérification, trois situations | `scripts/check-nginx.sh`, `scripts/Check-DnsClient.ps1` | [P-25](docs/preuves/P-25-script-check-nginx-trois-situations.txt), [P-14](docs/preuves/P-14-win-dc01-processus-services-script-dnsclient.txt) |
+| Étape 7, exercice C : playbook commenté, syntaxe, cible, deux exécutions | `linux_base.yml` complété (variable `site_message`, contrôle HTTP + contenu) : 1ᵉʳ passage `changed=1`, 2ᵉ `changed=0` ; simulation corrigée | [P-38](docs/preuves/P-38-playbook-linux-site-message-1er-passage.txt), [P-38b](docs/preuves/P-38b-playbook-linux-site-message-2e-passage.txt), [P-39a](docs/preuves/P-39a-playbook-linux-mode-check-echec.txt), [P-39](docs/preuves/P-39-playbook-linux-mode-check-corrige.txt) |
+| 7.4 : six scénarios de panne contrôlée | Voir tableau des scénarios | P-74 à P-79 |
+| 7.5 et étape 8 : procédure commune, compte rendu, retour arrière | Appliquée à chaque scénario (délimiter, collecter, corriger un seul élément, `--check --diff`, vérifier, restaurer) | P-74 à P-79, [P-05](docs/preuves/P-05-proxmox-snapshots-arbre-complet.txt) |
+
+> [!note] Adaptations au projet (le support demande d'adapter les noms existants)
+> `/data` au lieu de `/srv/infraready` (disque réalisé en phase C) ; site servi depuis `/var/www/infraready` (variable `web_root`) et non `/var/www/html` ; playbook `playbooks/linux_base.yml` et inventaire `inventory/hosts.yml` au lieu de `nginx.yml` / `inventory.ini` ; disque ajouté dans Proxmox et non VMware. Le groupe `linux` contient LINUX01 **et** OPS01 : le play cible explicitement `linux01`, vérifié par `--list-hosts` avant chaque scénario.
+
+### Processus et services observés
+
+| Machine | Élément | État observé | Interprétation | Preuve |
+| --- | --- | --- | --- | --- |
+| LINUX01 | `nginx` (maître root, workers www-data) | `active`, `enabled`, écoute `0.0.0.0:80` | Service de test autorisé pour les scénarios | P-21, P-26 |
+| LINUX01 | `prometheus-node-exporter`, `ssh` | `active` | Supervision et administration depuis OPS01 | P-26 |
+| LINUX01 | Processus en tête du tri CPU | `systemd-hostnamed` à 50 % | Démarré par notre propre `hostnamectl` quelques instants avant : un pic de CPU ne prouve pas un défaut | P-26 |
+| WIN-DC01 | `NTDS`, `DNS`, `Netlogon`, `W32Time` | `Running`, `Automatic` | Services critiques du domaine : exclus de toute panne volontaire | P-14 |
+| WIN-DC01 | `Dnscache` (client DNS), `WinRM` | `Running`, `Automatic` | `Dnscache` contrôlé par `Check-DnsClient.ps1` ; son état ne prouve pas qu'un nom se résout | P-14 |
+| WIN-DC01 | Processus en tête du tri CPU | `MsMpEng` (Defender, 109 s), `System`, `windows_exporter` | Temps CPU cumulé depuis le démarrage : normal | P-14 |
+| WIN-DC01 | Journal System (20 derniers événements) | 7036 (Service Control Manager), 6038 (LsaSrv, avertissement) | 6038 : NTLM utilisé par un client, ici les connexions WinRM d'Ansible ; aucun événement d'erreur | P-14 |
+
+### Scripts de vérification
+
+| Script | Contrôle | Code 0 | Code 1 | Code 2 | Situations testées |
+| --- | --- | --- | --- | --- | --- |
+| `scripts/check-nginx.sh [service] [url] [texte]` | Service actif, HTTP 200, texte attendu dans la page | Contrôle positif | Service inactif, site injoignable, HTTP ≠ 200 ou texte absent | Commande absente, service inconnu de l'hôte | Normal → 0 ; texte absent → 1 ; port sans service → 1 ; nginx arrêté → 1 (P-78) ; OPS01 sans nginx → 2 |
+| `scripts/Check-DnsClient.ps1 [-Name <service>]` | État local d'un service Windows (défaut `Dnscache`) | Service démarré | Présent mais arrêté | Introuvable | `Dnscache` → 0 ; `AxInstSV` (manuel, déjà arrêté) → 1 ; `ServiceInexistant` → 2 |
+
+Les deux scripts sont en lecture seule et ne corrigent rien (diagnostic et correction séparés). `check-nginx.sh` s'exécute sur l'hôte contrôlé sans `sudo` ; `Check-DnsClient.ps1` s'appelle avec `powershell -NoProfile -File Check-DnsClient.ps1 -Name Dnscache` puis `$LASTEXITCODE`.
+
+### Scénarios de panne contrôlée (7.4)
+
+| # | Défaut introduit (une seule modification) | Symptôme observé | Cause confirmée | Correction et contrôle | Preuve |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `site_message: "MESSAGE-INCORRECT-SCENARIO-1"` | nginx actif, HTTP 200, playbook `failed=0` ; page servie = fichier déployé = message incorrect | Valeur de variable | Valeur restaurée ; `--syntax-check`, `--list-hosts`, `--check --diff`, exécution ; marqueur absent, message attendu présent | [P-74](docs/preuves/P-74-scenario1-variable-incorrecte.txt) |
+| 2 | `{{ site_messsage }}` dans `index.html.j2` | Tâche template en échec : `'site_messsage' is undefined` ; site toujours en 200 avec l'ancienne page (date inchangée) | Nom de variable du modèle | Modèle restauré, exécution réussie, message attendu présent | [P-75](docs/preuves/P-75-scenario2-variable-jinja2-inexistante.txt) |
+| 3 | `dest: /tmp/ir-index.html` | Tâche `changed`, fichier créé dans `/tmp` à 13:01 ; fichier servi inchangé (12:59) ; `nginx -T` : `root /var/www/infraready` | Destination ≠ racine du serveur virtuel | Destination restaurée, fichier de test supprimé, playbook `changed=0` | [P-76](docs/preuves/P-76-scenario3-mauvais-chemin-de-destination.txt) |
+| 4 | `notify` retiré de « Virtual host nginx » + en-tête `X-InfraReady-Scenario` ajouté au modèle | Tâche `changed`, aucun `RUNNING HANDLER`, aucun rechargement au journal ; en-tête présent sur disque mais absent des réponses HTTP | Notification absente | `notify` rétabli → tâche `ok`, handler non déclenché ; nouvelle modification → handler exécuté, en-tête servi, `Reloaded nginx` au journal ; modèle restauré | [P-77](docs/preuves/P-77-scenario4-handler-non-notifie.txt) |
+| 5 | `systemctl stop nginx` | `inactive`, curl `000` (code 7), `check-nginx.sh` → 1 ; ping Ansible et syntaxe OK | Service arrêté, configuration intacte | `nginx -t`, `systemctl start nginx` ; script → 0 ; playbook `changed=0` | [P-78](docs/preuves/P-78-scenario5-nginx-arrete.txt) |
+| 6 | B1 : `site_message` changé (l'assertion réussit) ; B2 : ligne `{{ site_message }}` retirée du modèle | HTTP 200 mais tâche « Le message attendu est publié » en échec : « Le message attendu est absent de la page. » | Contenu publié incomplet | Modèle restauré ; `uri` + `assert` réussis | [P-79](docs/preuves/P-79-scenario6-controle-fonctionnel-contenu.txt) |
+
+**Clôture (7.5, phase 6) :** fichiers du projet comparés aux sauvegardes `.etat-initial` (identiques), sauvegardes retirées, dernier passage `changed=0` ; copie du projet sur OPS01 identique au dépôt (sommes SHA-256).
+
+### Plan de test (annexe A du support)
+
+| ID | Test | Résultat attendu | Résultat observé | Statut |
+| --- | --- | --- | --- | --- |
+| T01 | Identification du disque | Disque de données identifié sans ambiguïté | `sdb` 10 Go, série `INFRA-DATA01`, distinct de `sda` qui porte `/` | ✅ P-22 |
+| T02 | Montage du volume | Point de montage et système de fichiers attendus | `/data` ext4 monté par UUID, persistant après démontage/remontage | ✅ P-22 |
+| T03 | État du service | nginx actif, site en 200 avec le message attendu | `check-nginx.sh` → 0 ; panne détectée → 1 | ✅ P-25, P-78 |
+| T04 | Playbook Ansible | Tâches réussies sur la cible prévue uniquement | `--list-hosts` : `linux01` ; `failed=0` | ✅ P-38 |
+| T05 | Idempotence | Aucun changement inattendu à la seconde exécution | `changed=0` ; simulation `changed=0` après correction | ✅ P-38b, P-39 |
+
+### Difficultés / décision / retour arrière
+
+| Problème | Cause | Correction | Résultat |
+| --- | --- | --- | --- |
+| `--check --diff` en échec et faux changement annoncé sur `/data` | `blkid` et `uri` ne s'exécutent pas en mode check : UUID vide → montage « `UUID=` » annoncé, `page_check` sans contenu | `check_mode: false` sur les 4 tâches en lecture seule (2 `blkid`, 2 `uri`) | Simulation `changed=0 failed=0` ([P-39a](docs/preuves/P-39a-playbook-linux-mode-check-echec.txt) → [P-39](docs/preuves/P-39-playbook-linux-mode-check-corrige.txt)) |
+| Simulation de la correction du scénario 1 en échec (`failed=1`) | En mode check la page n'est pas déployée : l'assertion compare la nouvelle valeur à l'ancienne page | Limite assumée du mode `--check` ; exécution réelle ensuite | `failed=0` (P-74) |
+| `Check-DnsClient.ps1` renvoie `rc: 1` au lieu de 2 via Ansible | Le module `ansible.builtin.script` ramène tout code non nul à 1 | Test discriminant : exécution directe et lecture de `$LASTEXITCODE` | 0 / 1 / 2 confirmés (P-14) |
+| Message « injoignable (000) » ambigu | Le script affichait le code HTTP 000 au lieu de l'erreur | Afficher la première ligne de sortie de curl | Message explicite (P-25) |
+| Scénario 6 tel que décrit ne déclenche pas l'assertion | L'assertion compare la page à la variable qui vient de la générer | Défaut porté sur le contenu publié (modèle) | Assertion en échec puis réussie (P-79) |
+| Scénario 4 : rétablir `notify` ne suffit pas | Tâche `ok` → aucune notification ; ancienne configuration toujours chargée | Nouvelle modification pour déclencher le handler | Handler exécuté (P-77) |
+
+Retour arrière : snapshot Proxmox `s07_avant_seance4` des 3 VM pris avant la séance ; sauvegardes `.etat-initial` des fichiers du projet sur OPS01 pendant les scénarios ; configuration de référence dans le dépôt.
+
+---
+
+## 12. Sécurité et limites d'intervention
 
 - [x] VM du laboratoire uniquement, aucun système externe — seules les VM 100 à 102 ont été modifiées ; les autres VM de l'hôte n'ont pas été touchées.
 - [x] Cibles contrôlées avant formatage / partitionnement — disques système vérifiés vides avant installation ; disque de test identifié par numéro de série + 5 contrôles avec arrêt automatique.
@@ -630,13 +723,13 @@ Retour arrière disponible : `/root/infraready.nginx.bak-incident-h` sur LINUX01
 - [x] Aucun secret en clair dans Git ou dans ce dossier — vault AES256, modèles avec `__PLACEHOLDERS__`, fichiers de réponse supprimés après usage, recherche des vrais secrets avant chaque commit, gitleaks dans la CI.
 - [x] Playbooks testés avant exécution large — un hôte par playbook, snapshot préalable, second passage pour vérifier la stabilité.
 - [x] Changements perturbateurs documentés — redémarrage de promotion du DC, modification réseau de l'hôte (sauvegarde `interfaces.bak-infraready`), changement DNS des VM Linux (sauvegarde netplan).
-- [x] Fonctionnalités non réalisées signalées — voir section 13.
+- [x] Fonctionnalités non réalisées signalées — voir section 14.
 
 **Limites connues** : WinRM en HTTP (5985) avec chiffrement NTLM du message, mais sans certificat TLS ; Grafana consultable sans compte en lecture seule (rôle Viewer, réseau du labo uniquement) ; Prometheus et Grafana sans TLS (labo isolé) ; mot de passe `sudo` de l'hôte Proxmox faible et à changer en fin de projet.
 
 ---
 
-## 12. Recette finale et matrice des preuves
+## 13. Recette finale et matrice des preuves
 
 ### Recette finale
 
@@ -648,8 +741,9 @@ Retour arrière disponible : `/root/infraready.nginx.bak-incident-h` sur LINUX01
 | D | Playbooks Linux & Windows / idempotence | ✅ Validé | P-30 à P-35 |
 | E | Mises à jour / maintenance | ✅ Validé | P-40 à P-43 |
 | F | Exporters / dashboard / alerte | ✅ Validé | P-50 à P-55 |
-| G | Workflow GitHub Actions réussi | ✅ Validé (commits du binôme à compléter) | P-60 |
+| G | Workflow GitHub Actions réussi | ✅ Validé (commits de l'équipe à compléter) | P-60 |
 | H | Incident corrigé / retour normal | ✅ Validé | P-70 à P-73, `docs/rapport-incident.md` |
+| Séance 4 | Scripts de vérification / processus et services / 6 scénarios de panne / mode check | ✅ Validé (bilans individuels à compléter) | P-14, P-25, P-26, P-38 à P-39, P-74 à P-79 |
 
 ### Matrice des preuves
 
@@ -669,11 +763,14 @@ Retour arrière disponible : `/root/infraready.nginx.bak-incident-h` sur LINUX01
 | P-12 | 19/10/2026 | État du domaine, comptes, DNS, zones, dcdiag | [P-12](docs/preuves/P-12-domaine-dns-verifications.txt) |
 | P-12b | 19/10/2026 | dcdiag tests fonctionnels + NTP | [P-12b](docs/preuves/P-12b-dcdiag-tests-fonctionnels-ntp.txt) |
 | P-13 | 19/10/2026 | Journaux Windows (Security, Directory Service, DNS, System) | [P-13](docs/preuves/P-13-journaux-windows-ad.txt) |
+| P-14 | 20/10/2026 | Windows : état initial, services, processus, journal System, script `Check-DnsClient.ps1` (0/1/2) | [P-14](docs/preuves/P-14-win-dc01-processus-services-script-dnsclient.txt) |
 | P-20 | 19/10/2026 | Comptes, groupes, permissions Linux + tests de droits | [P-20](docs/preuves/P-20-linux01-comptes-groupes-permissions.txt) |
 | P-21 | 19/10/2026 | nginx, service et processus | [P-21](docs/preuves/P-21-linux01-service-nginx-processus.txt) |
 | P-22 | 19/10/2026 | Disque de test : contrôles, formatage, montage UUID | [P-22](docs/preuves/P-22-linux01-disque-test-montage.txt) |
 | P-23 | 19/10/2026 | Mise à jour contrôlée d'Ubuntu | [P-23](docs/preuves/P-23-linux01-mise-a-jour-controlee.txt) |
 | P-24 | 19/10/2026 | Analyse des journaux Linux | [P-24](docs/preuves/P-24-linux01-analyse-journaux.txt) |
+| P-25 | 20/10/2026 | Script `check-nginx.sh` testé dans 3 situations (codes 0/1/2) | [P-25](docs/preuves/P-25-script-check-nginx-trois-situations.txt) |
+| P-26 | 20/10/2026 | LINUX01 : état initial, processus, mémoire, disque, services, journaux nginx | [P-26](docs/preuves/P-26-linux01-processus-services-journaux.txt) |
 | P-30 | 19/10/2026 | Ansible : version, inventaire, connexions | [P-30](docs/preuves/P-30-ansible-inventaire-connexions.txt) |
 | P-31 | 19/10/2026 | Playbook Linux — 1er passage | [P-31](docs/preuves/P-31-playbook-linux-1er-passage.txt) |
 | P-32 | 19/10/2026 | Playbook Linux — 2e passage (idempotence) + UFW | [P-32](docs/preuves/P-32-playbook-linux-2e-passage-idempotence.txt) |
@@ -683,6 +780,10 @@ Retour arrière disponible : `/root/infraready.nginx.bak-incident-h` sur LINUX01
 | P-36 | 19/10/2026 | Diagnostic : enregistrements de la zone inverse (statique/dynamique) | [P-36](docs/preuves/P-36-diagnostic-ptr-dc-statique-vs-dynamique.txt) |
 | P-36b | 19/10/2026 | Zone inverse après réenregistrement du DC | [P-36b](docs/preuves/P-36b-ptr-dc-apres-reenregistrement-dynamique.txt) |
 | P-37 | 19/10/2026 | Playbook Windows stable après réenregistrement du DC (changed=0 ×2) | [P-37](docs/preuves/P-37-playbook-windows-ptr-dc-stable.txt) |
+| P-38 | 20/10/2026 | `linux_base.yml` + `site_message` et contrôle de contenu — 1ᵉʳ passage | [P-38](docs/preuves/P-38-playbook-linux-site-message-1er-passage.txt) |
+| P-38b | 20/10/2026 | `linux_base.yml` — 2ᵉ passage (`changed=0`) | [P-38b](docs/preuves/P-38b-playbook-linux-site-message-2e-passage.txt) |
+| P-39a | 20/10/2026 | Simulation `--check --diff` en échec (blkid / uri non exécutés) | [P-39a](docs/preuves/P-39a-playbook-linux-mode-check-echec.txt) |
+| P-39 | 20/10/2026 | Simulation corrigée (`check_mode: false`) puis exécution `changed=0` | [P-39](docs/preuves/P-39-playbook-linux-mode-check-corrige.txt) |
 | P-40 | 19/10/2026 | Maintenance Linux (linux01, ops01) : pré-contrôles, apt, post-contrôles | [P-40](docs/preuves/P-40-linux-maintenance-standard.txt) |
 | P-40b | 19/10/2026 | Rapports de maintenance générés (`~/infraready-logs/`) | [P-40b](docs/preuves/P-40b-rapports-maintenance-generes.txt) |
 | P-41a | 19/10/2026 | Maintenance Windows — 1er essai : lecteur CD vu comme volume plein | [P-41a](docs/preuves/P-41a-windows-maintenance-1er-essai-lecteur-cd.txt) |
@@ -696,6 +797,12 @@ Retour arrière disponible : `/root/infraready.nginx.bak-incident-h` sur LINUX01
 | P-72a | 19/10/2026 | Incident nginx : 1ᵉʳ essai de correction, handler non exécuté | [P-72a](docs/preuves/P-72a-incident-nginx-correction-1er-essai-handler-non-execute.txt) |
 | P-72 | 19/10/2026 | Incident nginx : correction avec le playbook corrigé (reproduction n°2) | [P-72](docs/preuves/P-72-incident-nginx-correction-playbook-corrige.txt) |
 | P-73 | 19/10/2026 | Incident nginx : retour à la normale et 2ᵉ passage `changed=0` | [P-73](docs/preuves/P-73-incident-nginx-retour-normale-et-second-passage.txt) |
+| P-74 | 20/10/2026 | Scénario 1 : variable incorrecte | [P-74](docs/preuves/P-74-scenario1-variable-incorrecte.txt) |
+| P-75 | 20/10/2026 | Scénario 2 : variable Jinja2 inexistante | [P-75](docs/preuves/P-75-scenario2-variable-jinja2-inexistante.txt) |
+| P-76 | 20/10/2026 | Scénario 3 : mauvais chemin de destination | [P-76](docs/preuves/P-76-scenario3-mauvais-chemin-de-destination.txt) |
+| P-77 | 20/10/2026 | Scénario 4 : handler non notifié | [P-77](docs/preuves/P-77-scenario4-handler-non-notifie.txt) |
+| P-78 | 20/10/2026 | Scénario 5 : nginx arrêté | [P-78](docs/preuves/P-78-scenario5-nginx-arrete.txt) |
+| P-79 | 20/10/2026 | Scénario 6 : contrôle fonctionnel du contenu | [P-79](docs/preuves/P-79-scenario6-controle-fonctionnel-contenu.txt) |
 | P-50a | 19/10/2026 | Monitoring — 1er essai : échec de connexion admin Grafana | [P-50a](docs/preuves/P-50a-ops01-grafana-1er-essai-echec-mot-de-passe-ini.txt) |
 | P-50 | 19/10/2026 | Playbook Prometheus + Grafana (cibles up, admin OK) | [P-50](docs/preuves/P-50-ops01-prometheus-grafana-installation.txt) |
 | P-50b | 19/10/2026 | Playbook monitoring — 2ᵉ passage (changed=0) | [P-50b](docs/preuves/P-50b-ops01-monitoring-2e-passage-idempotence.txt) |
@@ -709,19 +816,19 @@ Retour arrière disponible : `/root/infraready.nginx.bak-incident-h` sur LINUX01
 
 ---
 
-## 13. Difficultés, limites et bilan
+## 14. Difficultés, limites et bilan
 
 - **Blocages et corrections :** détaillés dans chaque phase (ISO Ubuntu 26.04 remplacée, carte e1000 → e1000e, nftables à la place d'iptables, paramètre `reboot_timeout` non supporté, `win_powershell` sans `path`, PTR du DC manquant, chemin de disque deviné, secret dans une preuve détecté et nettoyé, push GitHub bloqué par le droit `workflow`, lecteur CD vu comme volume plein, boucle Windows Update sur KB5007651, handler nginx non exécuté après un test en échec).
 - **Écarts à l'architecture :**
 	- **Proxmox VE 9.1 au lieu de VMware Workstation** — à faire valider par le formateur. Avantages : snapshots, ajout de disque à chaud, installations pilotables en ligne de commande, ressources suffisantes.
 	- Ressources légèrement supérieures au plan (vCPU) ; disque Windows en IDE (choix initial conservé).
 	- Ubuntu 24.04.**5** (dernière révision de la 24.04 LTS).
-- **Fonctionnalités inachevées / pistes :** commits du second membre du binôme ; `KB5007651` exclue de l'installation automatique (boucle Windows Update) et à suivre manuellement ; pas de sonde HTTP du site dans Prometheus (`blackbox_exporter` à ajouter) ; snapshot Proxmox non pris avant l'incident H (sauvegarde fichier jugée suffisante pour un changement d'une ligne, réversible).
-- **Bilan du binôme :** [À compléter]
+- **Fonctionnalités inachevées / pistes :** commits des autres membres de l'équipe ; `KB5007651` exclue de l'installation automatique (boucle Windows Update) et à suivre manuellement ; pas de sonde HTTP du site dans Prometheus (`blackbox_exporter` à ajouter) ; snapshot Proxmox non pris avant l'incident H (sauvegarde fichier jugée suffisante pour un changement d'une ligne, réversible).
+- **Bilan de l'équipe :** [À compléter]
 
 ---
 
-## 14. Annexes et journal de changements
+## 15. Annexes et journal de changements
 
 ### Arborescence GitHub
 
@@ -776,19 +883,26 @@ InfraReady/
 | 19/10/2026 19:27 | MIR Mahan / Jolan Allen | Incident contrôlé : `root` nginx modifié sur LINUX01 | 404 constaté depuis OPS01 | P-70 / `/root/infraready.nginx.bak-incident-h` |
 | 19/10/2026 19:30 | MIR Mahan / Jolan Allen | `flush_handlers` avant les vérifications dans `linux_base.yml` ; rejeu sur LINUX01 | HTTP 200, `changed=0` au 2ᵉ passage | P-72, P-73 / — |
 | 19/10/2026 19:37 | MIR Mahan / Jolan Allen | Snapshot final des 3 VM | `qm listsnapshot` | P-05 / `s05_phases_a_h_terminees` |
+| 20/10/2026 12:50 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | Snapshot des 3 VM avant la séance 4 | `qm snapshot` | `s07_avant_seance4` |
+| 20/10/2026 12:51 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | `site_message` + contrôle HTTP et contenu dans `linux_base.yml` (2 passages) | `changed=1` puis `changed=0` | P-38, P-38b / `s07_avant_seance4` |
+| 20/10/2026 12:52 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | Scripts `check-nginx.sh` et `Check-DnsClient.ps1` (3 situations chacun) | Codes 0 / 1 / 2 | P-25, P-14 / — |
+| 20/10/2026 12:57 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | `check_mode: false` sur 4 tâches en lecture seule de `linux_base.yml` | Simulation `changed=0 failed=0` | P-39a, P-39 / — |
+| 20/10/2026 12:58 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | 6 scénarios de panne contrôlée (7.4), un à la fois, jusqu'à 13:08 | Retour à l'état initial, `changed=0` | P-74 à P-79 / `.etat-initial`, `s07_avant_seance4` |
 
 **Annexes** : sorties complètes dans `docs/preuves/`, modèles d'installation dans `lab/`, configurations dans `ansible/` et `monitoring/`.
 
 ---
 
-## 15. Checklist de remise
+## 16. Checklist de remise
 
-- [ ] Dépôt GitHub prêt, avec contributions du binôme
+- [ ] Dépôt GitHub prêt, avec contributions de l'équipe
 - [ ] Dossier technique exporté en PDF + lien du dépôt
 - [x] Captures et sorties de commandes classées (`docs/preuves/`, numérotation par phase)
 - [x] Rapport d'incident distinct rédigé (`docs/rapport-incident.md`)
 - [ ] PowerPoint final préparé selon modalités du formateur
+- [x] TP de la séance 4 réalisé et documenté (section 11, preuves P-14, P-25, P-26, P-38 à P-39, P-74 à P-79)
+- [ ] Bilans individuels et revue croisée de la séance 4 (chaque membre)
 - [x] Aucun secret présent dans les livrables (vérifié à chaque commit)
-- [x] Tous les écarts et limites sont mentionnés (section 13)
+- [x] Tous les écarts et limites sont mentionnés (section 14)
 
 **Date et plateforme de remise :** [À compléter]

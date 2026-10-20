@@ -1,0 +1,91 @@
+# Preuve : P-76-scenario3-mauvais-chemin-de-destination
+# Séance 4, 7.4 — scénario 3 : la tâche template déploie vers un chemin que nginx ne sert pas
+# Date : 2026-10-20 13:01:23 CEST — laboratoire InfraReady (Proxmox), snapshot préalable s07_avant_seance4
+# Commandes : chaque commande est affichée précédée de « $ » ; playbook utilisé : playbooks/linux_base.yml (cible : linux01 uniquement)
+# Adaptation au projet : le site est servi depuis /var/www/infraready (variable web_root), pas /var/www/html.
+
+######## Étape A — introduire le défaut (OPS01) : seule la destination de la tâche « Page d'accueil du site » change
+[ops01, utilisateur ansible, ~/infraready/ansible — 13:01:26]
+$ diff playbooks/linux_base.yml.etat-initial playbooks/linux_base.yml && echo "playbook identique à l état initial"
+playbook identique à l état initial
+$ grep -n "dest: \"{{ web_root }}/index.html\"" playbooks/linux_base.yml
+63:        dest: "{{ web_root }}/index.html"
+$ sed -i "s|dest: \"{{ web_root }}/index.html\"|dest: /tmp/ir-index.html|" playbooks/linux_base.yml
+$ diff playbooks/linux_base.yml.etat-initial playbooks/linux_base.yml
+63c63
+<         dest: "{{ web_root }}/index.html"
+---
+>         dest: /tmp/ir-index.html
+(code de sortie : 1)
+$ ansible-playbook playbooks/linux_base.yml | sed -n "/Page d.accueil/,/^\$/p;/HTTP 200/,/^\$/p;/contenu attendu/,/^\$/p;/PLAY RECAP/,\$p"
+[WARNING]: Skipping callback plugin '', unable to load
+TASK [Page d'accueil du site] **************************************************
+changed: [linux01]
+
+TASK [Le site répond en HTTP 200] **********************************************
+ok: [linux01 -> localhost]
+
+    msg: Le contenu attendu est publié.
+
+PLAY RECAP *********************************************************************
+linux01                    : ok=22   changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+
+######## Étape B — comparer les deux fichiers et le répertoire réellement servi (LINUX01)
+[linux01, root via sudo — 13:01:44]
+$ sudo ls -l /tmp/ir-index.html /var/www/infraready/index.html
+-rw-rw-r-- 1 root webadmins 339 Oct 20 13:01 /tmp/ir-index.html
+-rw-rw-r-- 1 root webadmins 339 Oct 20 12:59 /var/www/infraready/index.html
+$ sudo stat -c "%y %n" /tmp/ir-index.html /var/www/infraready/index.html
+2026-10-20 13:01:31.493913614 +0200 /tmp/ir-index.html
+2026-10-20 12:59:29.251865078 +0200 /var/www/infraready/index.html
+$ sudo grep -n InfraReady /tmp/ir-index.html
+3:<head><meta charset="utf-8"><title>InfraReady - linux01</title></head>
+5:  <h1>InfraReady</h1>
+6:  <p>Site InfraReady déployé par Ansible depuis OPS01</p>
+$ sudo grep -n InfraReady /var/www/infraready/index.html
+3:<head><meta charset="utf-8"><title>InfraReady - linux01</title></head>
+5:  <h1>InfraReady</h1>
+6:  <p>Site InfraReady déployé par Ansible depuis OPS01</p>
+$ curl -sS http://127.0.0.1/ | grep -n "<p>" | head -1
+6:  <p>Site InfraReady déployé par Ansible depuis OPS01</p>
+$ sudo nginx -T 2>&1 | grep -n -E "server_name|root |index "
+26:	# server_names_hash_bucket_size 64;
+27:	# server_name_in_redirect off;
+195:    server_name linux01.infraready.test 192.168.50.20;
+196:    root /var/www/infraready;
+197:    index index.html;
+Constat : Ansible a bien généré un fichier (changed, /tmp/ir-index.html daté de l'exécution), mais nginx sert
+/var/www/infraready (directive root), dont le fichier n'a pas été modifié. Ici les deux contenus sont identiques car
+seule la destination a changé : le défaut resterait invisible jusqu'à la prochaine modification du contenu, qui ne
+serait jamais publiée. Cause confirmée : chemin de destination différent de la racine du serveur virtuel.
+
+######## Étape C — corriger (OPS01), puis nettoyer le fichier de test (LINUX01)
+[ops01, utilisateur ansible, ~/infraready/ansible — 13:01:47]
+$ cp playbooks/linux_base.yml.etat-initial playbooks/linux_base.yml
+$ diff playbooks/linux_base.yml.etat-initial playbooks/linux_base.yml && echo "playbook identique à l état initial"
+playbook identique à l état initial
+$ ansible-playbook playbooks/linux_base.yml --syntax-check
+
+playbook: playbooks/linux_base.yml
+$ ansible-playbook playbooks/linux_base.yml --check --diff | sed -n "/PLAY RECAP/,\$p"
+[WARNING]: Skipping callback plugin '', unable to load
+PLAY RECAP *********************************************************************
+linux01                    : ok=22   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+$ ansible-playbook playbooks/linux_base.yml | sed -n "/Page d.accueil/,/^\$/p;/PLAY RECAP/,\$p"
+[WARNING]: Skipping callback plugin '', unable to load
+TASK [Page d'accueil du site] **************************************************
+ok: [linux01]
+
+PLAY RECAP *********************************************************************
+linux01                    : ok=22   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+[linux01, root via sudo — 13:02:14]
+$ sudo rm -v /tmp/ir-index.html
+removed '/tmp/ir-index.html'
+$ sudo stat -c "%y %U:%G %a %n" /var/www/infraready/index.html
+2026-10-20 12:59:29.251865078 +0200 root:webadmins 664 /var/www/infraready/index.html
+$ curl -fsS http://127.0.0.1/ -o /tmp/ir-page.html && grep -n "Site InfraReady déployé par Ansible depuis OPS01" /tmp/ir-page.html
+6:  <p>Site InfraReady déployé par Ansible depuis OPS01</p>
+$ rm -f /tmp/ir-page.html

@@ -1,0 +1,78 @@
+# Preuve : P-14-win-dc01-processus-services-script-dnsclient
+# Séance 4, étapes 2, 5 et 6 (Windows) — état initial, processus, services, journal System, script Check-DnsClient.ps1
+# Lecture seule : aucun service arrêté ni redémarré. Exécuté depuis OPS01 (ansible, WinRM) — 2026-10-20 12:53:51 CEST
+# Commandes : ansible win-dc01 -m ansible.windows.win_shell -a '<PowerShell ci-dessous>' ; ansible win-dc01 -m ansible.builtin.script -a '../scripts/Check-DnsClient.ps1 -Name <service>'
+
+$ hostname; Get-NetIPConfiguration | Select-Object InterfaceAlias, @{n="IPv4";e={$_.IPv4Address.IPAddress}}, @{n="DNS";e={$_.DNSServer.ServerAddresses -join ","}} | Format-Table -AutoSize | Out-String -Width 120
+WIN-DC01
+InterfaceAlias IPv4          DNS          
+-------------- ----          ---          
+Ethernet       192.168.50.10 ::1,127.0.0.1
+$ "Services en cours : " + (Get-Service | Where-Object Status -eq "Running").Count; Get-Service NTDS, DNS, Netlogon, W32Time, Dnscache, WinRM | Select-Object Name, Status, StartType | Format-Table -AutoSize | Out-String
+Services en cours : 90
+Name      Status StartType
+----      ------ ---------
+DNS      Running Automatic
+Dnscache Running Automatic
+Netlogon Running Automatic
+NTDS     Running Automatic
+W32Time  Running Automatic
+WinRM    Running Automatic
+$ Get-Process | Sort-Object CPU -Descending | Select-Object -First 10 ProcessName, Id, @{n="CPU(s)";e={[math]::Round($_.CPU,1)}}, @{n="RAM(Mo)";e={[math]::Round($_.WorkingSet64/1MB)}} | Format-Table -AutoSize | Out-String
+ProcessName        Id CPU(s) RAM(Mo)
+-----------        -- ------ -------
+MsMpEng          3132    109     290
+System              4   35,2       0
+windows_exporter 3512   18,8      40
+services          820   18,4      16
+lsass             832   16,1      81
+svchost          1828   13,8      16
+msedge           8820   13,3       3
+msedge           5300    8,9     102
+svchost          5876    8,8      21
+svchost          1408    8,6      21
+$ Get-WinEvent -LogName System -MaxEvents 20 | Select-Object TimeCreated, Id, LevelDisplayName, ProviderName | Format-Table -AutoSize | Out-String -Width 140
+TimeCreated           Id LevelDisplayName ProviderName                  
+-----------           -- ---------------- ------------                  
+20/10/2026 12:54:01 7036 Information      Service Control Manager       
+20/10/2026 12:53:16 6038 Warning          LsaSrv                        
+20/10/2026 12:49:16 7036 Information      Service Control Manager       
+20/10/2026 12:45:42 7036 Information      Service Control Manager       
+20/10/2026 12:45:29 7036 Information      Service Control Manager       
+20/10/2026 12:45:27 7036 Information      Service Control Manager       
+20/10/2026 12:43:07 7036 Information      Service Control Manager       
+20/10/2026 12:42:41 7036 Information      Service Control Manager       
+20/10/2026 12:41:10 7036 Information      Service Control Manager       
+20/10/2026 12:41:07 7036 Information      Service Control Manager       
+20/10/2026 12:40:40 7036 Information      Service Control Manager       
+20/10/2026 12:33:22 7036 Information      Service Control Manager       
+20/10/2026 12:24:20 7036 Information      Service Control Manager       
+20/10/2026 12:22:38  566 Information      Microsoft-Windows-Kernel-Power
+20/10/2026 12:22:07 7036 Information      Service Control Manager       
+20/10/2026 12:22:07 7036 Information      Service Control Manager       
+20/10/2026 12:21:37 7036 Information      Service Control Manager       
+20/10/2026 12:21:37 7036 Information      Service Control Manager       
+20/10/2026 12:21:37  566 Information      Microsoft-Windows-Kernel-Power
+20/10/2026 12:20:36  566 Information      Microsoft-Windows-Kernel-Power
+######## Script Check-DnsClient.ps1 — situation 1 : état normal (Dnscache)
+rc: 0
+OK : le service Dnscache (DNS Client) est actif
+######## Situation 2 : condition non satisfaite — service présent mais arrêté (AxInstSV, manuel, non critique, observé tel quel)
+win-dc01 | FAILED! => 
+rc: 1
+ECHEC : le service AxInstSV (ActiveX Installer (AxInstSV)) est Stopped
+######## Situation 3 : erreur — service inexistant (ServiceInexistant)
+win-dc01 | FAILED! => 
+rc: 1
+ERREUR : service ServiceInexistant introuvable sur WIN-DC01
+
+######## Constat : le module ansible.builtin.script renvoie rc=1 pour tout code non nul (situation 3 : 1 au lieu de 2).
+######## Test discriminant — exécution directe du script sur WIN-DC01 et lecture de $LASTEXITCODE (12:55:12)
+$ win_copy ../scripts/Check-DnsClient.ps1 -> C:\Windows\Temp\ ; puis pour chaque service :
+$ powershell -NoProfile -ExecutionPolicy Bypass -File C:\Windows\Temp\Check-DnsClient.ps1 -Name <service> ; $LASTEXITCODE
+-Name Dnscache -> OK : le service Dnscache (DNS Client) est actif | code de sortie : 0
+-Name AxInstSV -> ECHEC : le service AxInstSV (ActiveX Installer (AxInstSV)) est Stopped | code de sortie : 1
+-Name ServiceInexistant -> ERREUR : service ServiceInexistant introuvable sur WIN-DC01 | code de sortie : 2
+fichier temporaire supprimé : True
+######## Conclusion (cause confirmée) : le script renvoie bien 0 / 1 / 2 ; la perte de distinction vient du module script d'Ansible.
+######## Pour une supervision, appeler le script directement (powershell -File) et lire $LASTEXITCODE.

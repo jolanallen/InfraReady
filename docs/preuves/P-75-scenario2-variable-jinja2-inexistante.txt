@@ -1,0 +1,127 @@
+# Preuve : P-75-scenario2-variable-jinja2-inexistante
+# Séance 4, 7.4 — scénario 2 : le modèle Jinja2 référence une variable qui n'existe pas (site_messsage)
+# Date : 2026-10-20 13:00:14 CEST — laboratoire InfraReady (Proxmox), snapshot préalable s07_avant_seance4
+# Commandes : chaque commande est affichée précédée de « $ » ; playbook utilisé : playbooks/linux_base.yml (cible : linux01 uniquement)
+
+######## État initial (LINUX01)
+[linux01, root via sudo — 13:00:17]
+$ sudo stat -c "%y %n" /var/www/infraready/index.html
+2026-10-20 12:59:29.251865078 +0200 /var/www/infraready/index.html
+$ curl -sS -o /tmp/ir-page.html -w "Code HTTP : %{http_code}\n" http://127.0.0.1/ && grep -n "<p>" /tmp/ir-page.html | head -1
+Code HTTP : 200
+6:  <p>Site InfraReady déployé par Ansible depuis OPS01</p>
+
+######## Étape A — introduire le défaut (OPS01) ; sauvegardes .etat-initial faites au scénario 1, vérifiées identiques
+[ops01, utilisateur ansible, ~/infraready/ansible — 13:00:20]
+$ diff playbooks/templates/index.html.j2.etat-initial playbooks/templates/index.html.j2 && echo "modèle identique à l état initial"
+modèle identique à l état initial
+$ sed -i "s/{{ site_message }}/{{ site_messsage }}/" playbooks/templates/index.html.j2
+$ diff playbooks/templates/index.html.j2.etat-initial playbooks/templates/index.html.j2
+6c6
+<   <p>{{ site_message }}</p>
+---
+>   <p>{{ site_messsage }}</p>
+(code de sortie : 1)
+$ ansible-playbook playbooks/linux_base.yml
+[WARNING]: Skipping callback plugin '', unable to load
+
+PLAY [LINUX01 - configuration de base] *****************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [linux01]
+
+TASK [Fuseau horaire] **********************************************************
+ok: [linux01]
+
+TASK [Paquets de base] *********************************************************
+ok: [linux01]
+
+TASK [Groupes du labo] *********************************************************
+ok: [linux01] => (item=webadmins)
+ok: [linux01] => (item=auditeurs)
+
+TASK [Utilisateurs du labo (sans mot de passe, connexion par su/sudo uniquement)] ***
+ok: [linux01] => (item=alice)
+ok: [linux01] => (item=bruno)
+ok: [linux01] => (item=chloe)
+
+TASK [Racine du site - écriture réservée à webadmins (setgid)] *****************
+ok: [linux01]
+
+TASK [Page d'accueil du site] **************************************************
+An exception occurred during task execution. To see the full traceback, use -vvv. The error was: ansible.errors.AnsibleUndefinedVariable: 'site_messsage' is undefined. 'site_messsage' is undefined
+fatal: [linux01]: FAILED! => 
+    changed: false
+    msg: 'AnsibleUndefinedVariable: ''site_messsage'' is undefined. ''site_messsage''
+        is undefined'
+
+PLAY RECAP *********************************************************************
+linux01                    : ok=6    changed=0    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+
+(code de sortie : 2)
+
+######## Étape B — collecter les preuves (OPS01 puis LINUX01)
+[ops01, utilisateur ansible, ~/infraready/ansible — 13:00:27]
+$ grep -n site_message playbooks/linux_base.yml
+17:    site_message: "Site InfraReady déployé par Ansible depuis OPS01"
+173:          - site_message in page_check.content
+$ grep -n -A 2 -B 2 site_messsage playbooks/templates/index.html.j2
+4-<body>
+5-  <h1>InfraReady</h1>
+6:  <p>{{ site_messsage }}</p>
+7-  <p>Serveur : {{ ansible_hostname }} ({{ ansible_host }})</p>
+8-  <p>Contenu géré par le groupe <code>webadmins</code> et déployé par Ansible.</p>
+$ ansible-playbook playbooks/linux_base.yml -vv 2>&1 | grep -n -A 6 "TASK \[Page d"
+130:TASK [Page d'accueil du site] **************************************************
+131-task path: /home/ansible/infraready/ansible/playbooks/linux_base.yml:60
+132-An exception occurred during task execution. To see the full traceback, use -vvv. The error was: ansible.errors.AnsibleUndefinedVariable: 'site_messsage' is undefined. 'site_messsage' is undefined
+133-fatal: [linux01]: FAILED! => 
+134-    changed: false
+135-    msg: 'AnsibleUndefinedVariable: ''site_messsage'' is undefined. ''site_messsage''
+136-        is undefined'
+[linux01, root via sudo — 13:00:35]
+$ sudo stat -c "%y %n" /var/www/infraready/index.html
+2026-10-20 12:59:29.251865078 +0200 /var/www/infraready/index.html
+$ sudo grep -n "<p>" /var/www/infraready/index.html | head -1
+6:  <p>Site InfraReady déployé par Ansible depuis OPS01</p>
+$ curl -sS -o /dev/null -w "Code HTTP : %{http_code}\n" http://127.0.0.1/
+Code HTTP : 200
+Relevé : tâche en échec = « Page d'accueil du site » (ansible.builtin.template) ; variable recherchée par le modèle =
+site_messsage ; variable réellement définie = site_message. Le fichier servi n'a pas été remplacé (même date de
+modification qu'à l'état initial) : le rendu a échoué avant le déploiement, le site continue de servir l'ancienne version.
+Cause confirmée : nom de variable incorrect dans le modèle (une seule modification, diff ci-dessus).
+
+######## Étape C — corriger et valider (OPS01)
+[ops01, utilisateur ansible, ~/infraready/ansible — 13:00:37]
+$ cp playbooks/templates/index.html.j2.etat-initial playbooks/templates/index.html.j2
+$ diff playbooks/templates/index.html.j2.etat-initial playbooks/templates/index.html.j2 && echo "modèle identique à l état initial"
+modèle identique à l état initial
+$ ansible-playbook playbooks/linux_base.yml --syntax-check
+
+playbook: playbooks/linux_base.yml
+$ ansible-playbook playbooks/linux_base.yml --check --diff | sed -n "/Page d.accueil/,/^\$/p;/PLAY RECAP/,\$p"
+[WARNING]: Skipping callback plugin '', unable to load
+TASK [Page d'accueil du site] **************************************************
+ok: [linux01]
+
+PLAY RECAP *********************************************************************
+linux01                    : ok=22   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+$ ansible-playbook playbooks/linux_base.yml | sed -n "/Page d.accueil/,/^\$/p;/contenu attendu/,/^\$/p;/PLAY RECAP/,\$p"
+[WARNING]: Skipping callback plugin '', unable to load
+TASK [Page d'accueil du site] **************************************************
+ok: [linux01]
+
+    msg: Le contenu attendu est publié.
+
+PLAY RECAP *********************************************************************
+linux01                    : ok=22   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+
+######## Vérification (LINUX01) — contrôle fonctionnel sur le message réel, pas sur le texte « site_message »
+[linux01, root via sudo — 13:01:03]
+$ curl -fsS http://127.0.0.1/ -o /tmp/ir-page.html && echo "HTTP OK"
+HTTP OK
+$ grep -n "Site InfraReady déployé par Ansible depuis OPS01" /tmp/ir-page.html
+6:  <p>Site InfraReady déployé par Ansible depuis OPS01</p>
+$ rm -f /tmp/ir-page.html

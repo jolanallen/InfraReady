@@ -47,7 +47,7 @@ ansible-playbook playbooks/windows_maintenance.yml -e maintenance_apply=true -e 
 ## 4. Précautions avant redémarrage ou changement majeur
 
 - Snapshot pris et nommé (vérifier avec `qm listsnapshot <vmid>`).
-- **WIN-DC01** : jamais de redémarrage pendant qu'un playbook ou qu'une démonstration utilise l'annuaire ; prévenir le binôme ; vérifier `dcdiag /q` après redémarrage.
+- **WIN-DC01** : jamais de redémarrage pendant qu'un playbook ou qu'une démonstration utilise l'annuaire ; prévenir l'équipe ; vérifier `dcdiag /q` après redémarrage.
 - **LINUX01** : le site web est indisponible pendant le redémarrage (~1 min) ; vérifier HTTP 200 après.
 - **OPS01** : Prometheus perd les points de mesure pendant le redémarrage ; les alertes `InstanceDown` ne sont pas évaluées pendant ce temps.
 - Changement majeur (nouvelle version, nouveau rôle, modification réseau) : d'abord sur une seule machine, snapshot, test, puis généralisation.

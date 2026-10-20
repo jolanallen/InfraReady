@@ -12,7 +12,7 @@ Laboratoire : 3 VM sur Proxmox VE, réseau isolé `192.168.50.0/24`.
 
 ## Documents
 
-- **Dossier technique** : [InfraReady - Dossier technique.md](InfraReady%20-%20Dossier%20technique.md) (phases A à H, preuves, écarts)
+- **Dossier technique** : [InfraReady - Dossier technique.md](InfraReady%20-%20Dossier%20technique.md) (phases A à H, TP de la séance 4 en section 11, preuves, écarts)
 - **Procédure de maintenance** : [docs/procedure-maintenance.md](docs/procedure-maintenance.md)
 - **Rapport d'incident** (phase H) : [docs/rapport-incident.md](docs/rapport-incident.md)
 - **Preuves** : `docs/preuves/` (sorties de commandes horodatées et captures, numérotées par phase)
@@ -43,3 +43,39 @@ ansible-playbook playbooks/windows_maintenance.yml # phase E (recherche ; -e mai
 ```
 
 Les mots de passe sont dans des fichiers Ansible Vault chiffrés (`group_vars/*/vault.yml`) ; le mot de passe du vault n'est pas dans le dépôt (`~/.vault_pass_infraready` sur OPS01).
+
+## Séance 4 — scripts de vérification et scénarios de panne
+
+**Prérequis** : laboratoire démarré, accès SSH par clé depuis OPS01, nginx installé sur LINUX01 (`linux_base.yml`), snapshot Proxmox pris avant toute panne volontaire.
+
+```bash
+# Sur LINUX01 (sans sudo) — 0 = OK, 1 = contrôle négatif, 2 = erreur / prérequis absent
+./scripts/check-nginx.sh [service] [url] [texte attendu]      # défauts : nginx http://127.0.0.1/ InfraReady
+
+# Sur WIN-DC01 — 0 = démarré, 1 = arrêté, 2 = introuvable
+powershell -NoProfile -File scripts\Check-DnsClient.ps1 -Name Dnscache ; $LASTEXITCODE
+
+# Sur OPS01 (ansible) — contrôles avant toute correction (procédure 7.5 du support)
+ansible-playbook playbooks/linux_base.yml --syntax-check
+ansible-playbook playbooks/linux_base.yml --list-hosts      # doit afficher linux01 uniquement
+ansible-playbook playbooks/linux_base.yml --check --diff
+ansible-playbook playbooks/linux_base.yml                   # 2e passage attendu : changed=0
+```
+
+**Limites** : `check-nginx.sh` contrôle l'hôte local (pas le DNS ni le pare-feu) ; `Check-DnsClient.ps1` vérifie l'état du service, pas la résolution d'un nom ; lancé via le module `script` d'Ansible, tout code non nul devient 1 ; en `--check`, l'assertion de contenu compare la nouvelle valeur à la page encore en place.
+
+## Où trouver les preuves
+
+| Exigence | Preuves (`docs/preuves/`) |
+| --- | --- |
+| Installation, réseau, snapshots (A) | P-01 à P-05 |
+| Windows : AD DS, DNS, journaux, services et processus (B, séance 4) | P-10 à P-14 |
+| Linux : comptes, nginx, disque `/data` par UUID, mises à jour, journaux, script de vérification, processus (C, séance 4) | P-20 à P-26 |
+| Ansible : inventaire, playbooks rejoués deux fois, simulation `--check` (D, séance 4) | P-30 à P-39 |
+| Maintenance (E) | P-40 à P-43 |
+| Supervision Prometheus / Grafana (F) | P-50 à P-55 |
+| GitHub Actions (G) | P-60a, P-60 |
+| Incident (H) et six scénarios de panne contrôlée (séance 4, 7.4) | P-70 à P-79, `docs/rapport-incident.md` |
+
+Une preuve suffixée `a` (ex. P-39a) est un premier essai en échec, conservé et expliqué dans le dossier.
+

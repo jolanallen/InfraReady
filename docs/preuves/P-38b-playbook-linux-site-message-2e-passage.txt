@@ -1,0 +1,95 @@
+# Preuve : P-38b-playbook-linux-site-message-2e-passage
+# Séance 4 — variable site_message + contrôle HTTP et contenu (assert) ajoutés à linux_base.yml ; passage 2
+# Hôte : ops01 (utilisateur ansible, ~/infraready/ansible) — 2026-10-20 12:51:26 CEST
+# Commandes : ansible-playbook playbooks/linux_base.yml --syntax-check ; ansible-playbook playbooks/linux_base.yml --list-hosts ; ansible-playbook playbooks/linux_base.yml
+
+
+playbook: playbooks/linux_base.yml
+
+playbook: playbooks/linux_base.yml
+
+  play #1 (linux01): LINUX01 - configuration de base	TAGS: []
+    pattern: ['linux01']
+    hosts (1):
+      linux01
+[WARNING]: Skipping callback plugin '', unable to load
+
+PLAY [LINUX01 - configuration de base] *****************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [linux01]
+
+TASK [Fuseau horaire] **********************************************************
+ok: [linux01]
+
+TASK [Paquets de base] *********************************************************
+ok: [linux01]
+
+TASK [Groupes du labo] *********************************************************
+ok: [linux01] => (item=webadmins)
+ok: [linux01] => (item=auditeurs)
+
+TASK [Utilisateurs du labo (sans mot de passe, connexion par su/sudo uniquement)] ***
+ok: [linux01] => (item=alice)
+ok: [linux01] => (item=bruno)
+ok: [linux01] => (item=chloe)
+
+TASK [Racine du site - écriture réservée à webadmins (setgid)] *****************
+ok: [linux01]
+
+TASK [Page d'accueil du site] **************************************************
+ok: [linux01]
+
+TASK [Virtual host nginx] ******************************************************
+ok: [linux01]
+
+TASK [Activer le site InfraReady] **********************************************
+ok: [linux01]
+
+TASK [Désactiver le site par défaut] *******************************************
+ok: [linux01]
+
+TASK [Services actifs au démarrage] ********************************************
+ok: [linux01] => (item=nginx)
+ok: [linux01] => (item=prometheus-node-exporter)
+
+TASK [Récupérer l'UUID du système de fichiers DATA] ****************************
+ok: [linux01]
+
+TASK [Lire l'UUID] *************************************************************
+ok: [linux01]
+
+TASK [Monter le disque de données via fstab - /data] ***************************
+ok: [linux01]
+
+TASK [Dossier des rapports - lecture pour auditeurs uniquement] ****************
+ok: [linux01]
+
+TASK [UFW - SSH depuis le sous-réseau du labo] *********************************
+ok: [linux01]
+
+TASK [UFW - HTTP depuis le sous-réseau du labo] ********************************
+ok: [linux01]
+
+TASK [UFW - node_exporter depuis OPS01 uniquement] *****************************
+ok: [linux01]
+
+TASK [UFW - politique par défaut et activation] ********************************
+ok: [linux01]
+
+TASK [Appliquer les rechargements en attente avant les vérifications] **********
+
+TASK [Le site répond en HTTP 200] **********************************************
+ok: [linux01 -> localhost]
+
+TASK [Le message attendu est publié] *******************************************
+ok: [linux01] => 
+    changed: false
+    msg: Le contenu attendu est publié.
+
+TASK [Les métriques node_exporter sont exposées] *******************************
+ok: [linux01 -> localhost]
+
+PLAY RECAP *********************************************************************
+linux01                    : ok=22   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+

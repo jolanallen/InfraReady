@@ -1,0 +1,152 @@
+# Preuve : P-79-scenario6-controle-fonctionnel-contenu
+# Séance 4, 7.4 — scénario 6 : le contrôle fonctionnel (uri + assert) détecte un contenu incorrect malgré un HTTP 200
+# Date : 2026-10-20 13:08:18 CEST — laboratoire InfraReady (Proxmox), snapshot préalable s07_avant_seance4
+# Commandes : chaque commande est affichée précédée de « $ » ; playbook utilisé : playbooks/linux_base.yml (cible : linux01 uniquement)
+
+######## Étape A — sauvegardes, le contrôle est en place (ajouté à linux_base.yml, preuve P-38) et réussit avec le contenu correct (OPS01)
+[ops01, utilisateur ansible, ~/infraready/ansible — 13:08:20]
+$ cp playbooks/linux_base.yml playbooks/linux_base.yml.etat-initial; cp playbooks/templates/index.html.j2 playbooks/templates/index.html.j2.etat-initial; echo "sauvegardes .etat-initial créées"
+sauvegardes .etat-initial créées
+$ grep -n -A 16 "name: Le site répond en HTTP 200" playbooks/linux_base.yml
+159:    - name: Le site répond en HTTP 200
+160-      ansible.builtin.uri:
+161-        url: "http://{{ ansible_host }}/"
+162-        status_code: 200
+163-        return_content: true
+164-      register: page_check
+165-      delegate_to: localhost
+166-      become: false
+167-      check_mode: false   # lecture seule : le contrôle reste exécuté en --check
+168-
+169-    # Un HTTP 200 ne prouve pas que le bon contenu est publié (séance 4, scénario 6)
+170-    - name: Le message attendu est publié
+171-      ansible.builtin.assert:
+172-        that:
+173-          - site_message in page_check.content
+174-        fail_msg: "Le message attendu est absent de la page."
+175-        success_msg: "Le contenu attendu est publié."
+$ ansible-playbook playbooks/linux_base.yml --syntax-check
+
+playbook: playbooks/linux_base.yml
+$ ansible-playbook playbooks/linux_base.yml | sed -n "/Page d.accueil/,/^\$/p;/HTTP 200/,/^\$/p;/message attendu/,/^\$/p;/PLAY RECAP/,\$p"
+[WARNING]: Skipping callback plugin '', unable to load
+TASK [Page d'accueil du site] **************************************************
+ok: [linux01]
+
+TASK [Le site répond en HTTP 200] **********************************************
+ok: [linux01 -> localhost]
+
+TASK [Le message attendu est publié] *******************************************
+ok: [linux01] => 
+    changed: false
+    msg: Le contenu attendu est publié.
+
+PLAY RECAP *********************************************************************
+linux01                    : ok=22   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+
+######## Étape B1 — défaut proposé par le support : site_message changé (comme au scénario 1)
+[ops01, utilisateur ansible, ~/infraready/ansible — 13:08:37]
+$ sed -i "s/^    site_message: .*/    site_message: \"MESSAGE-INCORRECT-SCENARIO-6\"/" playbooks/linux_base.yml
+$ ansible-playbook playbooks/linux_base.yml | sed -n "/Page d.accueil/,/^\$/p;/HTTP 200/,/^\$/p;/message attendu/,/^\$/p;/PLAY RECAP/,\$p"
+[WARNING]: Skipping callback plugin '', unable to load
+TASK [Page d'accueil du site] **************************************************
+changed: [linux01]
+
+TASK [Le site répond en HTTP 200] **********************************************
+ok: [linux01 -> localhost]
+
+TASK [Le message attendu est publié] *******************************************
+ok: [linux01] => 
+    changed: false
+    msg: Le contenu attendu est publié.
+
+PLAY RECAP *********************************************************************
+linux01                    : ok=22   changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+$ cp playbooks/linux_base.yml.etat-initial playbooks/linux_base.yml && ansible-playbook playbooks/linux_base.yml | sed -n "/PLAY RECAP/,\$p"
+[WARNING]: Skipping callback plugin '', unable to load
+PLAY RECAP *********************************************************************
+linux01                    : ok=22   changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+Constat : l'assertion RÉUSSIT. Elle compare la page à la variable qui vient de servir à la générer : si seule la valeur
+change, page et variable restent cohérentes. Ce contrôle détecte un contenu publié différent de ce qu'Ansible voulait
+publier, pas une mauvaise valeur (cf. scénario 1). Pour provoquer réellement un écart, le défaut doit porter sur le
+contenu publié lui-même : étape B2. (Valeur restaurée ci-dessus avant de continuer.)
+
+######## Étape B2 — défaut de contenu : le modèle n'affiche plus le message (OPS01)
+[ops01, utilisateur ansible, ~/infraready/ansible — 13:09:08]
+$ sed -i "/{{ site_message }}/d" playbooks/templates/index.html.j2
+$ diff playbooks/templates/index.html.j2.etat-initial playbooks/templates/index.html.j2
+6d5
+<   <p>{{ site_message }}</p>
+(code de sortie : 1)
+$ ansible-playbook playbooks/linux_base.yml | sed -n "/Page d.accueil/,/^\$/p;/HTTP 200/,/^\$/p;/message attendu/,/^\$/p;/PLAY RECAP/,\$p"
+[WARNING]: Skipping callback plugin '', unable to load
+TASK [Page d'accueil du site] **************************************************
+changed: [linux01]
+
+TASK [Le site répond en HTTP 200] **********************************************
+ok: [linux01 -> localhost]
+
+TASK [Le message attendu est publié] *******************************************
+fatal: [linux01]: FAILED! => 
+    assertion: site_message in page_check.content
+    changed: false
+    evaluated_to: false
+    msg: Le message attendu est absent de la page.
+
+PLAY RECAP *********************************************************************
+linux01                    : ok=20   changed=1    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+
+[linux01, root via sudo — 13:09:23]
+$ curl -sS -o /tmp/ir-page.html -w "Code HTTP : %{http_code}\n" http://127.0.0.1/
+Code HTTP : 200
+$ grep -c "Site InfraReady déployé par Ansible depuis OPS01" /tmp/ir-page.html
+0
+(code de sortie : 1)
+Relevé : la tâche uri « Le site répond en HTTP 200 » réussit ; la tâche en échec est « Le message attendu est publié »
+(ansible.builtin.assert) avec le message ci-dessus. Disponibilité HTTP ≠ validation fonctionnelle.
+
+######## Étape C — corriger et valider (OPS01 puis LINUX01)
+[ops01, utilisateur ansible, ~/infraready/ansible — 13:09:25]
+$ cp playbooks/templates/index.html.j2.etat-initial playbooks/templates/index.html.j2
+$ ansible-playbook playbooks/linux_base.yml --syntax-check
+
+playbook: playbooks/linux_base.yml
+$ ansible-playbook playbooks/linux_base.yml | sed -n "/Page d.accueil/,/^\$/p;/HTTP 200/,/^\$/p;/message attendu/,/^\$/p;/PLAY RECAP/,\$p"
+[WARNING]: Skipping callback plugin '', unable to load
+TASK [Page d'accueil du site] **************************************************
+changed: [linux01]
+
+TASK [Le site répond en HTTP 200] **********************************************
+ok: [linux01 -> localhost]
+
+TASK [Le message attendu est publié] *******************************************
+ok: [linux01] => 
+    changed: false
+    msg: Le contenu attendu est publié.
+
+PLAY RECAP *********************************************************************
+linux01                    : ok=22   changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+[linux01, root via sudo — 13:09:44]
+$ curl -fsS -o /tmp/ir-page.html -w "Code HTTP : %{http_code}\n" http://127.0.0.1/
+Code HTTP : 200
+$ grep -n "Site InfraReady déployé par Ansible depuis OPS01" /tmp/ir-page.html
+6:  <p>Site InfraReady déployé par Ansible depuis OPS01</p>
+$ rm -f /tmp/ir-page.html
+
+######## Phase 6 — restaurer et clôturer : fichiers identiques aux sauvegardes, sauvegardes retirées, passage à changed=0 (OPS01)
+[ops01, utilisateur ansible, ~/infraready/ansible — 13:09:47]
+$ for f in playbooks/linux_base.yml playbooks/templates/index.html.j2 playbooks/templates/nginx-infraready.conf.j2; do [ -e "$f.etat-initial" ] && { diff -q "$f.etat-initial" "$f" && echo "identique : $f"; }; done; true
+identique : playbooks/linux_base.yml
+identique : playbooks/templates/index.html.j2
+$ rm -v playbooks/*.etat-initial playbooks/templates/*.etat-initial
+removed 'playbooks/linux_base.yml.etat-initial'
+removed 'playbooks/templates/index.html.j2.etat-initial'
+$ ansible-playbook playbooks/linux_base.yml | sed -n "/PLAY RECAP/,\$p"
+[WARNING]: Skipping callback plugin '', unable to load
+PLAY RECAP *********************************************************************
+linux01                    : ok=22   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+

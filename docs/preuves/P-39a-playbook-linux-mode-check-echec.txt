@@ -1,0 +1,86 @@
+# Preuve : P-39a-playbook-linux-mode-check-echec
+# Séance 4 — simulation --check --diff demandée avant toute correction (7.5, phase 4) : 1er essai en échec
+# Hôte : ops01 (ansible, ~/infraready/ansible) — 2026-10-20 12:56:46 CEST
+# Commande : ansible-playbook playbooks/linux_base.yml --check --diff
+# Constat : blkid non exécuté en mode check -> UUID vide -> faux 'changed' sur le montage /data ; uri non exécuté -> assert en erreur
+
+[WARNING]: Skipping callback plugin '', unable to load
+
+PLAY [LINUX01 - configuration de base] *****************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [linux01]
+
+TASK [Fuseau horaire] **********************************************************
+ok: [linux01]
+
+TASK [Paquets de base] *********************************************************
+ok: [linux01]
+
+TASK [Groupes du labo] *********************************************************
+ok: [linux01] => (item=webadmins)
+ok: [linux01] => (item=auditeurs)
+
+TASK [Utilisateurs du labo (sans mot de passe, connexion par su/sudo uniquement)] ***
+ok: [linux01] => (item=alice)
+ok: [linux01] => (item=bruno)
+ok: [linux01] => (item=chloe)
+
+TASK [Racine du site - écriture réservée à webadmins (setgid)] *****************
+ok: [linux01]
+
+TASK [Page d'accueil du site] **************************************************
+ok: [linux01]
+
+TASK [Virtual host nginx] ******************************************************
+ok: [linux01]
+
+TASK [Activer le site InfraReady] **********************************************
+ok: [linux01]
+
+TASK [Désactiver le site par défaut] *******************************************
+ok: [linux01]
+
+TASK [Services actifs au démarrage] ********************************************
+ok: [linux01] => (item=nginx)
+ok: [linux01] => (item=prometheus-node-exporter)
+
+TASK [Récupérer l'UUID du système de fichiers DATA] ****************************
+skipping: [linux01]
+
+TASK [Lire l'UUID] *************************************************************
+skipping: [linux01]
+
+TASK [Monter le disque de données via fstab - /data] ***************************
+changed: [linux01]
+
+TASK [Dossier des rapports - lecture pour auditeurs uniquement] ****************
+ok: [linux01]
+
+TASK [UFW - SSH depuis le sous-réseau du labo] *********************************
+ok: [linux01]
+
+TASK [UFW - HTTP depuis le sous-réseau du labo] ********************************
+ok: [linux01]
+
+TASK [UFW - node_exporter depuis OPS01 uniquement] *****************************
+ok: [linux01]
+
+TASK [UFW - politique par défaut et activation] ********************************
+ok: [linux01]
+
+TASK [Appliquer les rechargements en attente avant les vérifications] **********
+
+TASK [Le site répond en HTTP 200] **********************************************
+skipping: [linux01]
+
+TASK [Le message attendu est publié] *******************************************
+fatal: [linux01]: FAILED! => 
+    msg: 'The conditional check ''site_message in page_check.content'' failed. The error
+        was: error while evaluating conditional (site_message in page_check.content):
+        ''dict object'' has no attribute ''content''. ''dict object'' has no attribute
+        ''content'''
+
+PLAY RECAP *********************************************************************
+linux01                    : ok=17   changed=1    unreachable=0    failed=1    skipped=3    rescued=0    ignored=0   
+

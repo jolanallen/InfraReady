@@ -13,6 +13,8 @@
       - { name: bruno, groups: [webadmins], comment: "Bruno - admin web" }
       - { name: chloe, groups: [auditeurs, systemd-journal], comment: "Chloe - auditrice (lecture des journaux)" }
     web_root: /var/www/infraready
+    # Message publié sur la page d'accueil et vérifié en fin de play (séance 4, scénarios 1, 2, 6)
+    site_message: "Site InfraReady déployé par Ansible depuis OPS01"
     data_label: DATA
     data_mount: /data
 
@@ -97,11 +99,13 @@
           ansible.builtin.command: blkid -L {{ data_label }}
           register: data_dev
           changed_when: false
+          check_mode: false   # lecture seule : exécutée aussi en --check (sinon UUID vide, faux changement)
 
         - name: Lire l'UUID
           ansible.builtin.command: blkid -s UUID -o value {{ data_dev.stdout }}
           register: data_uuid
           changed_when: false
+          check_mode: false   # lecture seule : exécutée aussi en --check (sinon UUID vide, faux changement)
 
         - name: Monter le disque de données via fstab - {{ data_mount }}
           ansible.posix.mount:
@@ -156,8 +160,19 @@
       ansible.builtin.uri:
         url: "http://{{ ansible_host }}/"
         status_code: 200
+        return_content: true
+      register: page_check
       delegate_to: localhost
       become: false
+      check_mode: false   # lecture seule : le contrôle reste exécuté en --check
+
+    # Un HTTP 200 ne prouve pas que le bon contenu est publié (séance 4, scénario 6)
+    - name: Le message attendu est publié
+      ansible.builtin.assert:
+        that:
+          - site_message in page_check.content
+        fail_msg: "Le message attendu est absent de la page."
+        success_msg: "Le contenu attendu est publié."
 
     - name: Les métriques node_exporter sont exposées
       ansible.builtin.uri:
@@ -165,6 +180,7 @@
         status_code: 200
       delegate_to: localhost
       become: false
+      check_mode: false   # lecture seule : le contrôle reste exécuté en --check
 
   handlers:
     - name: Recharger nginx
