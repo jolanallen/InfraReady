@@ -9,6 +9,17 @@
     repo_monitoring: "{{ playbook_dir }}/../../monitoring"
     grafana_dashboards_dir: /var/lib/grafana/dashboards/infraready
 
+  pre_tasks:
+    # Contrôle d'indépendance : le playbook échoue ici, avant toute modification du serveur,
+    # si la variable du vault n'est pas disponible (vault non déchiffré ou absent de l'inventaire).
+    - name: Variables du vault présentes avant toute modification
+      ansible.builtin.assert:
+        that: vault_grafana_admin_password is defined
+        fail_msg: >-
+          vault_grafana_admin_password est indéfinie : le fichier group_vars/monitoring/vault.yml n'a pas
+          pu être déchiffré (mot de passe du vault manquant : ~/.vault_pass_infraready sur OPS01).
+        quiet: true
+
   tasks:
     # --- Prometheus (paquet Ubuntu 24.04) ---------------------------------------
     - name: Paquets Prometheus et node_exporter local
