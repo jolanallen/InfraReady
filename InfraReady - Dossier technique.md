@@ -346,6 +346,8 @@ Retour arrière disponible : snapshot `s02_avant_maj_c` (inclut le disque de tes
 
 **Commandes réellement utilisées** : `ansible --version`, `ansible-inventory --graph`, `ansible linux -m ping`, `ansible windows -m win_ping`, `ansible-playbook playbooks/<nom>.yml [--diff]`, lancées deux fois de suite.
 
+**Contrôles ajoutés le 20/10 (PR #2 et #4, Jolan Allen)** : `windows_adds`, `windows_base` et `ops01_monitoring` commencent par un `assert` (`pre_tasks`) qui vérifie la présence de leur variable du vault avant toute modification ; `scripts/verif-idempotence.sh playbooks/<nom>.yml` (depuis `ansible/`) enchaîne deux exécutions et renvoie 0 si le 2ᵉ passage est à `changed=0`, 1 s'il reste des changements, 2 si une exécution échoue.
+
 ### Tests et preuves
 
 | Vérification | Attendu | Résultat observé | Preuve |
@@ -354,6 +356,8 @@ Retour arrière disponible : snapshot `s02_avant_maj_c` (inclut le disque de tes
 | Connexions | Linux SSH et Windows transport validés | `ping: pong` (linux01, ops01) et `win_ping: pong` (win-dc01) | [P-30](docs/preuves/P-30-ansible-inventaire-connexions.txt) |
 | Playbook Linux | Exécution sans erreur bloquante | ok=22 changed=10 failed=0 | [P-31](docs/preuves/P-31-playbook-linux-1er-passage.txt) |
 | Playbook Windows | Exécution sans erreur bloquante | ok=21 changed=12 failed=0 | [P-33](docs/preuves/P-33-playbook-windows-1er-passage.txt) |
+| Script d'idempotence (PR #4) | Détecte un 2ᵉ passage avec changements ou en échec | `windows_base`, `linux_base`, `ops01_monitoring` : IDEMPOTENT (code 0) ; playbook de test non idempotent → code 1 ; playbook en échec → code 2 | [P-61](docs/preuves/P-61-validation-pr-idempotence-playbooks.txt), [P-62](docs/preuves/P-62-validation-pr-tests-negatifs.txt), [P-56](docs/preuves/P-56-grafana-dashboard-v2-deploiement-idempotence.txt) |
+| Contrôle du vault (PR #2) | Arrêt avant toute modification si la variable du vault manque | Inventaire sans `group_vars` : arrêt sur l'assert, aucune tâche exécutée ; mot de passe du vault invalide : Ansible s'arrête avant le play (`ERROR! Invalid vault password`) | [P-62](docs/preuves/P-62-validation-pr-tests-negatifs.txt) |
 | Second passage | État stable / changements expliqués | **Linux changed=0**, **Windows changed=0** | [P-32](docs/preuves/P-32-playbook-linux-2e-passage-idempotence.txt), [P-34](docs/preuves/P-34-playbook-windows-2e-passage-idempotence.txt) |
 
 **Changements du 1er passage Linux expliqués** : paquets absents (node_exporter, ufw, acl, htop), description du compte chloe différente de la saisie manuelle, page et vhost remplacés par les templates, ligne fstab réécrite au format Ansible, 4 règles UFW nouvelles, rechargement nginx (handler). **Windows** : partage, ACL, DNS et exporter n'existaient pas ; OU, groupes et comptes déjà créés en phase B → `ok` sans changement.
@@ -366,6 +370,8 @@ Retour arrière disponible : snapshot `s02_avant_maj_c` (inclut le disque de tes
 | L'option MSI `ADDLOCAL=FirewallException` ouvre 9182 à tout le monde | Comportement de l'installeur | Option retirée, règle dédiée limitée à OPS01 | Port 9182 exposé à OPS01 seulement |
 | PTR du DC absent (vu en phase A) | Zone inverse créée après la promotion | 1ʳᵉ correction : PTR du DC ajouté à la liste gérée par le playbook (changed=1 puis 0) | [P-35](docs/preuves/P-35-playbook-windows-correction-ptr-dc.txt) |
 | Playbook de nouveau `changed=1` plus tard, sur ce même PTR | **Cause confirmée** : le DC enregistre lui-même son PTR par mise à jour dynamique (TTL 20 min, horodaté) ; le playbook le réécrivait en statique (TTL 1 h) → chacun écrasait l'autre à tour de rôle | Le playbook ne gère plus le PTR du DC : il ne déclenche `Register-DnsClient` que si le PTR manque. Seuls les hôtes Linux (qui ne s'enregistrent pas) restent gérés en statique | `changed=0` sur 2 passages, y compris juste après un réenregistrement forcé du DC ([P-36b](docs/preuves/P-36b-ptr-dc-apres-reenregistrement-dynamique.txt), [P-37](docs/preuves/P-37-playbook-windows-ptr-dc-stable.txt)) |
+| Test négatif du vault (20/10) : `windows_adds.yml` exécuté réellement au lieu d'échouer (`changed=1`) | `--vault-password-file` en ligne de commande s'**ajoute** au `vault_password_file` d'`ansible.cfg` au lieu de le remplacer : le vault a été déchiffré | Impact vérifié (seule la tâche DNS du DC rejouée, valeur inchangée, résolution OK) ; test refait avec `ANSIBLE_VAULT_PASSWORD_FILE`, qui remplace la configuration, et en `--check` ; défaut d'idempotence révélé et corrigé (phase B, PR #6) | [P-62](docs/preuves/P-62-validation-pr-tests-negatifs.txt) |
+| Message de l'assert du vault (PR #2) : il annonce un vault « non déchiffré » | Dans ce cas Ansible s'arrête lui-même avant la première tâche ; l'assert protège du cas où le fichier vault est absent de l'inventaire | Remarque de relecture : préciser le message ; comportement sûr dans les deux cas | [P-62](docs/preuves/P-62-validation-pr-tests-negatifs.txt) |
 | 1ʳᵉ exécution du workflow GitHub Actions en échec | Dashboard Grafana pas encore écrit, une ligne > 160 caractères, 7 remarques `ansible-lint` (chemins relatifs, noms de tâches) | Dashboard créé, playbooks corrigés, mêmes outils installés localement (ansible-core 2.16 + collections aux versions d'OPS01) pour valider avant de pousser | yamllint, syntax-check et ansible-lint (profil `production`) OK en local ; playbooks rejoués : `changed=0` |
 
 Retour arrière disponible : snapshot `s03_avant_ansible` (WIN-DC01 et LINUX01).
@@ -410,6 +416,7 @@ La procédure complète est dans **`docs/procedure-maintenance.md`** (fenêtre, 
 | Mise à jour Linux | Procédure automatisée vérifiable | LINUX01 : déjà à jour (phase C) ; OPS01 : paquets mis à jour ; aucun redémarrage requis ; `unattended-upgrades` actif (minuteries `apt-daily` 23:27 et `apt-daily-upgrade` 06:39), dry-run OK | [P-40](docs/preuves/P-40-linux-maintenance-standard.txt), [P-43](docs/preuves/P-43-linux01-mises-a-jour-automatiques-unattended.txt) |
 | Mise à jour Windows | Procédure exécutée et documentée | Recherche : **5 mises à jour** ; installation en 1 h 13 avec redémarrage du DC (18:04) : cumulative `KB5126646` (build 26100.33650), .NET `KB5127690`, MSRT, plateforme et signatures Defender ; la tâche échoue sur `KB5007651` (boucle Windows Update, voir Difficultés) ; après exclusion, passage complet `failed=0`, dernière signature Defender installée sans redémarrage, services/AD/DNS OK | [P-41](docs/preuves/P-41-windows-maintenance-recherche-maj.txt), [P-42](docs/preuves/P-42-windows-maintenance-installation-maj.txt), [P-42b](docs/preuves/P-42b-win-dc01-diagnostic-kb5007651-historique-wu.txt), [P-42c](docs/preuves/P-42c-windows-maintenance-installation-complete-apres-exclusion.txt) |
 | Capacité disque | État relevé et interprété | LINUX01 `/` 29,1 %, `/boot` 11,4 %, `/data` 5,3 % ; OPS01 `/` 26,1 % ; WIN-DC01 `C:` 24,2 % avant (37,1 Go libres) puis **37,2 %** après la cumulative (30,7 Go libres : WinSxS + fichiers de désinstallation) → tous < 85 %, marge suffisante | [P-40b](docs/preuves/P-40b-rapports-maintenance-generes.txt), [P-42c](docs/preuves/P-42c-windows-maintenance-installation-complete-apres-exclusion.txt) |
+| Calcul d'occupation simplifié (PR #1, 20/10) | Même résultat qu'avant la modification | Simulation : mêmes montages (`/`, `/data`, `/boot`), 29,2 % / 26,3 % max contre 29,1 % / 26,1 % le 19/10 ; écart avec `df` dû aux blocs réservés à root, comptés comme occupés (seuil appliqué de façon prudente) | [P-63](docs/preuves/P-63-validation-pr1-maintenance-linux-calcul-disque.txt) |
 | État des services | Services critiques contrôlés | Avant et après : ssh/nginx/node_exporter (LINUX01), ssh/prometheus/grafana/node_exporter (OPS01), NTDS/DNS/Netlogon/kdc/windows_exporter (WIN-DC01) tous actifs ; site HTTP 200 | [P-40](docs/preuves/P-40-linux-maintenance-standard.txt), [P-40b](docs/preuves/P-40b-rapports-maintenance-generes.txt) |
 
 ### Difficultés / décision / retour arrière
@@ -470,7 +477,7 @@ flowchart LR
 
 Chaque cible porte un label `host` (linux01, ops01, win-dc01) et `os`, utilisés dans les requêtes et la légende du dashboard.
 
-**Dashboard « InfraReady — Serveurs »** (`monitoring/grafana/dashboards/infraready.json`, uid `infraready-serveurs`) — 5 panneaux : disponibilité (`up`), CPU %, mémoire %, stockage % par volume, table des alertes Prometheus actives. Requêtes Linux (`node_*`) et Windows (`windows_*`) côte à côte dans chaque panneau.
+**Dashboard « InfraReady — Serveurs »** (`monitoring/grafana/dashboards/infraready.json`, uid `infraready-serveurs`) — 6 panneaux depuis la version 2 du 20/10 (PR #3, Jolan Allen) : disponibilité (`up`), **uptime** (`time() - node_boot_time_seconds` sous Linux, `windows_system_boot_time_timestamp` sous Windows), CPU %, mémoire %, stockage % par volume, table des alertes Prometheus actives. Variable **Hôte** (`label_values(up, host)`, multi-sélection, « Tous » par défaut) : chaque panneau est filtré par `host=~"$host"`. Requêtes Linux (`node_*`) et Windows (`windows_*`) côte à côte dans chaque panneau.
 
 **Règles d'alerte** (`monitoring/prometheus/rules/infraready.rules.yml`, validées par `promtool` dans la CI) :
 
@@ -486,6 +493,9 @@ Chaque cible porte un label `host` (linux01, ops01, win-dc01) et `os`, utilisés
 
 **Points de contrôle réellement utilisés** : `/api/v1/targets`, `/api/v1/rules`, `/api/v1/alerts`, `/api/v1/query`, page `/classic/targets` et `/classic/alerts`, `/metrics` de chaque exporter, API Grafana (`/api/health`, `/api/admin/stats`, `/api/datasources`), `ss -tlnp`, `promtool check config`.
 
+> [!warning] Captures à rafraîchir
+> P-53 et P-55 montrent la version 1 du dashboard (5 panneaux, sans filtre Hôte). La version 2 est vérifiée par l'API dans P-56 ; nouvelles captures à prendre.
+
 ![[P-53-grafana-dashboard-infraready.png|700]]
 
 ![[P-55-grafana-dashboard-alerte-linux01-hors-ligne.png|700]]
@@ -498,6 +508,7 @@ Chaque cible porte un label `host` (linux01, ops01, win-dc01) et `os`, utilisés
 | Collecte Windows | Métriques de WIN-DC01 disponibles | Cible `192.168.50.10:9182` **up** (3 263 métriques) ; CPU 1,0 %, mémoire 26,7 %, `C:` 24,2 % ; services DNS/NTDS/Netlogon/Kdc `running=1` | [P-51](docs/preuves/P-51-prometheus-targets.png), [P-52](docs/preuves/P-52-prometheus-cibles-metriques-regles.txt) |
 | Source Grafana | Prometheus connecté | Source `Prometheus` → `http://localhost:9090` provisionnée ; `/api/admin/stats` : 1 dashboard, 1 source | [P-50](docs/preuves/P-50-ops01-prometheus-grafana-installation.txt) |
 | Dashboard | CPU, RAM, disque et disponibilité visibles | 3 serveurs « EN LIGNE », courbes CPU/mémoire des 3 hôtes, 6 volumes, table d'alertes vide | [P-53](docs/preuves/P-53-grafana-dashboard-infraready.png) |
+| Dashboard v2 (PR #3) | Filtre Hôte et Uptime opérationnels | Grafana : version 2, variable `host`, 6 panneaux ; Uptime renvoyé pour les 3 hôtes, filtre `host=~"linux01"` OK ; `ops01_monitoring.yml` IDEMPOTENT | [P-56](docs/preuves/P-56-grafana-dashboard-v2-deploiement-idempotence.txt) |
 | Seuil / alerte | Démonstration vérifiable | `InstanceDown[linux01]` pending → firing à +60 s, visible dans Prometheus et Grafana, résolue 16 s après retour du service | [P-54](docs/preuves/P-54-alerte-instancedown-demonstration.txt), [P-54 png](docs/preuves/P-54-prometheus-alerte-instancedown.png), [P-55](docs/preuves/P-55-grafana-dashboard-alerte-linux01-hors-ligne.png) |
 | Idempotence | Second passage stable | `ops01_monitoring.yml` : changed=0 au 2ᵉ passage | [P-50b](docs/preuves/P-50b-ops01-monitoring-2e-passage-idempotence.txt) |
 
@@ -548,7 +559,7 @@ Retour arrière disponible : snapshot `s02_avant_monitoring` (OPS01).
 | Vérification | Attendu | Résultat observé | Preuve |
 | --- | --- | --- | --- |
 | Dépôt et arborescence | Fichiers attendus présents | Voir arborescence (annexe) ; job `Arborescence attendue` : success | [Lien](https://github.com/jolanallen/InfraReady), [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
-| Contributions | Contributions de l'équipe traçables | Pour l'instant un seul auteur (`git shortlog`) — **à compléter par les autres membres** | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
+| Contributions | Contributions de l'équipe traçables | MIR Mahan (`Nothypaa`) : commits directs jusqu'au 20/10 ; Jolan Allen (`jolan`) : PR #1 à #5 du 20/10, CI verte sur chaque branche et après fusion ; depuis, toute modification passe par une PR (règles de `CLAUDE.md`) ; Kenzi Bendjelloul : **à compléter** | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
 | Workflow automatique | Push / PR déclenche la validation | Chaque `push` sur `main` a lancé un run (événement `push`) | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
 | Pipeline vert | Exécution terminée avec succès | Run 39401095014 sur `jolanallen/InfraReady` : `Arborescence attendue`, `YAML + Ansible`, `Prometheus + Grafana`, `Aucun secret en clair` → success | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
 
@@ -741,7 +752,7 @@ Retour arrière : snapshot Proxmox `s07_avant_seance4` des 3 VM pris avant la s�
 | D | Playbooks Linux & Windows / idempotence | ✅ Validé | P-30 à P-35 |
 | E | Mises à jour / maintenance | ✅ Validé | P-40 à P-43 |
 | F | Exporters / dashboard / alerte | ✅ Validé | P-50 à P-55 |
-| G | Workflow GitHub Actions réussi | ✅ Validé (commits de l'équipe à compléter) | P-60 |
+| G | Workflow GitHub Actions réussi | ✅ Validé (contributions de Kenzi Bendjelloul à compléter) | P-60, P-61 à P-63 |
 | H | Incident corrigé / retour normal | ✅ Validé | P-70 à P-73, `docs/rapport-incident.md` |
 | Séance 4 | Scripts de vérification / processus et services / 6 scénarios de panne / mode check | ✅ Validé (bilans individuels à compléter) | P-14, P-25, P-26, P-38 à P-39, P-74 à P-79 |
 
@@ -916,6 +927,12 @@ InfraReady/
 | 20/10/2026 12:52 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | Scripts `check-nginx.sh` et `Check-DnsClient.ps1` (3 situations chacun) | Codes 0 / 1 / 2 | P-25, P-14 / — |
 | 20/10/2026 12:57 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | `check_mode: false` sur 4 tâches en lecture seule de `linux_base.yml` | Simulation `changed=0 failed=0` | P-39a, P-39 / — |
 | 20/10/2026 12:58 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | 6 scénarios de panne contrôlée (7.4), un à la fois, jusqu'à 13:08 | Retour à l'état initial, `changed=0` | P-74 à P-79 / `.etat-initial`, `s07_avant_seance4` |
+| 20/10/2026 14:15 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | Snapshot des 3 VM avant validation des PR #1 à #5 | `qm snapshot` | `s08_avant_validation_pr3_5` |
+| 20/10/2026 14:16 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | Dashboard Grafana v2 déployé (`ops01_monitoring.yml`, 2 passages) | IDEMPOTENT, version 2 chargée | P-56 / `s08_avant_validation_pr3_5` |
+| 20/10/2026 14:18 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | `windows_base.yml` et `linux_base.yml` via `verif-idempotence.sh` | IDEMPOTENT ×2 | P-61 / — |
+| 20/10/2026 14:21 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | Tests négatifs ; exécution réelle non voulue de `windows_adds.yml` (DNS du DC rejoué, valeur inchangée) | Résolution DNS OK | P-62 / `s08_avant_validation_pr3_5` |
+| 20/10/2026 14:24 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | `linux_maintenance.yml` en simulation (PR #1) | Calcul identique à P-40 | P-63 / — |
+| 20/10/2026 14:26 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | Correctif DNS de `windows_adds.yml` testé (PR #6), puis copie d'OPS01 remise à la version de `main` | IDEMPOTENT | P-15 (PR #6) / `s08_avant_validation_pr3_5` |
 
 **Annexes** : sorties complètes dans `docs/preuves/`, modèles d'installation dans `lab/`, configurations dans `ansible/` et `monitoring/`.
 
