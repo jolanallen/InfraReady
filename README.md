@@ -40,6 +40,9 @@ ansible-playbook playbooks/windows_base.yml        # phase B/D : objets AD, part
 ansible-playbook playbooks/ops01_monitoring.yml    # phase F : Prometheus + Grafana
 ansible-playbook playbooks/linux_maintenance.yml   # phase E (voir docs/procedure-maintenance.md)
 ansible-playbook playbooks/windows_maintenance.yml # phase E (recherche ; -e maintenance_apply=true pour installer)
+
+# Vérification de l'idempotence d'un playbook (2e passage doit afficher changed=0)
+../scripts/verif-idempotence.sh playbooks/linux_base.yml
 ```
 
 Les mots de passe sont dans des fichiers Ansible Vault chiffrés (`group_vars/*/vault.yml`) ; le mot de passe du vault n'est pas dans le dépôt (`~/.vault_pass_infraready` sur OPS01).
