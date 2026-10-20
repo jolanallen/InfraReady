@@ -26,6 +26,17 @@
     windows_exporter_url: >-
       https://github.com/prometheus-community/windows_exporter/releases/download/v{{ windows_exporter_version }}/{{ windows_exporter_msi }}
 
+  pre_tasks:
+    # Contrôle d'indépendance : le playbook échoue ici, avant toute modification du serveur,
+    # si les variables du vault ne sont pas disponibles (vault non déchiffré ou absent de l'inventaire).
+    - name: Variables du vault présentes avant toute modification
+      ansible.builtin.assert:
+        that: vault_ad_user_password is defined
+        fail_msg: >-
+          vault_ad_user_password est indéfinie : le fichier group_vars/windows/vault.yml n'a pas pu être
+          déchiffré (mot de passe du vault manquant : ~/.vault_pass_infraready sur OPS01).
+        quiet: true
+
   tasks:
     - name: Fuseau horaire
       community.windows.win_timezone:
