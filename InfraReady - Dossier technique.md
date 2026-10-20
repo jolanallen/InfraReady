@@ -811,8 +811,12 @@ Retour arrière : snapshot Proxmox `s07_avant_seance4` des 3 VM pris avant la s�
 | P-53 | 19/10/2026 | Capture : dashboard Grafana, état normal | [P-53](docs/preuves/P-53-grafana-dashboard-infraready.png) |
 | P-54 | 19/10/2026 | Démonstration InstanceDown : chronologie + capture Prometheus | [P-54](docs/preuves/P-54-alerte-instancedown-demonstration.txt), [png](docs/preuves/P-54-prometheus-alerte-instancedown.png) |
 | P-55 | 19/10/2026 | Capture : dashboard pendant l'alerte (LINUX01 hors ligne) | [P-55](docs/preuves/P-55-grafana-dashboard-alerte-linux01-hors-ligne.png) |
+| P-56 | 20/10/2026 | Dashboard Grafana v2 (variable Hôte, Uptime) déployé, idempotence, requêtes vérifiées | [P-56](docs/preuves/P-56-grafana-dashboard-v2-deploiement-idempotence.txt) |
 | P-60a | 19/10/2026 | GitHub Actions sur le dépôt de travail initial : 1er run en échec, 2ᵉ vert | [P-60a](docs/preuves/P-60a-github-actions-depot-de-travail-initial.txt) |
 | P-60 | 20/10/2026 | GitHub Actions sur `jolanallen/InfraReady` : run vert, jobs, déclencheurs, auteurs | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
+| P-61 | 20/10/2026 | Validation des PR #2 et #4 : `verif-idempotence.sh` sur `windows_base` et `linux_base` (IDEMPOTENT) | [P-61](docs/preuves/P-61-validation-pr-idempotence-playbooks.txt) |
+| P-62 | 20/10/2026 | Tests négatifs (non idempotent → 1, échec → 2, vault absent ou invalide) ; diagnostic du DNS de `windows_adds` | [P-62](docs/preuves/P-62-validation-pr-tests-negatifs.txt) |
+| P-63 | 20/10/2026 | Validation de la PR #1 : calcul d'occupation disque de `linux_maintenance` (simulation) | [P-63](docs/preuves/P-63-validation-pr1-maintenance-linux-calcul-disque.txt) |
 
 ---
 

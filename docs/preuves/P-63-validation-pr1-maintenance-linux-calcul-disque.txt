@@ -1,0 +1,60 @@
+# Preuve : P-63-validation-pr1-maintenance-linux-calcul-disque
+# Validation de la PR #1 (Jolan Allen) : calcul d'occupation disque simplifié dans linux_maintenance.yml
+# Exécuté en simulation (--check) : aucune mise à jour installée, aucun redémarrage — 2026-10-20 14:24:55 CEST
+# Comparaison avec la valeur réelle : df sur LINUX01 et OPS01
+$ ansible-playbook playbooks/linux_maintenance.yml --syntax-check
+
+playbook: playbooks/linux_maintenance.yml
+code de sortie : 0
+$ ansible-playbook playbooks/linux_maintenance.yml --check 2>&1 | sed -n "/Calcul du pourcentage/,/^\$/p;/dépasse\|Seuil\|seuil/,/^\$/p;/PLAY RECAP/,\$p"
+TASK [Calcul du pourcentage utilisé par montage] *******************************
+ok: [linux01] => (item=/)
+ok: [linux01] => (item=/data)
+ok: [linux01] => (item=/boot)
+
+TASK [Calcul du pourcentage utilisé par montage] *******************************
+ok: [ops01] => (item=/)
+ok: [ops01] => (item=/boot)
+
+PLAY RECAP *********************************************************************
+linux01                    : ok=15   changed=2    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
+ops01                      : ok=15   changed=2    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
+
+code de sortie : 0
+$ ansible linux -m ansible.builtin.command -a "df --output=target,pcent -t ext4 -t xfs" | grep -v "^\s*$"
+linux01 | CHANGED | rc=0 >>
+Mounted on Use%
+/           26%
+/data        1%
+/boot        6%
+ops01 | CHANGED | rc=0 >>
+Mounted on Use%
+/           23%
+/boot        6%
+code de sortie : 0
+
+######## Détail : valeurs calculées (message de synthèse / rapport) et tâches signalées changed en simulation
+$ ansible-playbook playbooks/linux_maintenance.yml --check -v | grep -E "^TASK|^changed|disques|Disques"
+TASK [Mise à jour des index et des paquets (upgrade, sans suppression)] ********
+changed: [linux01] => 
+TASK [Rapport de maintenance] **************************************************
+changed: [linux01 -> localhost] => 
+TASK [Résumé] ******************************************************************
+    msg: 'linux01 : disques 29.2 % max, paquets mis à jour, reboot requis=False'
+TASK [Mise à jour des index et des paquets (upgrade, sans suppression)] ********
+changed: [ops01] => 
+TASK [Rapport de maintenance] **************************************************
+changed: [ops01 -> localhost] => 
+TASK [Résumé] ******************************************************************
+    msg: 'ops01 : disques 26.3 % max, paquets mis à jour, reboot requis=False'
+
+######## Conclusion
+- La boucle porte directement sur ansible_mounts filtré (ext4/xfs) : mêmes montages qu'avant (/, /data, /boot sur LINUX01 ;
+  /, /boot sur OPS01), le fait intermédiaire « disques » supprimé n'était utilisé nulle part ailleurs (grep du dépôt).
+- Résultat identique à l'ancienne version : 29.2 % / 26.3 % max contre 29.1 % / 26.1 % dans P-40 (19/10), écart dû à
+  l'évolution normale de l'occupation. Refactorisation sans changement de comportement.
+- Écart avec df (26 % / 23 % pour /) : le playbook calcule 100 - disponible/taille et compte donc les blocs réservés à root
+  (5 % sur ext4) comme occupés ; df les exclut. Le seuil de 85 % est donc appliqué de façon prudente. Comportement antérieur
+  à la PR, inchangé.
+- En simulation, « changed » sur la mise à jour des paquets (paquets disponibles) et sur le rapport local : attendu en --check,
+  rien n'a été installé.
