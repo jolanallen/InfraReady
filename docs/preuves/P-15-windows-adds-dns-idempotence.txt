@@ -1,0 +1,96 @@
+# Preuve : P-15-windows-adds-dns-idempotence
+# Correction (branche fix/windows-adds-dns-idempotence) : tâche « Le DC utilise son propre DNS » avec dns_servers [127.0.0.1, ::1]
+# Cause confirmée en P-62 (test discriminant en mode check). Hôte : ops01 (ansible) — 2026-10-20 14:26:53 CEST — snapshot s08_avant_validation_pr3_5
+# Commande : ../scripts/verif-idempotence.sh playbooks/windows_adds.yml
+
+== 1er passage : mise à jour de l'état si nécessaire
+
+PLAY [WIN-DC01 - AD DS et DNS] *************************************************
+
+TASK [Variables du vault présentes avant toute modification] *******************
+ok: [win-dc01]
+
+TASK [Rôle AD DS + outils d'administration] ************************************
+ok: [win-dc01]
+
+TASK [Créer la forêt et redémarrer le serveur - infraready.test] ***************
+ok: [win-dc01]
+
+TASK [Attendre que les services AD soient disponibles] *************************
+ok: [win-dc01]
+
+TASK [Redirecteurs DNS vers Internet (résolution externe pour le labo)] ********
+ok: [win-dc01]
+
+TASK [Source de temps NTP externe (le DC racine sert l'heure à tout le domaine — Kerberos)] ***
+ok: [win-dc01]
+
+TASK [Le DC utilise son propre DNS] ********************************************
+ok: [win-dc01]
+
+TASK [État du domaine] *********************************************************
+ok: [win-dc01]
+
+TASK [Afficher l'état du domaine] **********************************************
+ok: [win-dc01] => 
+    domain_state.output:
+    -   DC: WIN-DC01.infraready.test
+        DNS: 192.168.50.10
+        Domaine: infraready.test
+        Mode: Windows2025Domain
+        NetBIOS: INFRAREADY
+
+PLAY RECAP *********************************************************************
+win-dc01                   : ok=9    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+
+== 2e passage : doit afficher changed=0
+
+PLAY [WIN-DC01 - AD DS et DNS] *************************************************
+
+TASK [Variables du vault présentes avant toute modification] *******************
+ok: [win-dc01]
+
+TASK [Rôle AD DS + outils d'administration] ************************************
+ok: [win-dc01]
+
+TASK [Créer la forêt et redémarrer le serveur - infraready.test] ***************
+ok: [win-dc01]
+
+TASK [Attendre que les services AD soient disponibles] *************************
+ok: [win-dc01]
+
+TASK [Redirecteurs DNS vers Internet (résolution externe pour le labo)] ********
+ok: [win-dc01]
+
+TASK [Source de temps NTP externe (le DC racine sert l'heure à tout le domaine — Kerberos)] ***
+ok: [win-dc01]
+
+TASK [Le DC utilise son propre DNS] ********************************************
+ok: [win-dc01]
+
+TASK [État du domaine] *********************************************************
+ok: [win-dc01]
+
+TASK [Afficher l'état du domaine] **********************************************
+ok: [win-dc01] => 
+    domain_state.output:
+    -   DC: WIN-DC01.infraready.test
+        DNS: 192.168.50.10
+        Domaine: infraready.test
+        Mode: Windows2025Domain
+        NetBIOS: INFRAREADY
+
+PLAY RECAP *********************************************************************
+win-dc01                   : ok=9    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+IDEMPOTENT : 2e passage sans changement (changed=0, failed=0, unreachable=0)
+code de sortie : 0
+
+######## État DNS du DC après les deux passages
+win-dc01 | CHANGED | rc=0 >>
+AddressFamily ServerAddresses
+------------- ---------------
+            2 {127.0.0.1}    
+           23 {::1}          
+192.168.50.20
