@@ -525,7 +525,7 @@ Retour arrière disponible : snapshot `s02_avant_monitoring` (OPS01).
 
 ### Travaux réalisés / checklist
 
-- [x] Créer un dépôt GitHub adapté au binôme : dépôt de remise `jolanallen/InfraReady`, créé par le chef de projet ; historique initial et premiers runs CI sur `Nothypaa/InfraReady` (privé), poussé tel quel vers le dépôt de remise.
+- [x] Créer un dépôt GitHub adapté au binôme : `jolanallen/InfraReady`, créé par le chef de projet.
 - [x] Organiser playbooks, scripts, variables, monitoring et docs (voir arborescence en annexe).
 - [ ] Utiliser des commits descriptifs des deux membres.
 - [x] Créer `.github/workflows/validation.yml`.
@@ -536,11 +536,12 @@ Retour arrière disponible : snapshot `s02_avant_monitoring` (OPS01).
 
 ### Procédure et configuration
 
-- **Dépôt de remise** : https://github.com/jolanallen/InfraReady — branche `main` (dépôt de travail initial : `Nothypaa/InfraReady`, privé).
+- **Dépôt** : https://github.com/jolanallen/InfraReady — branche `main`.
+- **Migration** : le travail a commencé le 19/10/2026 sur un dépôt de travail privé ; l'historique complet a été migré le 20/10/2026 vers le dépôt du binôme, où le workflow a été rejoué (P-60). Le 1er run en échec date du dépôt de travail (P-60a).
 - **Jobs** : `fichiers`, `yaml-ansible`, `monitoring`, `secrets` (voir `.github/workflows/validation.yml`).
 
 - **Validation locale avant push** : les mêmes outils que la CI (ansible-core 2.16, ansible-lint 24, yamllint, collections aux versions d'OPS01) sont installés sur le poste pour corriger avant de pousser.
-- **Run réussi** : https://github.com/Nothypaa/InfraReady/actions/runs/39268575079 (4 jobs `success`, sur le dépôt de travail initial).
+- **Runs** : https://github.com/jolanallen/InfraReady/actions (identifiant et lien du run vert dans P-60).
 
 ### Tests et preuves
 
@@ -549,14 +550,14 @@ Retour arrière disponible : snapshot `s02_avant_monitoring` (OPS01).
 | Dépôt et arborescence | Fichiers attendus présents | Voir arborescence (annexe) ; job `Arborescence attendue` : success | [Lien](https://github.com/jolanallen/InfraReady), [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
 | Contributions | Contributions du binôme traçables | Pour l'instant un seul auteur (`git shortlog`) — **à compléter par le second membre** | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
 | Workflow automatique | Push / PR déclenche la validation | Chaque `push` sur `main` a lancé un run (événement `push`) | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
-| Pipeline vert | Exécution terminée avec succès | Run 39268575079 : `Arborescence attendue`, `YAML + Ansible`, `Prometheus + Grafana`, `Aucun secret en clair` → success | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
+| Pipeline vert | Exécution terminée avec succès | Dernier run sur `jolanallen/InfraReady` : `Arborescence attendue`, `YAML + Ansible`, `Prometheus + Grafana`, `Aucun secret en clair` → success | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
 
 ### Difficultés / décision / retour arrière
 
 | Problème | Cause | Correction | Résultat |
 | --- | --- | --- | --- |
 | `git push` refusé : « refusing to allow an OAuth App to create or update workflow … without `workflow` scope » | Le jeton GitHub CLI n'a pas le droit `workflow`, obligatoire pour modifier `.github/workflows/` | `gh auth refresh -h github.com -s workflow` | Push accepté, 6 commits publiés |
-| 1er run en échec (3 jobs sur 4) | Dashboard Grafana absent, ligne > 160 caractères, 7 remarques `ansible-lint` | Dashboard écrit, playbooks corrigés et rejoués (`changed=0`), validation locale avant push | 2ᵉ run vert ([P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt)) |
+| 1er run en échec (3 jobs sur 4) | Dashboard Grafana absent, ligne > 160 caractères, 7 remarques `ansible-lint` | Dashboard écrit, playbooks corrigés et rejoués (`changed=0`), validation locale avant push | 2ᵉ run vert ([P-60a](docs/preuves/P-60a-github-actions-depot-de-travail-initial.txt)), puis vert sur le dépôt du binôme ([P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt)) |
 
 ---
 
@@ -703,7 +704,8 @@ Retour arrière disponible : `/root/infraready.nginx.bak-incident-h` sur LINUX01
 | P-53 | 19/10/2026 | Capture : dashboard Grafana, état normal | [P-53](docs/preuves/P-53-grafana-dashboard-infraready.png) |
 | P-54 | 19/10/2026 | Démonstration InstanceDown : chronologie + capture Prometheus | [P-54](docs/preuves/P-54-alerte-instancedown-demonstration.txt), [png](docs/preuves/P-54-prometheus-alerte-instancedown.png) |
 | P-55 | 19/10/2026 | Capture : dashboard pendant l'alerte (LINUX01 hors ligne) | [P-55](docs/preuves/P-55-grafana-dashboard-alerte-linux01-hors-ligne.png) |
-| P-60 | 19/10/2026 | GitHub Actions : runs (1er en échec, 2ᵉ vert), jobs, déclencheurs, auteurs | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
+| P-60a | 19/10/2026 | GitHub Actions sur le dépôt de travail initial : 1er run en échec, 2ᵉ vert | [P-60a](docs/preuves/P-60a-github-actions-depot-de-travail-initial.txt) |
+| P-60 | 20/10/2026 | GitHub Actions sur `jolanallen/InfraReady` : run vert, jobs, déclencheurs, auteurs | [P-60](docs/preuves/P-60-github-actions-pipeline-vert.txt) |
 
 ---
 
