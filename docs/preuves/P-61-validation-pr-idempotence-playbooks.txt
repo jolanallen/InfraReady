@@ -1,0 +1,366 @@
+# Preuve : P-61-validation-pr-idempotence-playbooks
+# Validation des PR #2 (contrôle du vault en tête de play) et #4 (scripts/verif-idempotence.sh) de Jolan Allen, sur le labo
+# Hôte : ops01 (utilisateur ansible, ~/infraready/ansible) — 2026-10-20 14:18:19 CEST — snapshot préalable s08_avant_validation_pr3_5
+# Commandes : ../scripts/verif-idempotence.sh playbooks/windows_base.yml ; ../scripts/verif-idempotence.sh playbooks/linux_base.yml
+
+################ playbooks/windows_base.yml
+== 1er passage : mise à jour de l'état si nécessaire
+[WARNING]: Skipping callback plugin '', unable to load
+
+PLAY [WIN-DC01 - configuration de base] ****************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [win-dc01]
+
+TASK [Variables du vault présentes avant toute modification] *******************
+ok: [win-dc01]
+
+TASK [Fuseau horaire] **********************************************************
+ok: [win-dc01]
+
+TASK [OU racine InfraReady] ****************************************************
+ok: [win-dc01]
+
+TASK [OU Utilisateurs et Groupes] **********************************************
+ok: [win-dc01] => (item=Utilisateurs)
+ok: [win-dc01] => (item=Groupes)
+
+TASK [Groupes de sécurité globaux] *********************************************
+ok: [win-dc01] => (item=GG_Support_IT)
+ok: [win-dc01] => (item=GG_Comptabilite)
+
+TASK [Comptes utilisateurs de test] ********************************************
+ok: [win-dc01] => (item=None)
+ok: [win-dc01] => (item=None)
+ok: [win-dc01] => (item=None)
+ok: [win-dc01] => (item=None)
+ok: [win-dc01]
+
+TASK [Dossier partagé Comptabilité] ********************************************
+ok: [win-dc01]
+
+TASK [NTFS - désactiver l'héritage (copie des ACE existantes)] *****************
+ok: [win-dc01]
+
+TASK [NTFS - retirer Users (BUILTIN) hérité] ***********************************
+ok: [win-dc01]
+
+TASK [NTFS - Comptabilité en modification, Support IT en lecture] **************
+ok: [win-dc01] => (item={'group': 'GG_Comptabilite', 'rights': 'Modify'})
+ok: [win-dc01] => (item={'group': 'GG_Support_IT', 'rights': 'ReadAndExecute'})
+
+TASK [Partage SMB \\WIN-DC01\Compta] *******************************************
+ok: [win-dc01]
+
+TASK [Zone DNS inverse 50.168.192.in-addr.arpa] ********************************
+ok: [win-dc01]
+
+TASK [Enregistrements A des serveurs Linux] ************************************
+ok: [win-dc01] => (item={'name': 'linux01', 'ip': '192.168.50.20'})
+ok: [win-dc01] => (item={'name': 'ops01', 'ip': '192.168.50.30'})
+
+TASK [Enregistrements PTR des serveurs Linux (ils ne s'enregistrent pas eux-mêmes dans le DNS AD)] ***
+ok: [win-dc01] => (item={'name': 'linux01', 'ip': '192.168.50.20'})
+ok: [win-dc01] => (item={'name': 'ops01', 'ip': '192.168.50.30'})
+
+TASK [PTR du contrôleur de domaine - déclencher son enregistrement dynamique s'il manque] ***
+ok: [win-dc01]
+
+TASK [Télécharger windows_exporter 0.31.8] *************************************
+ok: [win-dc01]
+
+TASK [Installer windows_exporter (collecteurs CPU, mémoire, disques, système, services)] ***
+ok: [win-dc01]
+
+TASK [Service windows_exporter démarré] ****************************************
+ok: [win-dc01]
+
+TASK [Pare-feu - port 9182 ouvert pour OPS01 uniquement] ***********************
+ok: [win-dc01]
+
+TASK [Services critiques du contrôleur de domaine] *****************************
+ok: [win-dc01] => (item=NTDS)
+ok: [win-dc01] => (item=DNS)
+ok: [win-dc01] => (item=Netlogon)
+ok: [win-dc01] => (item=kdc)
+ok: [win-dc01] => (item=windows_exporter)
+
+TASK [Tous les services critiques sont en cours d'exécution] *******************
+ok: [win-dc01] => (item=NTDS)
+ok: [win-dc01] => (item=DNS)
+ok: [win-dc01] => (item=Netlogon)
+ok: [win-dc01] => (item=kdc)
+ok: [win-dc01] => (item=windows_exporter)
+
+TASK [Le service windows_exporter répond depuis OPS01] *************************
+ok: [win-dc01 -> localhost]
+
+PLAY RECAP *********************************************************************
+win-dc01                   : ok=23   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+
+== 2e passage : doit afficher changed=0
+[WARNING]: Skipping callback plugin '', unable to load
+
+PLAY [WIN-DC01 - configuration de base] ****************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [win-dc01]
+
+TASK [Variables du vault présentes avant toute modification] *******************
+ok: [win-dc01]
+
+TASK [Fuseau horaire] **********************************************************
+ok: [win-dc01]
+
+TASK [OU racine InfraReady] ****************************************************
+ok: [win-dc01]
+
+TASK [OU Utilisateurs et Groupes] **********************************************
+ok: [win-dc01] => (item=Utilisateurs)
+ok: [win-dc01] => (item=Groupes)
+
+TASK [Groupes de sécurité globaux] *********************************************
+ok: [win-dc01] => (item=GG_Support_IT)
+ok: [win-dc01] => (item=GG_Comptabilite)
+
+TASK [Comptes utilisateurs de test] ********************************************
+ok: [win-dc01] => (item=None)
+ok: [win-dc01] => (item=None)
+ok: [win-dc01] => (item=None)
+ok: [win-dc01] => (item=None)
+ok: [win-dc01]
+
+TASK [Dossier partagé Comptabilité] ********************************************
+ok: [win-dc01]
+
+TASK [NTFS - désactiver l'héritage (copie des ACE existantes)] *****************
+ok: [win-dc01]
+
+TASK [NTFS - retirer Users (BUILTIN) hérité] ***********************************
+ok: [win-dc01]
+
+TASK [NTFS - Comptabilité en modification, Support IT en lecture] **************
+ok: [win-dc01] => (item={'group': 'GG_Comptabilite', 'rights': 'Modify'})
+ok: [win-dc01] => (item={'group': 'GG_Support_IT', 'rights': 'ReadAndExecute'})
+
+TASK [Partage SMB \\WIN-DC01\Compta] *******************************************
+ok: [win-dc01]
+
+TASK [Zone DNS inverse 50.168.192.in-addr.arpa] ********************************
+ok: [win-dc01]
+
+TASK [Enregistrements A des serveurs Linux] ************************************
+ok: [win-dc01] => (item={'name': 'linux01', 'ip': '192.168.50.20'})
+ok: [win-dc01] => (item={'name': 'ops01', 'ip': '192.168.50.30'})
+
+TASK [Enregistrements PTR des serveurs Linux (ils ne s'enregistrent pas eux-mêmes dans le DNS AD)] ***
+ok: [win-dc01] => (item={'name': 'linux01', 'ip': '192.168.50.20'})
+ok: [win-dc01] => (item={'name': 'ops01', 'ip': '192.168.50.30'})
+
+TASK [PTR du contrôleur de domaine - déclencher son enregistrement dynamique s'il manque] ***
+ok: [win-dc01]
+
+TASK [Télécharger windows_exporter 0.31.8] *************************************
+ok: [win-dc01]
+
+TASK [Installer windows_exporter (collecteurs CPU, mémoire, disques, système, services)] ***
+ok: [win-dc01]
+
+TASK [Service windows_exporter démarré] ****************************************
+ok: [win-dc01]
+
+TASK [Pare-feu - port 9182 ouvert pour OPS01 uniquement] ***********************
+ok: [win-dc01]
+
+TASK [Services critiques du contrôleur de domaine] *****************************
+ok: [win-dc01] => (item=NTDS)
+ok: [win-dc01] => (item=DNS)
+ok: [win-dc01] => (item=Netlogon)
+ok: [win-dc01] => (item=kdc)
+ok: [win-dc01] => (item=windows_exporter)
+
+TASK [Tous les services critiques sont en cours d'exécution] *******************
+ok: [win-dc01] => (item=NTDS)
+ok: [win-dc01] => (item=DNS)
+ok: [win-dc01] => (item=Netlogon)
+ok: [win-dc01] => (item=kdc)
+ok: [win-dc01] => (item=windows_exporter)
+
+TASK [Le service windows_exporter répond depuis OPS01] *************************
+ok: [win-dc01 -> localhost]
+
+PLAY RECAP *********************************************************************
+win-dc01                   : ok=23   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+IDEMPOTENT : 2e passage sans changement (changed=0, failed=0, unreachable=0)
+code de sortie : 0
+
+################ playbooks/linux_base.yml
+== 1er passage : mise à jour de l'état si nécessaire
+[WARNING]: Skipping callback plugin '', unable to load
+
+PLAY [LINUX01 - configuration de base] *****************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [linux01]
+
+TASK [Fuseau horaire] **********************************************************
+ok: [linux01]
+
+TASK [Paquets de base] *********************************************************
+ok: [linux01]
+
+TASK [Groupes du labo] *********************************************************
+ok: [linux01] => (item=webadmins)
+ok: [linux01] => (item=auditeurs)
+
+TASK [Utilisateurs du labo (sans mot de passe, connexion par su/sudo uniquement)] ***
+ok: [linux01] => (item=alice)
+ok: [linux01] => (item=bruno)
+ok: [linux01] => (item=chloe)
+
+TASK [Racine du site - écriture réservée à webadmins (setgid)] *****************
+ok: [linux01]
+
+TASK [Page d'accueil du site] **************************************************
+ok: [linux01]
+
+TASK [Virtual host nginx] ******************************************************
+ok: [linux01]
+
+TASK [Activer le site InfraReady] **********************************************
+ok: [linux01]
+
+TASK [Désactiver le site par défaut] *******************************************
+ok: [linux01]
+
+TASK [Services actifs au démarrage] ********************************************
+ok: [linux01] => (item=nginx)
+ok: [linux01] => (item=prometheus-node-exporter)
+
+TASK [Récupérer l'UUID du système de fichiers DATA] ****************************
+ok: [linux01]
+
+TASK [Lire l'UUID] *************************************************************
+ok: [linux01]
+
+TASK [Monter le disque de données via fstab - /data] ***************************
+ok: [linux01]
+
+TASK [Dossier des rapports - lecture pour auditeurs uniquement] ****************
+ok: [linux01]
+
+TASK [UFW - SSH depuis le sous-réseau du labo] *********************************
+ok: [linux01]
+
+TASK [UFW - HTTP depuis le sous-réseau du labo] ********************************
+ok: [linux01]
+
+TASK [UFW - node_exporter depuis OPS01 uniquement] *****************************
+ok: [linux01]
+
+TASK [UFW - politique par défaut et activation] ********************************
+ok: [linux01]
+
+TASK [Appliquer les rechargements en attente avant les vérifications] **********
+
+TASK [Le site répond en HTTP 200] **********************************************
+ok: [linux01 -> localhost]
+
+TASK [Le message attendu est publié] *******************************************
+ok: [linux01] => 
+    changed: false
+    msg: Le contenu attendu est publié.
+
+TASK [Les métriques node_exporter sont exposées] *******************************
+ok: [linux01 -> localhost]
+
+PLAY RECAP *********************************************************************
+linux01                    : ok=22   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+
+== 2e passage : doit afficher changed=0
+[WARNING]: Skipping callback plugin '', unable to load
+
+PLAY [LINUX01 - configuration de base] *****************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [linux01]
+
+TASK [Fuseau horaire] **********************************************************
+ok: [linux01]
+
+TASK [Paquets de base] *********************************************************
+ok: [linux01]
+
+TASK [Groupes du labo] *********************************************************
+ok: [linux01] => (item=webadmins)
+ok: [linux01] => (item=auditeurs)
+
+TASK [Utilisateurs du labo (sans mot de passe, connexion par su/sudo uniquement)] ***
+ok: [linux01] => (item=alice)
+ok: [linux01] => (item=bruno)
+ok: [linux01] => (item=chloe)
+
+TASK [Racine du site - écriture réservée à webadmins (setgid)] *****************
+ok: [linux01]
+
+TASK [Page d'accueil du site] **************************************************
+ok: [linux01]
+
+TASK [Virtual host nginx] ******************************************************
+ok: [linux01]
+
+TASK [Activer le site InfraReady] **********************************************
+ok: [linux01]
+
+TASK [Désactiver le site par défaut] *******************************************
+ok: [linux01]
+
+TASK [Services actifs au démarrage] ********************************************
+ok: [linux01] => (item=nginx)
+ok: [linux01] => (item=prometheus-node-exporter)
+
+TASK [Récupérer l'UUID du système de fichiers DATA] ****************************
+ok: [linux01]
+
+TASK [Lire l'UUID] *************************************************************
+ok: [linux01]
+
+TASK [Monter le disque de données via fstab - /data] ***************************
+ok: [linux01]
+
+TASK [Dossier des rapports - lecture pour auditeurs uniquement] ****************
+ok: [linux01]
+
+TASK [UFW - SSH depuis le sous-réseau du labo] *********************************
+ok: [linux01]
+
+TASK [UFW - HTTP depuis le sous-réseau du labo] ********************************
+ok: [linux01]
+
+TASK [UFW - node_exporter depuis OPS01 uniquement] *****************************
+ok: [linux01]
+
+TASK [UFW - politique par défaut et activation] ********************************
+ok: [linux01]
+
+TASK [Appliquer les rechargements en attente avant les vérifications] **********
+
+TASK [Le site répond en HTTP 200] **********************************************
+ok: [linux01 -> localhost]
+
+TASK [Le message attendu est publié] *******************************************
+ok: [linux01] => 
+    changed: false
+    msg: Le contenu attendu est publié.
+
+TASK [Les métriques node_exporter sont exposées] *******************************
+ok: [linux01 -> localhost]
+
+PLAY RECAP *********************************************************************
+linux01                    : ok=22   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+IDEMPOTENT : 2e passage sans changement (changed=0, failed=0, unreachable=0)
+code de sortie : 0

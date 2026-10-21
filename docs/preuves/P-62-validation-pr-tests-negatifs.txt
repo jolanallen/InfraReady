@@ -1,0 +1,110 @@
+# Preuve : P-62-validation-pr-tests-negatifs
+# Tests négatifs des PR #4 (verif-idempotence.sh doit détecter un playbook non idempotent ou en échec) et #2 (contrôle du vault)
+# Hôte : ops01 (utilisateur ansible, ~/infraready/ansible) — 2026-10-20 14:21:52 CEST
+# Les playbooks de test sont temporaires (/tmp, localhost) ; aucun serveur du labo n'est modifié.
+
+######## 1) Playbook non idempotent (tâche command sans changed_when) — attendu : NON IDEMPOTENT, code 1
+$ ../scripts/verif-idempotence.sh /tmp/test-non-idempotent.yml 2>&1 | grep -E "^== |PLAY RECAP|localhost +:|IDEMPOTENT"; exit ${PIPESTATUS[0]}
+== 1er passage : mise à jour de l'état si nécessaire
+PLAY RECAP *********************************************************************
+localhost                  : ok=1    changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+== 2e passage : doit afficher changed=0
+PLAY RECAP *********************************************************************
+localhost                  : ok=1    changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+NON IDEMPOTENT : changed=1 failed=0 unreachable=0 sur le 2e passage
+code de sortie : 1
+
+######## 2) Playbook en échec — attendu : ECHEC au 1er passage, code 2
+$ ../scripts/verif-idempotence.sh /tmp/test-echec.yml 2>&1 | grep -E "^== |PLAY RECAP|localhost +:|ECHEC|fatal"; exit ${PIPESTATUS[0]}
+== 1er passage : mise à jour de l'état si nécessaire
+fatal: [localhost]: FAILED! => 
+PLAY RECAP *********************************************************************
+localhost                  : ok=0    changed=0    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+ECHEC : le 1er passage a échoué — corriger avant de parler d'idempotence
+code de sortie : 2
+
+######## 3) PR #2 — vault absent de l'inventaire (inventaire en ligne, sans group_vars) — attendu : arrêt sur l'assert, aucune tâche exécutée
+$ ansible-playbook -i "win-dc01," playbooks/windows_adds.yml 2>&1 | grep -v "^\s*$"
+[WARNING]: Skipping callback plugin '', unable to load
+PLAY [WIN-DC01 - AD DS et DNS] *************************************************
+TASK [Variables du vault présentes avant toute modification] *******************
+fatal: [win-dc01]: FAILED! => 
+    assertion: vault_dsrm_password is defined
+    changed: false
+    evaluated_to: false
+    msg: 'vault_dsrm_password est indéfinie : le fichier group_vars/windows/vault.yml
+        n''a pas pu être déchiffré (mot de passe du vault manquant : ~/.vault_pass_infraready
+        sur OPS01).'
+PLAY RECAP *********************************************************************
+win-dc01                   : ok=0    changed=0    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+code de sortie : 0
+
+######## 4) PR #2 — mot de passe du vault incorrect (fichier vide) — que se passe-t-il ?
+$ ansible-playbook playbooks/windows_adds.yml --vault-password-file /dev/null 2>&1 | grep -v "^\s*$" | tail -6
+        DNS: 192.168.50.10
+        Domaine: infraready.test
+        Mode: Windows2025Domain
+        NetBIOS: INFRAREADY
+PLAY RECAP *********************************************************************
+win-dc01                   : ok=9    changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+code de sortie : 0
+
+######## 5) PR #2 — cas nominal en simulation : l'assert passe, rien à changer
+$ ansible-playbook playbooks/windows_adds.yml --check 2>&1 | sed -n "/Variables du vault/,/^\$/p;/PLAY RECAP/,\$p"
+TASK [Variables du vault présentes avant toute modification] *******************
+ok: [win-dc01]
+
+PLAY RECAP *********************************************************************
+win-dc01                   : ok=9    changed=4    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+code de sortie : 0
+
+######## Analyse du test 4 (écart constaté, documenté tel quel)
+Le test 4 devait échouer faute de mot de passe du vault. --vault-password-file passé en ligne de commande s'AJOUTE à
+vault_password_file d'ansible.cfg au lieu de le remplacer : le vault a été déchiffré et windows_adds.yml s'est exécuté
+réellement sur WIN-DC01 (14:21:58). Journal ~/infraready-logs/ansible.log : 8 tâches ok, 1 changed = « Le DC utilise son
+propre DNS » (win_dns_client, 127.0.0.1). Impact vérifié ci-dessous : DNS du DC inchangé (127.0.0.1 / ::1), résolution
+interne et externe OK. Le journal montre ce même « changed » à chaque exécution réelle depuis le 19/10 (P-10) :
+défaut d'idempotence préexistant de windows_adds.yml, indépendant des PR de Jolan.
+
+######## Impact : état DNS du DC et résolution après l'exécution
+$ ansible win-dc01 -m ansible.windows.win_shell -a "Get-DnsClientServerAddress | Format-Table InterfaceAlias,AddressFamily,ServerAddresses -AutoSize | Out-String; (Resolve-DnsName linux01.infraready.test).IPAddress; (Resolve-DnsName example.com -Type A | Select-Object -First 1).Name" | grep -v "^\s*$"
+[WARNING]: Skipping callback plugin '', unable to load
+win-dc01 | CHANGED | rc=0 >>
+InterfaceAlias              AddressFamily ServerAddresses                                       
+--------------              ------------- ---------------                                       
+Ethernet                                2 {127.0.0.1}                                           
+Ethernet                               23 {::1}                                                 
+Loopback Pseudo-Interface 1             2 {}                                                    
+Loopback Pseudo-Interface 1            23 {fec0:0:0:ffff::1, fec0:0:0:ffff::2, fec0:0:0:ffff::3}
+192.168.50.20
+example.com
+code de sortie : 0
+
+######## Test discriminant (mode check, aucune modification) : la cause est-elle adapter_names="*" ?
+$ ansible win-dc01 -m ansible.windows.win_dns_client -a "adapter_names=* dns_servers=127.0.0.1" --check | head -1
+[WARNING]: Skipping callback plugin '', unable to load
+win-dc01 | CHANGED => 
+code de sortie : 0
+$ ansible win-dc01 -m ansible.windows.win_dns_client -a "adapter_names=Ethernet dns_servers=127.0.0.1" --check | head -1
+[WARNING]: Skipping callback plugin '', unable to load
+win-dc01 | CHANGED => 
+code de sortie : 0
+
+######## 4 bis) Mot de passe du vault réellement absent (ANSIBLE_VAULT_PASSWORD_FILE remplace ansible.cfg), en --check
+$ ANSIBLE_VAULT_PASSWORD_FILE=/dev/null ansible-playbook playbooks/windows_adds.yml --check 2>&1 | grep -v "^\s*$" | tail -4
+[WARNING]: Error in vault password file loading (default): Invalid vault
+password was provided from file (/dev/null)
+ERROR! Invalid vault password was provided from file (/dev/null)
+code de sortie : 0
+
+######## Hypothèse 1 écartée : adapter_names=Ethernet signale aussi un changement (l'interface de bouclage n'est pas en cause).
+######## Hypothèse 2 : le module gère IPv4 et IPv6 ensemble et veut retirer ::1 (IPv6), que Windows remet sur un DC.
+$ ansible win-dc01 -m ansible.windows.win_dns_client -a "adapter_names=Ethernet dns_servers=127.0.0.1" --check --diff -v 2>&1 | grep -v "^\s*$" | head -20
+Using /home/ansible/infraready/ansible/ansible.cfg as config file
+win-dc01 | CHANGED => 
+    changed: true
+code de sortie : 0
+$ ansible win-dc01 -m ansible.windows.win_dns_client -a "{\"adapter_names\": \"*\", \"dns_servers\": [\"127.0.0.1\", \"::1\"]}" --check | head -1
+win-dc01 | SUCCESS => 
+code de sortie : 0
