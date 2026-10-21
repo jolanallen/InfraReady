@@ -229,6 +229,7 @@ Principe : moindre privilège — le support peut consulter pour dépanner, seul
 | DC synchronisé sur sa propre horloge (« Local CMOS Clock ») | Configuration par défaut | NTP externe configuré dans le playbook | Stratum 2, synchronisé ([P-12b](docs/preuves/P-12b-dcdiag-tests-fonctionnels-ntp.txt)) |
 | Événements horodatés **23:52** (dans le futur) | **Hypothèse** : saut d'horloge pendant la promotion, avant toute synchronisation NTP | NTP configuré ; heure du DC vérifiée identique à OPS01 | Plus de dérive observée |
 | `win_powershell` refuse le paramètre `path` | Option absente d'`ansible.windows` 2.2.0 | Contenu du script passé par `lookup('file', …)` | Scripts exécutés à distance |
+| « Le DC utilise son propre DNS » signale `changed` à chaque exécution de `windows_adds.yml` (constaté le 20/10 lors de la validation des PR) | **Cause confirmée** : `win_dns_client` gère IPv4 et IPv6 ensemble ; avec la seule adresse `127.0.0.1`, il retire `::1` que Windows remet sur un DC. Hypothèse « interface de bouclage » écartée par un test en mode check | `dns_servers: ["127.0.0.1", "::1"]` | 2ᵉ passage `changed=0` ([P-62](docs/preuves/P-62-validation-pr-tests-negatifs.txt) → [P-15](docs/preuves/P-15-windows-adds-dns-idempotence.txt)) |
 
 Retour arrière disponible : snapshots `s02_avant_adds` et `s03_avant_ansible` de WIN-DC01.
 
@@ -662,6 +663,7 @@ Retour arrière disponible : `/root/infraready.nginx.bak-incident-h` sur LINUX01
 | LINUX01 | `prometheus-node-exporter`, `ssh` | `active` | Supervision et administration depuis OPS01 | P-26 |
 | LINUX01 | Processus en tête du tri CPU | `systemd-hostnamed` à 50 % | Démarré par notre propre `hostnamectl` quelques instants avant : un pic de CPU ne prouve pas un défaut | P-26 |
 | WIN-DC01 | `NTDS`, `DNS`, `Netlogon`, `W32Time` | `Running`, `Automatic` | Services critiques du domaine : exclus de toute panne volontaire | P-14 |
+| P-15 | 20/10/2026 | `windows_adds.yml` idempotent après correction du DNS du DC (`changed=0` ×2) | [P-15](docs/preuves/P-15-windows-adds-dns-idempotence.txt) |
 | WIN-DC01 | `Dnscache` (client DNS), `WinRM` | `Running`, `Automatic` | `Dnscache` contrôlé par `Check-DnsClient.ps1` ; son état ne prouve pas qu'un nom se résout | P-14 |
 | WIN-DC01 | Processus en tête du tri CPU | `MsMpEng` (Defender, 109 s), `System`, `windows_exporter` | Temps CPU cumulé depuis le démarrage : normal | P-14 |
 | WIN-DC01 | Journal System (20 derniers événements) | 7036 (Service Control Manager), 6038 (LsaSrv, avertissement) | 6038 : NTLM utilisé par un client, ici les connexions WinRM d'Ansible ; aucun événement d'erreur | P-14 |

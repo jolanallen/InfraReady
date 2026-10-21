@@ -68,10 +68,12 @@
             $Ansible.Changed = $true
           } else { $Ansible.Changed = $false }
 
+    # IPv4 et IPv6 : le module gère les deux familles ; sans ::1, il retire l'adresse IPv6 de bouclage que
+    # Windows remet sur un contrôleur de domaine, et la tâche signale « changed » à chaque passage (P-62, P-15).
     - name: Le DC utilise son propre DNS
       ansible.windows.win_dns_client:
         adapter_names: "*"
-        dns_servers: ["127.0.0.1"]
+        dns_servers: ["127.0.0.1", "::1"]
 
     - name: État du domaine
       ansible.windows.win_powershell:
