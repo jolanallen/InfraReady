@@ -674,7 +674,6 @@ Retour arrière disponible : `/root/infraready.nginx.bak-incident-h` sur LINUX01
 | LINUX01 | `prometheus-node-exporter`, `ssh` | `active` | Supervision et administration depuis OPS01 | P-26 |
 | LINUX01 | Processus en tête du tri CPU | `systemd-hostnamed` à 50 % | Démarré par notre propre `hostnamectl` quelques instants avant : un pic de CPU ne prouve pas un défaut | P-26 |
 | WIN-DC01 | `NTDS`, `DNS`, `Netlogon`, `W32Time` | `Running`, `Automatic` | Services critiques du domaine : exclus de toute panne volontaire | P-14 |
-| P-15 | 20/10/2026 | `windows_adds.yml` idempotent après correction du DNS du DC (`changed=0` ×2) | [P-15](docs/preuves/P-15-windows-adds-dns-idempotence.txt) |
 | WIN-DC01 | `Dnscache` (client DNS), `WinRM` | `Running`, `Automatic` | `Dnscache` contrôlé par `Check-DnsClient.ps1` ; son état ne prouve pas qu'un nom se résout | P-14 |
 | WIN-DC01 | Processus en tête du tri CPU | `MsMpEng` (Defender, 109 s), `System`, `windows_exporter` | Temps CPU cumulé depuis le démarrage : normal | P-14 |
 | WIN-DC01 | Journal System (20 derniers événements) | 7036 (Service Control Manager), 6038 (LsaSrv, avertissement) | 6038 : NTLM utilisé par un client, ici les connexions WinRM d'Ansible ; aucun événement d'erreur | P-14 |
@@ -777,6 +776,7 @@ Retour arrière : snapshot Proxmox `s07_avant_seance4` des 3 VM pris avant la s�
 | P-12b | 19/10/2026 | dcdiag tests fonctionnels + NTP | [P-12b](docs/preuves/P-12b-dcdiag-tests-fonctionnels-ntp.txt) |
 | P-13 | 19/10/2026 | Journaux Windows (Security, Directory Service, DNS, System) | [P-13](docs/preuves/P-13-journaux-windows-ad.txt) |
 | P-14 | 20/10/2026 | Windows : état initial, services, processus, journal System, script `Check-DnsClient.ps1` (0/1/2) | [P-14](docs/preuves/P-14-win-dc01-processus-services-script-dnsclient.txt) |
+| P-15 | 20/10/2026 | `windows_adds.yml` idempotent après correction du DNS du DC (`changed=0` ×2) | [P-15](docs/preuves/P-15-windows-adds-dns-idempotence.txt) |
 | P-20 | 19/10/2026 | Comptes, groupes, permissions Linux + tests de droits | [P-20](docs/preuves/P-20-linux01-comptes-groupes-permissions.txt) |
 | P-21 | 19/10/2026 | nginx, service et processus | [P-21](docs/preuves/P-21-linux01-service-nginx-processus.txt) |
 | P-22 | 19/10/2026 | Disque de test : contrôles, formatage, montage UUID | [P-22](docs/preuves/P-22-linux01-disque-test-montage.txt) |
