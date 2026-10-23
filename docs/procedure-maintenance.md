@@ -1,6 +1,6 @@
 # Procédure de maintenance standard — InfraReady
 
-Version 1.0 — 19/10/2026. S'applique aux trois serveurs du laboratoire (WIN-DC01, LINUX01, OPS01).
+Version 1.1 — 23/10/2026 (contrôle de santé avant / après, séance 6). S'applique aux trois serveurs du laboratoire (WIN-DC01, LINUX01, OPS01).
 
 ## 1. Fenêtre et périmètre
 
@@ -18,6 +18,11 @@ Version 1.0 — 19/10/2026. S'applique aux trois serveurs du laboratoire (WIN-DC
    - espace disque < 85 % sur chaque volume ;
    - services attendus actifs (`ssh`, `nginx`, exporters, `prometheus`, `grafana-server` / `NTDS`, `DNS`, `Netlogon`, `kdc`, `windows_exporter`).
 3. Regarder Grafana (dashboard « InfraReady — Serveurs ») : aucune alerte active avant de commencer.
+4. **Contrôle de santé « avant »** (lecture seule, rapport daté conservé) — la maintenance ne commence que s'il se termine sans ECHEC ni INACCESSIBLE :
+   ```bash
+   ansible-playbook playbooks/controle_sante.yml --limit <hôte>,localhost -e sante_rapport=true
+   ```
+5. Linux : `apt list --upgradable` sur le serveur. Le panneau « Maintenance Linux » de Grafana (collecteur `apt` de node_exporter) n'est qu'un indicateur : le 23/10, il annonçait 0 paquet à installer alors que 3 l'étaient (P-87). Les paquets « reportés par le phasage » d'Ubuntu ne sont pas installés par `apt upgrade` : c'est normal.
 
 ## 3. Pendant
 
@@ -55,6 +60,13 @@ ansible-playbook playbooks/windows_maintenance.yml -e maintenance_apply=true -e 
 ## 5. Après (post-contrôles)
 
 Les playbooks revérifient les services et, pour LINUX01, le site web. Compléter par :
+
+- **Contrôle de santé « après »** et comparaison avec le rapport « avant » (aucun statut ne doit avoir changé) :
+  ```bash
+  ansible-playbook playbooks/controle_sante.yml --limit <hôte>,localhost -e sante_rapport=true
+  cd ~/infraready-logs && a=$(ls -t controle-sante-* | sed -n 2p) && b=$(ls -t controle-sante-* | head -1)
+  diff <(cut -c1-52 "$a" | tail -n +2) <(cut -c1-52 "$b" | tail -n +2) && echo "aucun écart de statut"
+  ```
 
 - Grafana : les trois serveurs « EN LIGNE », aucune alerte active ;
 - WIN-DC01 : `Get-ADDomain` et résolution DNS OK (fait par le playbook) ;
