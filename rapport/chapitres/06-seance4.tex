@@ -1,0 +1,80 @@
+% =============================================================================
+\chapter{Séance 4 — Stockage, processus et scénarios de panne}\label{chap:seance4}
+% =============================================================================
+
+\fiche{Appliquer au laboratoire le TP de la séance 4 : disque de test identifié et monté de façon
+persistante, processus et services observés sans perturbation, scripts de vérification à codes de
+sortie, playbook commenté rejoué deux fois, six scénarios de panne contrôlée avec une procédure
+commune de diagnostic.}{MIR Mahan, Jolan Allen, Kenzi Bendjelloul}{19--20/10/2026}{\fait{} (bilans individuels à rédiger)}
+
+\section{Correspondance avec le support}
+
+\begin{table}[H]
+\centering
+\caption{Étapes du support et réalisation}\label{tab:s4-corresp}
+\begin{tabularx}{\linewidth}{@{}P{3.8cm}LP{2.4cm}@{}}
+\toprule
+\textbf{Étape du support} & \textbf{Réalisation dans InfraReady} & \textbf{Preuves} \\
+\midrule
+Disque identifié, formaté, monté, droits & Disque de 10 Go identifié par son numéro de série \code{INFRA-DATA01}, ext4 monté sur \code{/data} par UUID, droits par groupe & \preuve{P-22} \\
+État initial Linux et Windows & Processus, mémoire, disques, services et journaux relevés sans arrêter de service critique & \preuve{P-14}, \preuve{P-21}, \preuve{P-26} \\
+Scripts de vérification & \code{check-nginx.sh} et \code{Check-DnsClient.ps1}, testés dans trois situations & \preuve{P-25}, \preuve{P-14} \\
+Playbook commenté & \code{linux_base.yml} complété (message publié et contrôle du contenu) : \code{changed=1} puis \code{changed=0} ; simulation \code{--check} corrigée & \preuve{P-38}, \preuve{P-38b}, \preuve{P-39} \\
+Six scénarios de panne & Un seul défaut à la fois, retour à l'état initial vérifié & \preuve{P-74} à \preuve{P-79} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Scripts de vérification}
+
+Les deux scripts sont en lecture seule : ils diagnostiquent sans rien corriger, et leurs codes de
+sortie sont exploitables par un autre script.
+
+\begin{table}[H]
+\centering
+\caption{Codes de sortie des scripts de vérification}\label{tab:scripts}
+\begin{tabularx}{\linewidth}{@{}P{3.3cm}LLL@{}}
+\toprule
+\textbf{Script} & \textbf{Code 0} & \textbf{Code 1} & \textbf{Code 2} \\
+\midrule
+\code{check-nginx.sh} & Service actif, HTTP 200, texte attendu présent & Service inactif, site injoignable, HTTP différent de 200 ou texte absent & Commande absente, service inconnu \\
+\code{Check-DnsClient.ps1} & Service démarré & Service présent mais arrêté & Service introuvable \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Scénarios de panne contrôlée}
+
+\begin{table}[H]
+\centering
+\caption{Six scénarios de panne contrôlée}\label{tab:scenarios}
+\begin{tabularx}{\linewidth}{@{}P{0.4cm}P{3.6cm}LP{1.3cm}@{}}
+\toprule
+\textbf{\#} & \textbf{Défaut introduit} & \textbf{Symptôme, cause et correction} & \textbf{Preuve} \\
+\midrule
+1 & Variable \code{site_message} incorrecte & HTTP 200 et playbook sans erreur, mais message incorrect publié ; valeur restaurée, contrôles \code{--syntax-check}, \code{--list-hosts}, \code{--check --diff} & \preuve{P-74} \\
+2 & Variable Jinja2 mal orthographiée & Tâche de modèle en échec (\og undefined \fg{}) ; l'ancienne page reste servie & \preuve{P-75} \\
+3 & Mauvais chemin de destination & Fichier créé dans \code{/tmp}, page servie inchangée ; \code{nginx -T} confirme la racine réelle & \preuve{P-76} \\
+4 & Notification du gestionnaire retirée & Fichier modifié sans rechargement de nginx : l'en-tête ajouté n'est pas servi ; rétablir la notification ne suffit pas sans nouvelle modification & \preuve{P-77} \\
+5 & nginx arrêté & \code{check-nginx.sh} renvoie 1, curl en échec ; redémarrage puis script à 0 et playbook \code{changed=0} & \preuve{P-78} \\
+6 & Contenu publié incomplet & HTTP 200 mais l'assertion « message attendu publié » échoue ; modèle restauré & \preuve{P-79} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Enseignements}
+
+\begin{itemize}
+  \item \textbf{Un code HTTP 200 ne prouve pas le bon contenu} : d'où le contrôle du contenu ajouté au
+        playbook (scénarios 1 et 6).
+  \item \textbf{Le mode \code{--check} a des limites} : les tâches de lecture (\code{blkid}, \code{uri})
+        n'y sont pas exécutées, ce qui produisait un faux changement sur \code{/data} ; elles sont
+        désormais marquées \code{check_mode: false} (\preuve{P-39a} → \preuve{P-39}).
+  \item \textbf{Un pic de CPU ne prouve pas un défaut} : le processus en tête de liste était lancé par
+        notre propre commande de relevé (\preuve{P-26}).
+  \item \textbf{Le module \code{script} d'Ansible ramène tout code non nul à 1} : le code 2 du script
+        PowerShell n'est observable qu'en exécution directe (\preuve{P-14}).
+\end{itemize}
+
+\textbf{Retour arrière :} snapshot \code{s07_avant_seance4} des trois VM et sauvegardes
+\code{.etat-initial} des fichiers du projet pendant les scénarios.

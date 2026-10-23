@@ -1,0 +1,39 @@
+% =============================================================================
+%  InfraReady — Rapport final du projet fil rouge (B3 Cybersécurité, 2026)
+%  Compilation (LuaLaTeX) : ./rapport/build.sh   ou   latexmk -lualatex InfraReady-Rapport-final.tex
+%  Sources : dossier technique (InfraReady - Dossier technique.md), preuves docs/preuves/,
+%            schémas rapport/diagrammes/*.mmd rendus en PDF dans rapport/figures/.
+% =============================================================================
+\documentclass[a4paper,11pt,oneside,headings=standardclasses,parskip=half,
+               toc=listof,toc=bibliography,numbers=noenddot]{scrreprt}
+
+\input{rapport/preambule}
+
+\begin{document}
+
+\input{rapport/chapitres/00-garde}
+
+\pagenumbering{roman}
+\input{rapport/chapitres/00-resume}
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+\cleardoublepage
+\pagenumbering{arabic}
+
+\input{rapport/chapitres/01-introduction}
+\input{rapport/chapitres/02-organisation}
+\input{rapport/chapitres/03-architecture}
+\input{rapport/chapitres/04-phases-a-c}
+\input{rapport/chapitres/05-phases-d-h}
+\input{rapport/chapitres/06-seance4}
+\input{rapport/chapitres/07-seance6}
+\input{rapport/chapitres/08-securite-recette}
+\input{rapport/chapitres/09-bilan}
+
+\appendix
+\input{rapport/chapitres/10-annexes}
+
+\end{document}

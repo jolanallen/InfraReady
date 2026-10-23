@@ -1,0 +1,88 @@
+% =============================================================================
+%  Annexes
+% =============================================================================
+
+\chapter{Matrice des preuves}\label{annexe:preuves}
+
+Chaque preuve est un fichier de \code{docs/preuves/} : sortie horodatée de commandes réelles
+(\code{.txt}) ou capture (\code{.png}). La matrice ci-dessous est générée à partir du dossier
+technique par \code{rapport/generer-annexes.py}.
+
+{\small\input{rapport/chapitres/annexe-preuves}}
+
+\chapter{Arborescence du dépôt}\label{annexe:arborescence}
+
+\begin{footnotesize}
+\begin{verbatim}
+InfraReady/
+├── .github/workflows/validation.yml     pipeline de validation (4 jobs)
+├── ansible/
+│   ├── ansible.cfg · requirements.yml
+│   ├── inventory/hosts.yml
+│   ├── inventory/group_vars/            all, linux, windows, monitoring (vaults chiffrés)
+│   └── playbooks/                       windows_adds, windows_base, windows_maintenance,
+│       │                                linux_base, linux_maintenance, linux_quotas,
+│       │                                ops01_monitoring, controle_sante
+│       └── templates/                   index.html.j2, nginx-infraready.conf.j2
+├── lab/                                 modèles autoinstall / autounattend, réseau Proxmox
+├── monitoring/
+│   ├── prometheus/                      prometheus.yml, rules/infraready.rules.yml
+│   └── grafana/                         dashboard infraready.json, provisioning
+├── scripts/                             amorçage, vérification, diagnostic (Bash, PowerShell)
+├── docs/
+│   ├── procedure-maintenance.md · rapport-incident.md
+│   └── preuves/                         P-01 … P-89 (texte horodaté et captures)
+├── rapport/                             sources LaTeX de ce rapport, schémas, script de build
+├── InfraReady - Dossier technique.md    dossier technique (Obsidian)
+├── InfraReady - Séance 6.md             note de synthèse illustrée de la séance 6
+├── InfraReady-Rapport-final.tex / .pdf  ce rapport
+├── CLAUDE.md                            règles de contribution (Git, documentation, validation)
+└── README.md
+\end{verbatim}
+\end{footnotesize}
+
+\chapter{Journal des changements}\label{annexe:journal}
+
+Changements appliqués au laboratoire, dans l'ordre chronologique, avec leur validation et le
+moyen de retour arrière (\code{sNN_…} = snapshot Proxmox).
+
+{\small\input{rapport/chapitres/annexe-journal}}
+
+\chapter{Glossaire}\label{annexe:glossaire}
+
+\begin{description}[style=nextline,leftmargin=1.2cm]
+  \item[AD DS] Active Directory Domain Services : annuaire Windows (comptes, groupes, ordinateurs, authentification Kerberos).
+  \item[ACPI] Interface standard de gestion de l'alimentation ; l'hyperviseur l'utilise pour demander l'arrêt d'une VM.
+  \item[Ansible Vault] Chiffrement AES256 de fichiers de variables Ansible contenant des secrets.
+  \item[CI] Intégration continue : contrôles automatiques exécutés à chaque modification du dépôt (ici GitHub Actions).
+  \item[DC] Contrôleur de domaine (WIN-DC01).
+  \item[Exporter] Programme qui expose les métriques d'un système au format Prometheus (node\_exporter, windows\_exporter).
+  \item[Gestionnaire (handler)] Tâche Ansible déclenchée seulement si une autre tâche a changé quelque chose (ex. recharger nginx).
+  \item[Idempotence] Propriété d'une automatisation dont un second passage ne modifie plus rien (\code{changed=0}).
+  \item[nftables] Pare-feu et traduction d'adresses du noyau Linux, successeur d'iptables.
+  \item[Preuve P-xx] Fichier horodaté de \code{docs/preuves/} qui justifie un résultat de ce rapport.
+  \item[PromQL] Langage de requête de Prometheus.
+  \item[PTR] Enregistrement DNS inverse (adresse IP vers nom).
+  \item[Scrape] Collecte périodique des métriques d'une cible par Prometheus (toutes les 15 s ici).
+  \item[Snapshot] Instantané d'une VM permettant de revenir à un état antérieur.
+  \item[Textfile (collecteur)] Fonction de node\_exporter qui publie des métriques écrites dans des fichiers \code{.prom}.
+  \item[Timer systemd] Planification d'un service par systemd, équivalent moderne de cron.
+  \item[UFW] Pare-feu simplifié d'Ubuntu.
+  \item[WinRM] Protocole d'administration à distance de Windows, utilisé par Ansible.
+\end{description}
+
+\chapter{Références}\label{annexe:references}
+
+\begin{itemize}
+  \item Sujet du projet fil rouge InfraReady et supports pédagogiques des séances 4 (\emph{Stockage et
+        processus}) et 6 (\emph{Maintenance opérationnelle et supervision}), Bachelor 3 — Administration
+        systèmes Linux / Windows.
+  \item Dossier technique du projet : \code{InfraReady - Dossier technique.md} ; procédure de
+        maintenance : \code{docs/procedure-maintenance.md} ; rapports d'incident :
+        \code{docs/rapport-incident.md}.
+  \item Documentations officielles : Proxmox VE, Ansible (collections \code{ansible.windows},
+        \code{microsoft.ad}, \code{community.general}), Prometheus, Grafana, node\_exporter,
+        windows\_exporter, Microsoft Learn (AD DS, DNS, Windows Update), Ubuntu Server
+        (autoinstall, unattended-upgrades, quota).
+  \item Dépôt de remise : \url{https://github.com/jolanallen/InfraReady}.
+\end{itemize}

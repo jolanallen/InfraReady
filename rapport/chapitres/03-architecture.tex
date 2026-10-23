@@ -1,0 +1,87 @@
+% =============================================================================
+\chapter{Architecture}\label{chap:architecture}
+% =============================================================================
+
+\section{Vue d'ensemble}
+
+Le laboratoire est hébergé sur un hôte Proxmox VE (\code{corsair1}, 192.168.0.7) du réseau
+domestique. Un pont dédié \code{vmbr1}, sans carte physique, porte le réseau du laboratoire
+\code{192.168.50.0/24} ; l'hôte joue le rôle de passerelle (\code{192.168.50.1}) avec une
+traduction d'adresses vers Internet et un filtrage qui interdit toute nouvelle connexion vers le
+réseau domestique (figure~\ref{fig:architecture}).
+
+\illustration{00-architecture.pdf}{1}{Architecture réellement déployée : hôte Proxmox, pont \code{vmbr1}, trois serveurs et flux principaux}{fig:architecture}
+
+\section{Inventaire des serveurs}
+
+\begin{table}[H]
+\centering
+\caption{Serveurs du laboratoire et ressources réelles}\label{tab:inventaire}
+\begin{tabularx}{\linewidth}{@{}P{2cm}P{1.1cm}P{3.6cm}P{2.6cm}LP{2.1cm}@{}}
+\toprule
+\textbf{Machine} & \textbf{VMID} & \textbf{Système} & \textbf{Rôle} & \textbf{Ressources} & \textbf{Adresse} \\
+\midrule
+WIN-DC01 & 100 & Windows Server 2025 Standard Evaluation (Desktop Experience) & AD DS, DNS & 4 vCPU, 6 Go, 50 Go ; UEFI + TPM 2.0 ; carte e1000e & 192.168.50.10 \\
+LINUX01 & 101 & Ubuntu Server 24.04.5 LTS & Service web nginx, stockage de test & 4 vCPU, 4 Go, 30 Go + disque de test 10 Go (\code{/data}) & 192.168.50.20 \\
+OPS01 & 102 & Ubuntu Server 24.04.5 LTS & Ansible, Git, Prometheus, Grafana & 8 vCPU, 6 Go, 50 Go & 192.168.50.30 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Paramètres réseau et domaine}\label{tab:parametres}
+\begin{tabularx}{\linewidth}{@{}P{4.2cm}L@{}}
+\toprule
+\textbf{Paramètre} & \textbf{Valeur} \\
+\midrule
+Sous-réseau du laboratoire & \code{192.168.50.0/24}, passerelle \code{192.168.50.1} (hôte Proxmox) \\
+Domaine Active Directory & \code{infraready.test} (NetBIOS \code{INFRAREADY}), niveau fonctionnel Windows 2025 \\
+DNS & WIN-DC01 (\code{192.168.50.10}) pour tout le laboratoire ; redirecteurs 1.1.1.1 et 9.9.9.9 \\
+Heure & WIN-DC01 synchronisé sur \code{fr.pool.ntp.org} ; VM Linux synchronisées par NTP \\
+Stockage & Disques sur le pool ZFS \code{pool-ssd} de l'hôte \\
+Hôte & 16 cœurs, environ 46 Go de mémoire : aucune réduction de ressources nécessaire \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Flux autorisés et filtrage}
+
+\begin{table}[H]
+\centering
+\caption{Matrice des flux autorisés}\label{tab:flux}
+\begin{tabularx}{\linewidth}{@{}P{2.7cm}P{2.3cm}P{2.3cm}LP{3.4cm}@{}}
+\toprule
+\textbf{Source} & \textbf{Destination} & \textbf{Port} & \textbf{Justification} & \textbf{Contrôle} \\
+\midrule
+Laboratoire & Internet & tous (sortant) & Mises à jour, téléchargements & NAT nftables sur l'hôte \\
+Laboratoire & Réseau domestique & — & \textbf{Interdit} (isolation) & nftables : \code{ct state new drop} \\
+Laboratoire & LINUX01 & 22/tcp & Administration SSH par clé & UFW, mot de passe désactivé \\
+Laboratoire & LINUX01 & 80/tcp & Service web & UFW \\
+OPS01 & LINUX01 & 9100/tcp & node\_exporter & UFW (OPS01 seul) \\
+Laboratoire & WIN-DC01 & 5985/tcp & WinRM (Ansible) & Pare-feu Windows limité au laboratoire \\
+OPS01 & WIN-DC01 & 9182/tcp & windows\_exporter & Pare-feu Windows (OPS01 seul) \\
+Laboratoire & WIN-DC01 & 53, 88, 389, 445… & DNS, Kerberos, LDAP, SMB & Règles AD par défaut \\
+Laboratoire & OPS01 & 22, 3000, 9090/tcp & SSH, Grafana, Prometheus & UFW \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Choix techniques et écarts au sujet}
+
+\begin{table}[H]
+\centering
+\caption{Choix techniques et justification}\label{tab:choix}
+\begin{tabularx}{\linewidth}{@{}P{3.8cm}L@{}}
+\toprule
+\textbf{Choix} & \textbf{Justification} \\
+\midrule
+Proxmox VE au lieu de VMware Workstation & Snapshots et API scriptables, ajout de disque à chaud, installations pilotables en ligne de commande, ressources suffisantes. \textbf{Écart à faire valider par le formateur.} \\
+Installations automatiques & Ubuntu autoinstall (cloud-init) et Windows \code{autounattend.xml} : aucune saisie manuelle, installations reproductibles (modèles dans \code{lab/}). \\
+nftables plutôt qu'iptables & Proxmox VE 9 n'installe pas iptables ; table dédiée \code{infraready_nat} chargée avec le pont. \\
+OPS01 comme nœud de contrôle & Ansible, Prometheus et Grafana sur une même VM d'exploitation ; les serveurs administrés n'ont pas d'outil d'administration en plus. \\
+WinRM HTTP + NTLM & Messages chiffrés par NTLM sans certificat TLS ; acceptable dans un laboratoire isolé (limite documentée). \\
+Ubuntu 24.04.5 & Dernière révision de la 24.04 LTS demandée par le sujet. \\
+\bottomrule
+\end{tabularx}
+\end{table}

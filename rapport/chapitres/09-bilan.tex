@@ -1,0 +1,87 @@
+% =============================================================================
+\chapter{Bilan}\label{chap:bilan}
+% =============================================================================
+
+\section{Principales difficultés}
+
+Le projet a rencontré une quarantaine de difficultés, toutes documentées avec leur cause et leur
+correction dans les chapitres précédents. Elles se regroupent en quatre familles :
+
+\begin{table}[H]
+\centering
+\caption{Familles de difficultés et enseignements}\label{tab:difficultes}
+\begin{tabularx}{\linewidth}{@{}P{3.3cm}P{5.2cm}L@{}}
+\toprule
+\textbf{Famille} & \textbf{Exemples} & \textbf{Enseignement} \\
+\midrule
+Environnement & ISO Ubuntu erronée, carte réseau e1000, absence d'iptables, VM éteintes après un redémarrage de l'hôte & Vérifier la plateforme réelle avant de dérouler la procédure prévue \\
+Idempotence & PTR du DC réécrit à chaque passage, DNS \code{::1}, quotas réécrits, handler non exécuté & Un second passage est un test, pas une formalité : il révèle des conflits entre l'automatisation et le système \\
+Vérifications trompeuses & Assertion réussie sur 0 cible, HTTP 200 avec un mauvais contenu, \code{--check} qui n'exécute pas les lectures, arrêt « TASK OK » d'une VM tuée & Une vérification doit échouer quand elle ne vérifie rien ; tester aussi le cas négatif \\
+Mises à jour & Boucle Windows Update sur KB5007651, lecteur CD vu comme volume plein, collecteur apt imprécis & Croiser plusieurs sources (historique, journaux, état réel) avant de conclure \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Écarts au sujet}
+
+\begin{itemize}
+  \item \textbf{Proxmox VE 9.1 au lieu de VMware Workstation} — à faire valider par le formateur
+        (avantages : snapshots, ajout de disque à chaud, installations et snapshots pilotables par API).
+  \item Ressources légèrement supérieures au plan (vCPU) ; disque Windows en IDE (choix initial conservé).
+  \item Ubuntu 24.04.\textbf{5}, dernière révision de la version LTS demandée.
+\end{itemize}
+
+\section{Fonctionnalités inachevées}
+
+\begin{table}[H]
+\centering
+\caption{Points ouverts et action nécessaire}\label{tab:inacheves}
+\begin{tabularx}{\linewidth}{@{}P{5cm}LP{2cm}@{}}
+\toprule
+\textbf{Point} & \textbf{Action nécessaire} & \textbf{Statut} \\
+\midrule
+Arrêt non propre de WIN-DC01 (INC-2026-10-23-01) & Validation de l'équipe, application de \code{ShutdownWithoutLogon = 1}, test d'arrêt réel & \partiel \\
+Bilans individuels (séance 4) et revue croisée & À rédiger par chaque membre & \afaire \\
+Contributions de Kenzi Bendjelloul dans l'historique Git & Commits à ajouter par l'intéressé & \afaire \\
+Notification des alertes & Ajouter Alertmanager (messagerie de l'équipe) & \afaire \\
+KB5007651 & Suivi manuel, retrait de l'exclusion quand Microsoft aura corrigé & \afaire \\
+Démarrage automatique des VM & Décider de l'option \code{onboot} sur l'hôte & \afaire \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Perspectives}
+
+\begin{itemize}
+  \item \textbf{Supervision hors de l'hôte} : une sonde externe (ou un second hôte) pour détecter un arrêt
+        complet du laboratoire, angle mort mis en évidence par l'incident UC-05.
+  \item \textbf{Chiffrement des flux d'administration} : WinRM en HTTPS, TLS pour Prometheus et Grafana.
+  \item \textbf{Centralisation des journaux} (Loki et Grafana Alloy) pour corréler plus vite les événements
+        de plusieurs serveurs.
+  \item \textbf{Alerte prédictive sur le disque}, à valider après une semaine de fonctionnement continu.
+  \item \textbf{Intégration d'Ubuntu au domaine Active Directory} pour centraliser les identités.
+\end{itemize}
+
+\section{Bilan de l'équipe}
+
+Le projet a atteint ses objectifs : un laboratoire hybride entièrement décrit par un dépôt Git, des
+configurations rejouables et idempotentes, des secrets chiffrés, une supervision qui détecte à la
+fois l'indisponibilité d'un serveur et celle d'un service, et une chaîne de livraison où chaque
+changement est validé automatiquement puis relu. La règle « une preuve par résultat, y compris les
+échecs » a structuré le travail : la plupart des défauts corrigés ont été trouvés en vérifiant
+qu'une vérification pouvait échouer.
+
+\info{Bilans individuels}{%
+Les bilans individuels demandés par les supports des séances 4 et 6 (opération maîtrisée, commande
+la plus utile, difficulté isolée, risque identifié, reproductibilité) sont à rédiger par chaque
+membre de l'équipe ; ils ne sont pas rédigés à leur place dans ce rapport.}
+
+\section*{Conclusion}
+\addcontentsline{toc}{section}{Conclusion}
+
+InfraReady disposait au départ de serveurs administrés à la main. Elle dispose désormais d'une
+infrastructure de laboratoire dont l'état est reproductible depuis le dépôt, dont la maintenance
+s'arrête d'elle-même si les conditions ne sont pas réunies, et dont les anomalies sont visibles avant
+les utilisateurs. Les écarts et limites sont identifiés et accompagnés d'une action ; le principal
+point ouvert, l'arrêt non propre du contrôleur de domaine, est compris, reproduit et sa correction
+est prête. Ce socle peut être étendu sans remise en cause, dans l'ordre des perspectives ci-dessus.

@@ -1,0 +1,46 @@
+% Fichier généré par rapport/generer-annexes.py — ne pas modifier à la main
+\begin{longtable}{@{}P{2cm}P{6.3cm}P{3.4cm}P{2.6cm}@{}}
+\caption{Journal des changements sur le laboratoire}\label{tab:journal}\\
+\toprule \textbf{Date} & \textbf{Modification} & \textbf{Validation} & \textbf{Preuve / retour arrière} \\ \midrule \endfirsthead
+\toprule \textbf{Date} & \textbf{Modification} & \textbf{Validation} & \textbf{Preuve / retour arrière} \\ \midrule \endhead
+\bottomrule \endfoot
+19/10/2026 14:42 & Pont \code{vmbr1} + NAT/isolation nftables sur l'hôte & \code{ifreload -a}, ping/isolation OK & {\small P-01, P-02 / \code{interfaces.bak-infraready}} \\
+19/10/2026 14:47 & Installations automatiques des 3 VM & 3 VM joignables & {\small P-01, P-03 / —} \\
+19/10/2026 14:58 & Snapshot de base & \code{qm listsnapshot} & {\small \code{s01_installation_ok}} \\
+19/10/2026 15:05 & AD DS + forêt infraready.test & dcdiag fonctionnel OK & {\small P-10, P-12b / \code{s02_avant_adds}} \\
+19/10/2026 15:14 & OU, groupes, comptes AD & Membres conformes & {\small P-11 / \code{s02_avant_adds}} \\
+19/10/2026 15:20 & NTP externe sur le DC & Stratum 2 & {\small P-12b / —} \\
+19/10/2026 15:23 & Comptes Linux, nginx, disque \code{/data} & Tests de droits OK & {\small P-20 à P-22 / \code{s02_avant_maj_c}} \\
+19/10/2026 15:24 & \code{apt upgrade} LINUX01 (20 paquets) & Code retour 0 & {\small P-23 / \code{s02_avant_maj_c}} \\
+19/10/2026 15:28 & Playbooks Linux et Windows (2 passages) & changed=0 au 2ᵉ passage & {\small P-31 à P-34 / \code{s03_avant_ansible}} \\
+19/10/2026 & DNS des VM Linux → DC, PTR du DC & A/PTR/SRV résolus & {\small P-04, P-35 / \code{/root/50-cloud-init.yaml.bak-dns}} \\
+19/10/2026 16:30 & Prometheus, exporters, Grafana sur OPS01 & Cibles UP, dashboard, alerte testée & {\small P-50 à P-55 / \code{s04_avant_maintenance_e}} \\
+19/10/2026 16:48 & Maintenance Linux (LINUX01, OPS01), \code{unattended-upgrades} & Post-contrôles OK, reboot non requis & {\small P-40, P-43 / \code{s04_avant_maintenance_e}} \\
+19/10/2026 16:54 & Windows Update sur WIN-DC01 (5 MAJ, redémarrage 18:04) & \code{failed=1} (boucle KB5007651) puis passage complet OK & {\small P-42 à P-42c / \code{s04_avant_maj_windows}} \\
+19/10/2026 19:21 & \code{reject_list: [KB5007651]} + gabarit du rapport Windows & \code{failed=0}, rapport lisible & {\small P-42c / —} \\
+19/10/2026 19:27 & Incident contrôlé : \code{root} nginx modifié sur LINUX01 & 404 constaté depuis OPS01 & {\small P-70 / \code{/root/infraready.nginx.bak-incident-h}} \\
+19/10/2026 19:30 & \code{flush_handlers} avant les vérifications dans \code{linux_base.yml} ; rejeu sur LINUX01 & HTTP 200, \code{changed=0} au 2ᵉ passage & {\small P-72, P-73 / —} \\
+19/10/2026 19:37 & Snapshot final des 3 VM & \code{qm listsnapshot} & {\small P-05 / \code{s05_phases_a_h_terminees}} \\
+20/10/2026 12:50 & Snapshot des 3 VM avant la séance 4 & \code{qm snapshot} & {\small \code{s07_avant_seance4}} \\
+20/10/2026 12:51 & \code{site_message} + contrôle HTTP et contenu dans \code{linux_base.yml} (2 passages) & \code{changed=1} puis \code{changed=0} & {\small P-38, P-38b / \code{s07_avant_seance4}} \\
+20/10/2026 12:52 & Scripts \code{check-nginx.sh} et \code{Check-DnsClient.ps1} (3 situations chacun) & Codes 0 / 1 / 2 & {\small P-25, P-14 / —} \\
+20/10/2026 12:57 & \code{check_mode: false} sur 4 tâches en lecture seule de \code{linux_base.yml} & Simulation \code{changed=0 failed=0} & {\small P-39a, P-39 / —} \\
+20/10/2026 12:58 & 6 scénarios de panne contrôlée (7.4), un à la fois, jusqu'à 13:08 & Retour à l'état initial, \code{changed=0} & {\small P-74 à P-79 / \code{.etat-initial}, \code{s07_avant_seance4}} \\
+20/10/2026 14:15 & Snapshot des 3 VM avant validation des PR \#1 à \#5 & \code{qm snapshot} & {\small \code{s08_avant_validation_pr3_5}} \\
+20/10/2026 14:16 & Dashboard Grafana v2 déployé (\code{ops01_monitoring.yml}, 2 passages) & IDEMPOTENT, version 2 chargée & {\small P-56 / \code{s08_avant_validation_pr3_5}} \\
+20/10/2026 14:18 & \code{windows_base.yml} et \code{linux_base.yml} via \code{verif-idempotence.sh} & IDEMPOTENT ×2 & {\small P-61 / —} \\
+20/10/2026 14:21 & Tests négatifs ; exécution réelle non voulue de \code{windows_adds.yml} (DNS du DC rejoué, valeur inchangée) & Résolution DNS OK & {\small P-62 / \code{s08_avant_validation_pr3_5}} \\
+20/10/2026 14:24 & \code{linux_maintenance.yml} en simulation (PR \#1) & Calcul identique à P-40 & {\small P-63 / —} \\
+20/10/2026 14:26 & Correctif DNS de \code{windows_adds.yml} testé (PR \#6), puis copie d'OPS01 remise à la version de \code{main} & IDEMPOTENT & {\small P-15 (PR \#6) / \code{s08_avant_validation_pr3_5}} \\
+23/10/2026 09:05 & Snapshot des 3 VM avant la séance 6 (API Proxmox) & Tâches \code{qmsnapshot} OK & {\small \code{s09_avant_seance6}} \\
+23/10/2026 09:06 & État initial des 3 serveurs (lecture seule) & 5 écarts relevés & {\small P-80 / —} \\
+23/10/2026 09:17 & Copie du projet sur OPS01 resynchronisée ; \code{ops01_monitoring.yml} rejoué (5 règles) puis corrigé (attente du 1ᵉʳ scrape) & IDEMPOTENT & {\small P-81a, P-81b / \code{s09_avant_seance6}} \\
+23/10/2026 09:22 & Timer \code{infraready-controle-site} (\code{linux_base.yml}) et 2 règles d'alerte (\code{ops01_monitoring.yml}) & \code{changed=0} au 2ᵉ passage, 7 règles & {\small P-83 / \code{s09_avant_seance6}} \\
+23/10/2026 09:26 & Test d'alerte : nginx arrêté sur LINUX01 puis redémarré (09:30) & firing à +3 min 08 s, résolue 27 s après & {\small P-84 / —} \\
+23/10/2026 09:35 & \code{openipmi} désactivé (\code{linux_base.yml}, \code{ops01_monitoring.yml}) & Contrôle de santé sans ECHEC & {\small P-80b / \code{s09_avant_seance6}} \\
+23/10/2026 09:38 & Reproduction : arrêt ACPI de WIN-DC01 demandé sans arrêt forcé & Ignoré pendant 90 s, VM restée allumée & {\small P-86 / —} \\
+23/10/2026 09:43 & Dashboard Grafana v3 (\code{ops01_monitoring.yml}) & IDEMPOTENT, version 3 chargée & {\small P-85 / \code{s09_avant_seance6}} \\
+23/10/2026 09:45 & Maintenance LINUX01 (3 paquets) entre deux contrôles de santé & Aucun écart de statut & {\small P-87 / \code{s09_avant_seance6}} \\
+23/10/2026 09:48 & \code{/data} remonté avec \code{usrquota,grpquota} ; quotas alice / bruno (\code{linux_quotas.yml}) & IDEMPOTENT après correction ; dépassement testé & {\small P-89a, P-89 / \code{s09_avant_seance6}} \\
+23/10/2026 09:54 & Test d'alerte : timer du contrôle planifié arrêté (09:54) puis redémarré (10:04) & \code{ControlePlanifieEnRetard} firing à 10:04:01, résolue à 10:04:17 & {\small P-84 / —} \\
+\end{longtable}

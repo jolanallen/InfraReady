@@ -1,0 +1,41 @@
+% --- Page de garde --------------------------------------------------------------
+\begin{titlepage}
+  \newgeometry{top=2cm,bottom=2cm,left=2.3cm,right=2.3cm}
+  \begin{tikzpicture}[remember picture,overlay]
+    \fill[bleu] (current page.north west) rectangle ([yshift=-8.6cm]current page.north east);
+    \fill[bleuclair] ([yshift=-8.6cm]current page.north west) rectangle ([yshift=-8.9cm]current page.north east);
+  \end{tikzpicture}
+
+  \vspace*{0.4cm}
+  {\sffamily\color{white}
+   {\large Projet fil rouge 2026 — Bachelor 3 Cybersécurité\par}
+   \vspace{0.9cm}
+   {\fontsize{40}{44}\selectfont\bfseries InfraReady\par}
+   \vspace{0.35cm}
+   {\LARGE Rapport final de projet\par}}
+
+  \vspace{3.2cm}
+  {\sffamily\Large\color{bleu}\bfseries
+   Standardiser, automatiser et superviser\\ une infrastructure Linux / Windows\par}
+  \vspace{0.4cm}
+  {\large Laboratoire Proxmox de trois serveurs — Active Directory, Ansible,
+   Prometheus, Grafana et intégration continue GitHub Actions\par}
+
+  \vspace{1.6cm}
+  \noindent\begin{tabularx}{\linewidth}{@{}>{\sffamily\bfseries\color{bleu}}lL@{}}
+    Équipe            & MIR Mahan \\
+                      & Jolan Allen (chef de projet) \\
+                      & Kenzi Bendjelloul (automatisation Ansible) \\[4pt]
+    Formation         & Bachelor 3 Cybersécurité — Administration systèmes Linux / Windows \\[4pt]
+    Période           & 19 au 23 octobre 2026 \\[4pt]
+    Dépôt de remise   & \url{https://github.com/jolanallen/InfraReady} \\[4pt]
+    Version           & 1.0 — 23/10/2026 \\
+  \end{tabularx}
+
+  \vfill
+  {\small\color{gris}
+   Toutes les valeurs, captures et sorties citées proviennent du laboratoire réel et sont conservées,
+   horodatées, dans \code{docs/preuves/} du dépôt (preuves numérotées \preuve{P-xx}).
+   Aucun mot de passe ni secret n'apparaît dans ce document.\par}
+  \restoregeometry
+\end{titlepage}
