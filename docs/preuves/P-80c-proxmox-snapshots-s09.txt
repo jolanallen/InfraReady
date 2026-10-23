@@ -1,0 +1,33 @@
+# Preuve : P-80c-proxmox-snapshots-s09
+# Séance 6 — arbre des snapshots des 3 VM lu par l'API Proxmox (lecture seule) : s09_avant_seance6 pris le 23/10/2026 à 09:05:43,
+#   avant toute modification de la séance 6. Rendu visuel : P-80c-rendu-proxmox-snapshots-s09.png
+$ GET /nodes/corsair1/qemu/<vmid>/snapshot   (API Proxmox, 2026-10-23 10:45:56)
+VM 100 WIN-DC01
+   s01_installation_ok          19/10 14:58  OS installe, IP fixe, avant configuration
+   s02_avant_adds               19/10 15:03  Avant installation AD DS et promotion DC
+   s03_avant_ansible            19/10 15:26  Avant premier passage des playbooks (phase D)
+   s04_avant_maj_windows        19/10 16:54  Avant Windows Update (phase E) - KB5126646
+   s05_phases_a_h_terminees     19/10 19:37  Etat final : phases A a H terminees et documentees (19/10/2026 soir)
+   s06_avant_mdp_password       20/10 11:58  Avant passage des mots de passe a password (20/10/2026)
+   s07_avant_seance4            20/10 12:49  Avant TP seance 4 : scripts de verification, scenarios de panne 7.4 (2
+   s08_avant_validation_pr3_5   20/10 14:15  Avant validation des PR 1 a 5 de Jolan (20/10/2026)
+   s09_avant_seance6            23/10 09:05  Avant seance 6 (maintenance operationnelle et supervision), apres rede
+VM 101 LINUX01
+   s01_installation_ok          19/10 14:58  OS installe, IP fixe, avant configuration
+   s02_avant_maj_c              19/10 15:24  Avant mise a jour apt (phase C)
+   s03_avant_ansible            19/10 15:26  Avant premier passage des playbooks (phase D)
+   s04_avant_maintenance_e      19/10 16:48  Avant maintenance standard (phase E)
+   s05_phases_a_h_terminees     19/10 19:37  Etat final : phases A a H terminees et documentees (19/10/2026 soir)
+   s06_avant_mdp_password       20/10 11:58  Avant passage des mots de passe a password (20/10/2026)
+   s07_avant_seance4            20/10 12:49  Avant TP seance 4 : scripts de verification, scenarios de panne 7.4 (2
+   s08_avant_validation_pr3_5   20/10 14:15  Avant validation des PR 1 a 5 de Jolan (20/10/2026)
+   s09_avant_seance6            23/10 09:05  Avant seance 6 (maintenance operationnelle et supervision), apres rede
+VM 102 OPS01
+   s01_installation_ok          19/10 14:58  OS installe, IP fixe, avant configuration
+   s02_avant_monitoring         19/10 16:30  Avant Prometheus/Grafana (phase F)
+   s04_avant_maintenance_e      19/10 16:48  Avant maintenance standard (phase E)
+   s05_phases_a_h_terminees     19/10 19:37  Etat final : phases A a H terminees et documentees (19/10/2026 soir)
+   s06_avant_mdp_password       20/10 11:58  Avant passage des mots de passe a password (20/10/2026)
+   s07_avant_seance4            20/10 12:49  Avant TP seance 4 : scripts de verification, scenarios de panne 7.4 (2
+   s08_avant_validation_pr3_5   20/10 14:15  Avant validation des PR 1 a 5 de Jolan (20/10/2026)
+   s09_avant_seance6            23/10 09:05  Avant seance 6 (maintenance operationnelle et supervision), apres rede
