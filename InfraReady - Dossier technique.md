@@ -15,6 +15,12 @@ tags:
 > [!info] À propos de ce dossier
 > Rempli avec les configurations et preuves **réellement obtenues** sur le laboratoire. Chaque résultat renvoie à une preuve `P-xx` stockée dans `docs/preuves/` (sorties de commandes horodatées, captures). Aucun secret n'apparaît dans ce dossier ni dans le dépôt.
 
+> [!summary] Sommaire
+> **Cadre :** [[#1. Présentation et périmètre|1. Présentation]] · [[#2. Architecture et inventaire|2. Architecture]]
+> **Phases :** [[#3. Phase A — Installation et réseau|A Installation]] · [[#4. Phase B — Administration Windows|B Windows]] · [[#5. Phase C — Administration Linux|C Linux]] · [[#6. Phase D — Automatisation avec Ansible|D Ansible]] · [[#7. Phase E — Maintenance et mises à jour|E Maintenance]] · [[#8. Phase F — Supervision Prometheus et Grafana|F Supervision]] · [[#9. Phase G — GitHub et intégration continue|G GitHub]] · [[#10. Phase H — Diagnostic d'incident|H Incident]]
+> **TP :** [[#11. Séance 4 — Stockage, processus, scripts et scénarios de panne|Séance 4]] · **[[#12. Séance 6 — Maintenance opérationnelle et supervision|Séance 6 — maintenance opérationnelle et supervision]]** (note de synthèse : [[InfraReady - Séance 6]])
+> **Clôture :** [[#13. Sécurité et limites d'intervention|13. Sécurité]] · [[#14. Recette finale et matrice des preuves|14. Recette et preuves]] · [[#15. Difficultés, limites et bilan|15. Bilan]] · [[#16. Annexes et journal de changements|16. Annexes]] · [[#17. Checklist de remise|17. Checklist]]
+
 | Champ | Valeur |
 | --- | --- |
 | **Équipe** | MIR Mahan / Jolan Allen (chef de projet) / Kenzi Bendjelloul |
@@ -33,7 +39,7 @@ tags:
 	- Administration reproductible (Ansible), supervision (Prometheus/Grafana), dépôt versionné et validé par CI.
 	- Aucune donnée réelle : comptes, groupes et données sont fictifs.
 - **Répartition de l'équipe :** Jolan Allen, chef de projet (planification, coordination, suivi et dépôt de remise) ; Kenzi Bendjelloul, partie Ansible (phase D) ; les autres phases ont été réalisées conjointement par MIR Mahan et Jolan Allen.
-- **Conventions de preuves :** numérotation par phase — A = P-0x, B = P-1x, C = P-2x, D = P-3x, E = P-4x, F = P-5x, G = P-6x, H = P-7x ; séance 6 = P-8x. Les sorties sont capturées automatiquement avec l'heure et la commande exécutée.
+- **Conventions de preuves :** numérotation par phase — A = P-0x, B = P-1x, C = P-2x, D = P-3x, E = P-4x, F = P-5x, G = P-6x, H = P-7x ; séance 6 = P-8x. Les images `P-xx-rendu-*.png` sont des **rendus visuels de sorties de commandes réelles**, dont le texte intégral est dans le fichier `.txt` cité ; les autres `.png` sont des captures d'écran de Prometheus, Grafana ou GitHub. Les sorties sont capturées automatiquement avec l'heure et la commande exécutée.
 
 ---
 
@@ -759,6 +765,10 @@ Retour arrière : snapshot Proxmox `s09_avant_seance6` des 3 VM, pris le 23/10/2
 | 4 | `openipmi.service` en échec à chaque démarrage (LINUX01, OPS01) | Paquet recommandé `ipmitool`, tiré par `prometheus-node-exporter` installé par nos playbooks ; aucun matériel IPMI dans une VM | Service désactivé **par Ansible** dans `linux_base.yml` et `ops01_monitoring.yml` | Corrigé (P-80b) |
 | 5 | WIN-DC01 : événements 41 et 6008 « arrêt précédent inattendu » | Incident traité en UC-05 | Diagnostic et reproduction faits, correction en attente de validation | Diagnostiqué (P-86) |
 
+
+> [!example] Snapshots Proxmox des 3 VM : `s09_avant_seance6` pris avant toute modification (rendu de la sortie de l'API, P-80c)
+> ![[P-80c-rendu-proxmox-snapshots-s09.png|760]]
+
 ### Travaux réalisés / checklist
 
 - [x] **UC-01** — État de santé initial daté des 3 serveurs, avant toute modification, avec un test fonctionnel par service (P-80).
@@ -809,6 +819,10 @@ Relevé fait **avant toute modification**, cinq minutes après le démarrage des
 >
 > Chaque service a un test fonctionnel : résolution DNS par le DC et depuis les clients Linux, page HTTP avec contrôle du contenu (par le nom DNS, depuis OPS01), API Prometheus et Grafana, requête Active Directory. Les captures et sorties ne contiennent aucun secret : le vault reste chiffré et les mots de passe ne passent que par l'entrée standard.
 
+
+> [!example] WIN-DC01 : événements 41 / 6008 relevés dans l'état initial, point de départ de l'incident UC-05 (rendu de la sortie, P-80)
+> ![[P-80-rendu-win-dc01-evenements-arret.png|760]]
+
 ### UC-02 — Métriques Linux et Windows collectables
 
 | Cible attendue (dépôt) | Job | Observée par Prometheus | Durée du scrape | Séries | Preuve de collecte |
@@ -817,6 +831,10 @@ Relevé fait **avant toute modification**, cinq minutes après le démarrage des
 | OPS01 `localhost:9100` | `linux` | `up` | 50 ms | 1 764 | CPU 6,5 %, mémoire 12,3 % |
 | OPS01 `localhost:9090` | `prometheus` | `up` | 3 ms | — | Auto-supervision |
 | WIN-DC01 `192.168.50.10:9182` | `windows` | `up` | 25 ms | 3 285 | CPU 0,8 %, mémoire 23,8 %, `C:` 37,3 % ; services DNS, NTDS, Netlogon, Kdc `running = 1` |
+
+
+> [!example] Prometheus, page des cibles : 4/4 cibles `up` (LINUX01, OPS01, Prometheus, WIN-DC01), après correction de l'écart de règles (P-81)
+> ![[P-81-prometheus-cibles-up.png|700]]
 
 - **Chemin vérifié de bout en bout** : configuration chargée (`/etc/prometheus/prometheus.yml`), connexions TCP établies vers `:9100` et `:9182` (`ss`), endpoints `/metrics` en HTTP 200 (164 Ko côté Linux, 263 Ko côté Windows), puis valeurs **lues dans la base Prometheus** (`/api/v1/query`) : la collecte aboutit réellement et n'est pas simulée.
 - **Écart corrigé** : `ops01_monitoring.yml` a été rejoué depuis une copie resynchronisée avec `main`. Prometheus charge désormais 5 règles, puis 7 avec celles de la séance (P-81, P-83).
@@ -871,7 +889,24 @@ Le support demande une alerte liée à une exigence du projet. L'incident de la 
 
 ![[P-84-prometheus-alerte-sitewebindisponible-firing.png|600]]
 
+
+> [!example] Grafana, vue arrêtée à 09:29:40 : le contrôle planifié de LINUX01 est en **ÉCHEC** et `SiteWebIndisponible` est `firing`, alors que le serveur reste EN LIGNE (P-84)
+> ![[P-84-grafana-dashboard-site-en-echec.png|760]]
+
+> [!example] Prometheus : `infraready_controle_succes` tombe à 0 pendant l'arrêt de nginx puis remonte à 1 (axe horaire en UTC = heure de Paris − 2 h)
+> ![[P-84-prometheus-historique-controle-succes.png|700]]
+
+> [!example] Prometheus, page des règles : les nouvelles règles chargées et évaluées sans erreur (extrait, P-83)
+> ![[P-83-prometheus-regles-chargees.png|700]]
+
 **Second test, `ControlePlanifieEnRetard` :** arrêt du timer à 09:54:02, alors que nginx reste actif et que le site reste servi. Dernier contrôle de plus de 300 s → `pending` à 09:59:02, **`firing` à 10:04:01** (durée `for` de 5 min respectée), sans que `SiteWebIndisponible` ne se déclenche. Timer redémarré à 10:04:06 : contrôle exécuté aussitôt, alerte résolue à 10:04:17 (P-84).
+
+> [!example] Grafana, vue arrêtée à 10:04:10 : âge du dernier contrôle **10 min** (rouge) et `ControlePlanifieEnRetard` `firing`, pendant que le site reste OK (P-84)
+> ![[P-84-grafana-dashboard-controle-en-retard.png|760]]
+
+> [!example] Prometheus : séries `ALERTS` des deux tests (pending puis firing), axe en UTC (P-84)
+> ![[P-84-prometheus-historique-alertes.png|700]]
+
 
 ### UC-05 — Incident INC-2026-10-23-01 : arrêt non propre de WIN-DC01
 
@@ -888,6 +923,10 @@ Le support demande une alerte liée à une exigence du projet. L'incident de la 
 | Observation discriminante | `ShutdownWithoutLogon = 0`, aucune session ouverte (`quser` : « No User exists »), pas de service QEMU-GA | Hypothèse **confortée** |
 | Reproduction contrôlée (09:38:45) | Arrêt ACPI demandé par l'API Proxmox, délai 90 s, **sans arrêt forcé** (`forceStop=0`) : « VM quit/powerdown failed - got timeout », VM toujours `running` | Hypothèse **confirmée**, sans arrêt brutal du DC |
 
+
+> [!example] Journal des tâches Proxmox : la VM 100 met 182-183 s à « s'arrêter » (SIGTERM) et la reproduction contrôlée de 09:38 échoue sur un délai dépassé (rendu de la sortie, P-86)
+> ![[P-86-rendu-proxmox-arrets-vm100-reproduction.png|760]]
+
 **Correction proposée (autorisée, réversible, rejouée en Ansible) :** tâche `win_regedit` dans `windows_base.yml`, `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\shutdownwithoutlogon = 1` ; retour arrière = valeur 0. **Validation prévue :** nouvel arrêt ACPI par l'API (doit aboutir proprement en moins de 90 s), redémarrage, événements 1074 / 6006 et **absence** de 41 / 6008, contrôle de santé complet, puis `windows_base.yml` rejoué deux fois (`changed=0`). Piste complémentaire : agent invité QEMU (ISO virtio-win) avec `agent: 1` pour un arrêt par l'agent.
 
 > [!todo] Correction non appliquée à ce stade
@@ -902,6 +941,14 @@ Le support demande une alerte liée à une exigence du projet. L'incident de la 
 | Validation ≠ déploiement | ⚠️ La CI **valide les fichiers** ; elle ne déploie rien. Le déploiement est fait depuis OPS01 (copie du dépôt), car un runner hébergé par GitHub ne peut pas joindre le réseau privé du labo | README, section 9 |
 | Prérequis, étapes, tests, résultats | ✅ README (commandes de la séance 6) et cette section | `README.md` |
 | Aucun secret commité, captures expurgées | ✅ Recherche des vrais secrets avant chaque commit, gitleaks en CI ; les captures ne montrent ni mot de passe ni jeton | — |
+
+**Fusion :** les 7 PR de la séance 6 (#8 à #14) ont été relues et fusionnées par Jolan Allen le 23/10/2026 entre 10:34 et 10:37 ; la CI a été rejouée en vert sur `main` après chaque fusion.
+
+> [!example] GitHub : PR #8 à #14 de la séance 6 fusionnées, contrôles CI 8/8 (P-64)
+> ![[P-64-github-pr-seance6-fusionnees.png|700]]
+
+> [!example] GitHub Actions : runs `Validation` verts sur les branches, les PR puis `main` (P-64)
+> ![[P-64-github-actions-runs-verts.png|700]]
 
 | Fonctionnalité | Statut | Cause / action nécessaire |
 | --- | --- | --- |
@@ -933,6 +980,10 @@ Le support demande une alerte liée à une exigence du projet. L'incident de la 
 | Redémarrage requis | non | non |
 | Statuts du contrôle de santé | 19 lignes (LINUX01 + OPS01) | **aucun écart de statut** (`diff` des deux rapports) |
 
+
+> [!example] Maintenance de LINUX01 : 3 paquets installés, 5 reportés par le phasage, aucun écart de statut entre les deux contrôles de santé (rendu de la sortie, P-87)
+> ![[P-87-rendu-maintenance-avant-apres.png|760]]
+
 **Limite constatée :** avant la maintenance, le collecteur `apt` de node_exporter comptait les 8 paquets comme « retenus » et 0 « à installer », alors que 3 étaient installables. Après la maintenance, il compte 5 retenus, ce qui correspond aux paquets reportés par le phasage. Le panneau « Maintenance Linux » est donc un indicateur : la liste de référence reste `apt list --upgradable` en pré-contrôle (P-87).
 
 ### UC-C2 — Contrôle de santé automatisé avec Ansible
@@ -952,6 +1003,10 @@ Le support demande une alerte liée à une exigence du projet. L'incident de la 
 | Tests fonctionnels | site HTTP + contenu par le nom ; cibles Prometheus ; API Grafana | domaine AD ; `windows_exporter` | OK / ECHEC |
 | Connexion | — | — | INACCESSIBLE (hôte injoignable ou erreur de privilèges) |
 
+
+> [!example] Résultat de `controle_sante.yml` : 23 OK, 3 ATTENTION, 1 NON APPLICABLE, 0 ECHEC (rendu de la sortie, P-80b / P-82)
+> ![[P-82-rendu-tableau-controle-sante.png|760]]
+
 - **Lecture seule vérifiée** : `changed=0` sur les trois serveurs en exécution normale et en `--check`. Seule l'option `-e sante_rapport=true` écrit un rapport daté dans `~/infraready-logs/` sur OPS01, et cette écriture est annoncée comme `changed`.
 - **Résultat exploitable** : un tableau hôte / contrôle / statut / détail, puis un dernier play en échec (code 2) s'il reste un ECHEC ou un INACCESSIBLE. Le playbook peut donc servir de critère d'arrêt (UC-C1) ou être lancé par une tâche planifiée.
 - **Premier passage (P-82)** : il a détecté 2 ECHEC réels (`openipmi`), corrigés en Ansible (P-80b) ; ensuite 23 OK, 3 ATTENTION (événements réels des dernières 24 h), 1 NON APPLICABLE, 0 ECHEC.
@@ -970,6 +1025,10 @@ Le support demande une alerte liée à une exigence du projet. L'incident de la 
 | Ce qu'il ne faut pas conclure | `deriv()` sur 6 h annonce LINUX01 « − 234 Mio/jour » et `predict_linear()` une occupation de 4,7 % dans 30 jours : la fenêtre ne contient que 45 min de données, dont la maintenance qui a vidé le cache apt. **Une pente calculée sur si peu de données n'est pas une tendance.** On n'attribue pas non plus la croissance d'OPS01 à Prometheus seul (journaux, apt) sans mesure dédiée |
 | Proposition de suivi | Panneau « Stockage utilisé (%) — évolution » consulté sur 7 jours. Alerte prédictive à valider **après une semaine de fonctionnement continu** : `predict_linear(node_filesystem_avail_bytes{mountpoint="/"}[3d], 14*86400) < 0`, avec un `for` de 1 h. Taille de la base suivie par `prometheus_tsdb_storage_blocks_bytes` |
 
+
+> [!example] Grafana, « Stockage utilisé (%) — évolution » du 19/10 au 23/10 : trois îlots de données séparés par les périodes où le labo était éteint (aucune donnée, pas 0 %). On y voit aussi `C:` de WIN-DC01 passer de 24 % à 43 % puis 37 % le 19/10 (Windows Update), et les séries « / » et « /boot » sans label `host` du 1ᵉʳ démarrage de Prometheus (P-88)
+> ![[P-88-grafana-evolution-stockage-19-23-oct.png|760]]
+
 ### UC-C4 — Tâche planifiée et traçabilité
 
 | Élément de la fiche | Valeur |
@@ -982,6 +1041,10 @@ Le support demande une alerte liée à une exigence du projet. L'incident de la 
 | Traces | Journal : `journalctl -u infraready-controle-site` (sortie du contrôle, `Result=exit-code`) ; métriques : `/var/lib/prometheus/node-exporter/infraready_controle.prom` (écriture atomique), lues par node_exporter puis Prometheus ; Grafana : panneau « Contrôle planifié du site web » |
 | Scénario normal testé | Exécution chaque minute, `Result=success`, `ExecMainStatus=0`, métrique `succes=1`, âge < 60 s dans Prometheus (P-83) |
 | Diagnostic d'un échec | 1) `systemctl list-timers infraready-controle-site.timer` : le timer tourne-t-il ? 2) `systemctl status infraready-controle-site` / `journalctl -u … -n 20` : dernier code et message ; 3) code 1 → le site (nginx, HTTP, contenu), code 2 → prérequis (curl, unité nginx), code 3 → droits ou espace sur le dossier textfile ; 4) `node_textfile_scrape_error` et âge de la métrique côté Prometheus. Cas réel observé pendant UC-04 : unité `failed`, « ECHEC : le service nginx n'est pas actif » |
+
+
+> [!example] LINUX01 : timer actif chaque minute, journal du contrôle (« OK : nginx actif… »), fichier de métriques lu par node_exporter puis Prometheus (rendu de la sortie, P-83)
+> ![[P-83-rendu-timer-journal-metriques.png|760]]
 
 ### UC-A3 (défi) — Prévenir la saturation du stockage avec des quotas
 
@@ -998,6 +1061,10 @@ Choix : **quotas** plutôt que RAID logiciel. Un seul disque de test est réserv
 | Résultats observés | alice : 220 Mio acceptés (`220M*`, grâce `7days`), puis bloquée à 250 Mio (`dd: … Disk quota exceeded`, code 1) ; bruno écrit 50 Mio sans gêne ; fichiers de test supprimés (P-89) |
 | Limites | root n'est pas soumis aux quotas ; `repquota` lit le fichier de quotas, mis à jour en différé, alors que `quota -u` interroge le noyau et fait foi ; aucune trace dans le journal système, l'erreur est renvoyée à l'application |
 | Surveillance proposée | Capacité du volume : `DisquePresquePlein` et panneau d'évolution, déjà en place. Quotas, non réalisé : script `repquota -uv -O csv` lancé par un timer, qui publierait `infraready_quota_utilise_octets{user}` et `infraready_quota_limite_octets{user}` (collecteur textfile), avec une alerte quand l'utilisation dépasse 90 % du seuil souple pendant 15 min |
+
+
+> [!example] Test des quotas : alice acceptée à 220 Mio (délai de grâce), puis **bloquée à 250 Mio** (« Disk quota exceeded ») ; bruno non affecté (rendu de la sortie, P-89)
+> ![[P-89-rendu-test-quotas-alice.png|760]]
 
 ### Difficultés / décision / retour arrière
 
@@ -1122,20 +1189,21 @@ Choix : **quotas** plutôt que RAID logiciel. Un seul disque de test est réserv
 | P-77 | 20/10/2026 | Scénario 4 : handler non notifié | [P-77](docs/preuves/P-77-scenario4-handler-non-notifie.txt) |
 | P-78 | 20/10/2026 | Scénario 5 : nginx arrêté | [P-78](docs/preuves/P-78-scenario5-nginx-arrete.txt) |
 | P-79 | 20/10/2026 | Scénario 6 : contrôle fonctionnel du contenu | [P-79](docs/preuves/P-79-scenario6-controle-fonctionnel-contenu.txt) |
-| P-80 | 23/10/2026 | Séance 6 : état initial des 3 serveurs avant toute modification, blocages initiaux | [P-80](docs/preuves/P-80-seance6-etat-initial-trois-serveurs.txt) |
+| P-80 | 23/10/2026 | Séance 6 : état initial des 3 serveurs avant toute modification, blocages initiaux | [P-80](docs/preuves/P-80-seance6-etat-initial-trois-serveurs.txt), [png](docs/preuves/P-80-rendu-win-dc01-evenements-arret.png) |
+| P-80c | 23/10/2026 | Arbre des snapshots des 3 VM (API Proxmox), dont `s09_avant_seance6` | [P-80c](docs/preuves/P-80c-proxmox-snapshots-s09.txt), [png](docs/preuves/P-80c-rendu-proxmox-snapshots-s09.png) |
 | P-80b | 23/10/2026 | `openipmi` désactivé par Ansible ; contrôle de santé sans ECHEC | [P-80b](docs/preuves/P-80b-seance6-correction-openipmi-et-controle-sante-vert.txt) |
 | P-81a | 23/10/2026 | Redéploiement de la supervision : écart de règles corrigé, vérification des cibles instable | [P-81a](docs/preuves/P-81a-seance6-redeploiement-monitoring-verification-cibles-instable.txt) |
 | P-81b | 23/10/2026 | Vérification des cibles corrigée (attente du 1ᵉʳ scrape), idempotence | [P-81b](docs/preuves/P-81b-seance6-monitoring-verification-cibles-corrigee.txt) |
-| P-81 | 23/10/2026 | Cibles attendues / observées, endpoints, métriques Linux et Windows, règles | [P-81](docs/preuves/P-81-seance6-collecte-metriques-linux-windows.txt) |
-| P-82 | 23/10/2026 | `controle_sante.yml` : exécution, `--check`, hôte injoignable, correctif `--limit` | [P-82](docs/preuves/P-82-controle-sante-ansible-lecture-seule.txt) |
-| P-83 | 23/10/2026 | Tâche planifiée : timer systemd, journal, métriques textfile, 2 nouvelles règles | [P-83](docs/preuves/P-83-controle-planifie-timer-systemd.txt) |
-| P-84 | 23/10/2026 | Alertes `SiteWebIndisponible` et `ControlePlanifieEnRetard` : déclenchement et retour à la normale + capture | [P-84](docs/preuves/P-84-alerte-sitewebindisponible-test-controle.txt), [png](docs/preuves/P-84-prometheus-alerte-sitewebindisponible-firing.png) |
+| P-81 | 23/10/2026 | Cibles attendues / observées, endpoints, métriques Linux et Windows, règles | [P-81](docs/preuves/P-81-seance6-collecte-metriques-linux-windows.txt), [cibles png](docs/preuves/P-81-prometheus-cibles-up.png) |
+| P-82 | 23/10/2026 | `controle_sante.yml` : exécution, `--check`, hôte injoignable, correctif `--limit` | [P-82](docs/preuves/P-82-controle-sante-ansible-lecture-seule.txt), [png](docs/preuves/P-82-rendu-tableau-controle-sante.png) |
+| P-83 | 23/10/2026 | Tâche planifiée : timer systemd, journal, métriques textfile, 2 nouvelles règles | [P-83](docs/preuves/P-83-controle-planifie-timer-systemd.txt), [timer png](docs/preuves/P-83-rendu-timer-journal-metriques.png), [règles png](docs/preuves/P-83-prometheus-regles-chargees.png) |
+| P-84 | 23/10/2026 | Alertes `SiteWebIndisponible` et `ControlePlanifieEnRetard` : déclenchement et retour à la normale + capture | [P-84](docs/preuves/P-84-alerte-sitewebindisponible-test-controle.txt), [png](docs/preuves/P-84-prometheus-alerte-sitewebindisponible-firing.png), [Grafana échec](docs/preuves/P-84-grafana-dashboard-site-en-echec.png), [Grafana retard](docs/preuves/P-84-grafana-dashboard-controle-en-retard.png), [historique](docs/preuves/P-84-prometheus-historique-controle-succes.png), [ALERTS](docs/preuves/P-84-prometheus-historique-alertes.png) |
 | P-85 | 23/10/2026 | Dashboard Grafana v3 : déploiement, vérification par l'API + capture | [P-85](docs/preuves/P-85-grafana-dashboard-v3-deploiement.txt), [png](docs/preuves/P-85-grafana-dashboard-v3-exploitation.png) |
-| P-86 | 23/10/2026 | Incident INC-2026-10-23-01 : arrêt non propre de WIN-DC01, diagnostic et reproduction | [P-86](docs/preuves/P-86-incident-arret-non-propre-win-dc01-diagnostic.txt) |
-| P-87 | 23/10/2026 | Maintenance LINUX01 avec contrôle de santé avant / après | [P-87](docs/preuves/P-87-maintenance-linux01-controle-avant-apres.txt) |
-| P-88 | 23/10/2026 | Espace disque : observation ponctuelle et historique Prometheus | [P-88](docs/preuves/P-88-observation-ponctuelle-vs-historique-disque.txt) |
+| P-86 | 23/10/2026 | Incident INC-2026-10-23-01 : arrêt non propre de WIN-DC01, diagnostic et reproduction | [P-86](docs/preuves/P-86-incident-arret-non-propre-win-dc01-diagnostic.txt), [png](docs/preuves/P-86-rendu-proxmox-arrets-vm100-reproduction.png) |
+| P-87 | 23/10/2026 | Maintenance LINUX01 avec contrôle de santé avant / après | [P-87](docs/preuves/P-87-maintenance-linux01-controle-avant-apres.txt), [png](docs/preuves/P-87-rendu-maintenance-avant-apres.png) |
+| P-88 | 23/10/2026 | Espace disque : observation ponctuelle et historique Prometheus | [P-88](docs/preuves/P-88-observation-ponctuelle-vs-historique-disque.txt), [png](docs/preuves/P-88-grafana-evolution-stockage-19-23-oct.png) |
 | P-89a | 23/10/2026 | Quotas — 1ᵉʳ essai non idempotent (`repquota` sans `-v`) | [P-89a](docs/preuves/P-89a-quotas-1er-essai-non-idempotent.txt) |
-| P-89 | 23/10/2026 | Quotas sur `/data` : idempotence, dépassement souple / strict, nettoyage | [P-89](docs/preuves/P-89-quotas-disque-test-data-linux01.txt) |
+| P-89 | 23/10/2026 | Quotas sur `/data` : idempotence, dépassement souple / strict, nettoyage | [P-89](docs/preuves/P-89-quotas-disque-test-data-linux01.txt), [png](docs/preuves/P-89-rendu-test-quotas-alice.png) |
 | P-50a | 19/10/2026 | Monitoring — 1er essai : échec de connexion admin Grafana | [P-50a](docs/preuves/P-50a-ops01-grafana-1er-essai-echec-mot-de-passe-ini.txt) |
 | P-50 | 19/10/2026 | Playbook Prometheus + Grafana (cibles up, admin OK) | [P-50](docs/preuves/P-50-ops01-prometheus-grafana-installation.txt) |
 | P-50b | 19/10/2026 | Playbook monitoring — 2ᵉ passage (changed=0) | [P-50b](docs/preuves/P-50b-ops01-monitoring-2e-passage-idempotence.txt) |
@@ -1150,7 +1218,7 @@ Choix : **quotas** plutôt que RAID logiciel. Un seul disque de test est réserv
 | P-61 | 20/10/2026 | Validation des PR #2 et #4 : `verif-idempotence.sh` sur `windows_base` et `linux_base` (IDEMPOTENT) | [P-61](docs/preuves/P-61-validation-pr-idempotence-playbooks.txt) |
 | P-62 | 20/10/2026 | Tests négatifs (non idempotent → 1, échec → 2, vault absent ou invalide) ; diagnostic du DNS de `windows_adds` | [P-62](docs/preuves/P-62-validation-pr-tests-negatifs.txt) |
 | P-63 | 20/10/2026 | Validation de la PR #1 : calcul d'occupation disque de `linux_maintenance` (simulation) | [P-63](docs/preuves/P-63-validation-pr1-maintenance-linux-calcul-disque.txt) |
-| P-64 | 23/10/2026 | GitHub Actions sur les PR de la séance 6 : contrôles exécutés sur chaque branche | [P-64](docs/preuves/P-64-github-actions-pr-seance6.txt) |
+| P-64 | 23/10/2026 | GitHub Actions sur les PR de la séance 6 : contrôles exécutés sur chaque branche ; PR #8 à #14 fusionnées | [P-64](docs/preuves/P-64-github-actions-pr-seance6.txt), [PR png](docs/preuves/P-64-github-pr-seance6-fusionnees.png), [Actions png](docs/preuves/P-64-github-actions-runs-verts.png) |
 
 ---
 
