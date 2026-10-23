@@ -1,0 +1,11 @@
+sequenceDiagram
+    participant H as Hôte Proxmox (stopall)
+    participant L as LINUX01 / OPS01
+    participant W as WIN-DC01
+    H->>L: ACPI « bouton d'alimentation »
+    L-->>H: arrêt propre en 2 à 12 s
+    H->>W: ACPI « bouton d'alimentation »
+    Note over W: écran de connexion, aucune session<br/>ShutdownWithoutLogon = 0 → demande ignorée
+    H->>H: attente du délai de 180 s
+    H->>W: SIGTERM (équivaut à couper le courant)
+    Note over W: au démarrage suivant :<br/>événements 41 + 6008

@@ -1,0 +1,20 @@
+stateDiagram-v2
+    direction LR
+    state "SiteWebIndisponible — test 1" as A {
+        state "inactive" as i1
+        state "pending à 09h27m23" as p1
+        state "FIRING à 09h29m22" as f1
+        [*] --> i1
+        i1 --> p1 : succes = 0
+        p1 --> f1 : condition vraie 2 min
+        f1 --> i1 : nginx redémarré, résolue à 09h30m32
+    }
+    state "ControlePlanifieEnRetard — test 2" as B {
+        state "inactive" as i2
+        state "pending à 09h59m02" as p2
+        state "FIRING à 10h04m01" as f2
+        [*] --> i2
+        i2 --> p2 : âge du contrôle > 300 s
+        p2 --> f2 : condition vraie 5 min
+        f2 --> i2 : timer redémarré, résolue à 10h04m17
+    }

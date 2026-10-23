@@ -1,0 +1,21 @@
+flowchart TD
+    S["Symptôme — 23/10 09:01<br/>WIN-DC01 : événements 41 + 6008<br/>« arrêt précédent inattendu »"] --> Q1{"Accidentel<br/>ou systématique ?"}
+    Q1 -- "41/6008 aussi le 20/10<br/>après l'arrêt du 19/10" --> SYS["Systématique :<br/>à chaque arrêt de l'hôte"]
+    SYS --> Q2{"Que fait<br/>l'hyperviseur ?"}
+    Q2 -- "journal des tâches Proxmox" --> PVE["VM 101/102 arrêtées en 2-12 s<br/>VM 100 : 182-183 s puis<br/>« terminating now with SIGTERM »"]
+    PVE --> Q3{"Les métriques<br/>le montrent-elles ?"}
+    Q3 -- "non" --> LIM["Limite : Prometheus (OPS01)<br/>s'arrête aussi à 19:29:50"]
+    PVE --> H["Hypothèse : Windows Server ignore<br/>le bouton ACPI sans session ouverte"]
+    H --> OBS["Observation : ShutdownWithoutLogon = 0<br/>aucune session (quser), pas d'agent QEMU"]
+    OBS --> REP["Reproduction contrôlée 09:38<br/>arrêt ACPI, 90 s, forceStop = 0"]
+    REP --> RES{"La VM<br/>s'arrête ?"}
+    RES -- "non : got timeout,<br/>VM toujours running" --> CAUSE["Cause confirmée"]
+    RES -. "oui (aurait infirmé)" .-> AUTRE["Chercher une autre cause"]
+    CAUSE --> FIX["Correction proposée :<br/>ShutdownWithoutLogon = 1<br/>dans windows_base.yml"]
+    FIX --> WAIT["⏳ En attente de validation<br/>(DC partagé)"]
+    classDef bad fill:#da3633,color:#fff,stroke:#da3633
+    classDef ok fill:#238636,color:#fff,stroke:#238636
+    classDef wait fill:#9e6a03,color:#fff,stroke:#9e6a03
+    class S,PVE bad
+    class CAUSE ok
+    class WAIT wait

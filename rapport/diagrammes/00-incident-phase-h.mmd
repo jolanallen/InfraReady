@@ -1,0 +1,7 @@
+flowchart TD
+    A["19:27:22<br/>root → /var/www/infraready-v2<br/>nginx -t OK, reload"] --> B["19:27:27<br/>Constat depuis OPS01<br/>HTTP 404 (IP et DNS)"]
+    B --> C["19:27:51<br/>Diagnostic<br/>service ? port ? contenu ? config !"]
+    C --> D["19:28:20<br/>1er essai : playbook<br/>fichier OK mais 404<br/>(handler non exécuté)"]
+    D --> E["Correction du playbook<br/>meta: flush_handlers"]
+    E --> F["19:30:34 → 19:30:51<br/>Incident reproduit, playbook corrigé<br/>HTTP 200 en 1 passage"]
+    F --> G["19:31<br/>2e passage changed=0<br/>retour à la normale"]

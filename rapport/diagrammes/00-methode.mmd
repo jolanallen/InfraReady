@@ -1,0 +1,14 @@
+flowchart TD
+    P["Planifier<br/>périmètre, risques"] --> SN["Snapshot Proxmox<br/>retour arrière"]
+    SN --> R["Réaliser<br/>Ansible depuis OPS01"]
+    R --> ID{"2e passage<br/>changed = 0 ?"}
+    ID -- "non" --> DG["Diagnostiquer<br/>corriger le playbook"]
+    DG --> R
+    ID -- "oui" --> PR["Capturer la preuve<br/>P-xx horodatée"]
+    PR --> DOC["Documenter<br/>dossier technique"]
+    DOC --> GIT["Branche + PR<br/>1 sujet, 1 commit"]
+    GIT --> CI{"CI GitHub<br/>Actions"}
+    CI -- "échec" --> DG
+    CI -- "vert" --> M(["Relecture et fusion<br/>par le chef de projet"])
+    classDef ok fill:#238636,color:#fff,stroke:#238636
+    class M ok

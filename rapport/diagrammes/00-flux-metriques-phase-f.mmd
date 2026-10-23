@@ -1,0 +1,10 @@
+flowchart LR
+    L1["LINUX01<br/>node_exporter :9100<br/>(UFW : OPS01 seulement)"]
+    DC["WIN-DC01<br/>windows_exporter 0.31.8 :9182<br/>cpu, memory, logical_disk, os, system, net, service<br/>(pare-feu : OPS01 seulement)"]
+    O1["OPS01<br/>node_exporter :9100 (local)"]
+    PR["Prometheus :9090<br/>scrape toutes les 15 s<br/>jobs linux / windows / prometheus<br/>règles d'alerte"]
+    GR["Grafana :3000<br/>source Prometheus (localhost:9090)<br/>dashboard « InfraReady — Serveurs »"]
+    L1 -- "HTTP GET /metrics" --> PR
+    DC -- "HTTP GET /metrics" --> PR
+    O1 --> PR
+    PR -- "PromQL" --> GR

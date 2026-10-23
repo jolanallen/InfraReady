@@ -1,0 +1,15 @@
+flowchart LR
+    Z["0 Mio"] --> S1["alice écrit 220 Mio"]
+    S1 --> SOFT{{"seuil souple 200 Mio<br/>dépassé"}}
+    SOFT -- "accepté<br/>délai de grâce 7 jours" --> W["quota : 220M* · 7days"]
+    W --> S2["alice écrit 100 Mio de plus"]
+    S2 --> HARD{{"seuil strict 250 Mio"}}
+    HARD -- "refusé à 250 Mio" --> E["dd : Disk quota exceeded<br/>code 1"]
+    B["bruno écrit 50 Mio<br/>même dossier"] --> OKB["accepté :<br/>quota indépendant"]
+    GF["Garde-fou du playbook :<br/>série INFRA-DATA01 + usrquota,grpquota"] -. "avant toute modification" .-> Z
+    classDef warn fill:#9e6a03,color:#fff,stroke:#9e6a03
+    classDef bad fill:#da3633,color:#fff,stroke:#da3633
+    classDef ok fill:#238636,color:#fff,stroke:#238636
+    class SOFT,W warn
+    class HARD,E bad
+    class OKB ok

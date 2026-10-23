@@ -1,0 +1,22 @@
+gantt
+    title Séance 6 — déroulé réel du 23/10/2026
+    dateFormat HH:mm
+    axisFormat %H:%M
+    todayMarker off
+    section Démarrage
+    Hôte redémarré, VM éteintes (blocage)      :crit, b1, 08:27, 34m
+    VM démarrées à la main                     :milestone, 09:01, 0m
+    Snapshot s09_avant_seance6                 :milestone, 09:05, 0m
+    État initial UC-01 (P-80)                  :a1, 09:06, 4m
+    section Supervision
+    Écart de règles corrigé UC-02 (P-81)       :a2, 09:15, 6m
+    Timer + 2 alertes UC-C4 (P-83)             :a3, 09:22, 4m
+    Test alerte 1 - nginx arrêté UC-04         :crit, t1, 09:26, 4m
+    Contrôle de santé UC-C2 (P-82)             :a4, 09:31, 4m
+    openipmi corrigé (P-80b)                   :a5, 09:35, 2m
+    section Incident et maintenance
+    Reproduction arrêt ACPI du DC UC-05        :crit, i1, 09:38, 2m
+    Dashboard v3 UC-03 (P-85)                  :a6, 09:42, 2m
+    Maintenance LINUX01 UC-C1 (P-87)           :a7, 09:45, 1m
+    Quotas /data UC-A3 (P-89)                  :a8, 09:48, 5m
+    Test alerte 2 - timer arrêté UC-04         :crit, t2, 09:54, 10m

@@ -1,0 +1,19 @@
+flowchart LR
+    subgraph HOME["Réseau domestique 192.168.0.0/24"]
+        PC["Poste d'administration"]
+        GW["Box / passerelle<br/>192.168.0.254"]
+        subgraph PVE["Hôte Proxmox VE 9.1 — corsair1 — 192.168.0.7 (vmbr0)"]
+            NAT{{"vmbr1 192.168.50.1<br/>NAT nftables<br/>LAN domestique bloqué"}}
+            subgraph LAB["Labo InfraReady 192.168.50.0/24 (vmbr1)"]
+                DC["WIN-DC01<br/>192.168.50.10<br/>AD DS · DNS · windows_exporter"]
+                L1["LINUX01<br/>192.168.50.20<br/>nginx · /data · node_exporter"]
+                OPS["OPS01<br/>192.168.50.30<br/>Ansible · Git · Prometheus · Grafana"]
+            end
+        end
+    end
+    PC -- "SSH (rebond via l'hôte)" --> NAT
+    NAT --- DC & L1 & OPS
+    OPS -- "SSH 22 / HTTP 80 / 9100" --> L1
+    OPS -- "WinRM 5985 / 9182" --> DC
+    L1 & OPS -- "DNS 53" --> DC
+    NAT -- "Internet (MAJ)" --> GW

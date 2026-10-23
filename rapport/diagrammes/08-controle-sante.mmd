@@ -1,0 +1,25 @@
+flowchart LR
+    subgraph P1["Play 1 — linux (SSH)"]
+        L["identité · heure NTP · disques<br/>services · unités en échec<br/>journal 24 h · DNS<br/>site HTTP + contenu<br/>cibles Prometheus · API Grafana"]
+    end
+    subgraph P2["Play 2 — windows (WinRM)"]
+        W["PowerShell lecture seule<br/>w32tm · disques · services AD<br/>journal System · DNS local<br/>Get-ADDomain · exporter"]
+        RS["rescue : INACCESSIBLE / ECHEC<br/>au lieu d'arrêter le playbook"]
+        W -. "erreur ou injoignable" .-> RS
+    end
+    subgraph P3["Play 3 — synthèse (localhost)"]
+        T["Tableau hôte · contrôle · statut"]
+        R[("rapport daté<br/>-e sante_rapport=true")]
+        X{"ECHEC ou<br/>INACCESSIBLE ?"}
+    end
+    L --> T
+    W --> T
+    RS --> T
+    T --> R
+    T --> X
+    X -- "non" --> OK(["code 0 — 23 OK, 3 ATTENTION, 1 NA"])
+    X -- "oui" --> KO(["code 2 — exploitable par un script"])
+    classDef ok fill:#238636,color:#fff,stroke:#238636
+    classDef bad fill:#da3633,color:#fff,stroke:#da3633
+    class OK ok
+    class KO bad

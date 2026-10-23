@@ -1,0 +1,33 @@
+flowchart LR
+    subgraph L1["LINUX01 — 192.168.50.20"]
+        TIM["infraready-controle-site.timer<br/>chaque minute"] --> SCR["controle-site-planifie.sh"]
+        SCR --> CHK["check-nginx.sh<br/>service + HTTP + contenu"]
+        CHK --> NGX["nginx :80"]
+        SCR -- "écriture atomique" --> PROM[("infraready_controle.prom")]
+        SCR -- "sortie" --> JRN[("journal systemd")]
+        APT["collecteur apt"] --> PROM2[("apt.prom")]
+        NE1["node_exporter :9100<br/>+ collecteur textfile"]
+        PROM --> NE1
+        PROM2 --> NE1
+    end
+    subgraph DC["WIN-DC01 — 192.168.50.10"]
+        WE["windows_exporter :9182<br/>cpu, mémoire, disques, services"]
+    end
+    subgraph O["OPS01 — 192.168.50.30"]
+        NE2["node_exporter :9100"]
+        P["Prometheus :9090<br/>scrape 15 s"]
+        R{{"7 règles d'alerte<br/>InstanceDown · ServiceWindowsCritiqueArrete<br/>SiteWebIndisponible · ControlePlanifieEnRetard<br/>CpuEleve · MemoireElevee · DisquePresquePlein"}}
+        G["Grafana :3000<br/>dashboard v3 — 9 panneaux"]
+        A["controle_sante.yml<br/>Ansible, lecture seule"]
+    end
+    NE1 -- "GET /metrics" --> P
+    WE -- "GET /metrics" --> P
+    NE2 --> P
+    P --> R
+    P -- "PromQL" --> G
+    R -- "ALERTS" --> G
+    A -. "SSH" .-> L1
+    A -. "WinRM" .-> DC
+    A -. "API" .-> P
+    classDef new fill:#1f6feb,color:#fff,stroke:#1f6feb
+    class TIM,SCR,PROM,A,R new

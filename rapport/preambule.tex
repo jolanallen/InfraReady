@@ -1,0 +1,106 @@
+% =============================================================================
+%  Préambule du rapport final InfraReady (LuaLaTeX)
+% =============================================================================
+
+% --- Langue et polices -------------------------------------------------------
+\usepackage[french]{babel}
+\usepackage{fontspec}
+\directlua{luaotfload.add_fallback("repli", {"DejaVuSans:mode=harf;", "DejaVuSansMono:mode=harf;"})}
+\setmainfont{TeX Gyre Pagella}[RawFeature={fallback=repli}]
+\setsansfont{TeX Gyre Heros}[RawFeature={fallback=repli}]
+\setmonofont{DejaVu Sans Mono}[Scale=0.84]
+\usepackage[final]{microtype}
+
+% --- Mise en page --------------------------------------------------------------
+\usepackage[a4paper,top=2.4cm,bottom=2.6cm,left=2.3cm,right=2.3cm,headheight=15pt]{geometry}
+\usepackage[autooneside=false,automark]{scrlayer-scrpage}
+\clearpairofpagestyles
+\ihead{\small\sffamily InfraReady — Rapport final}
+\ohead{\small\sffamily\leftmark}
+\cfoot*{\small\sffamily\pagemark}
+\setkomafont{pageheadfoot}{\color{gris}}
+\renewcommand*{\chapterpagestyle}{plain.scrheadings}
+
+% --- Couleurs ------------------------------------------------------------------
+\usepackage[table]{xcolor}
+\definecolor{bleu}{HTML}{1F4E79}
+\definecolor{bleuclair}{HTML}{DCE8F5}
+\definecolor{vert}{HTML}{1A7F37}
+\definecolor{vertclair}{HTML}{DDF4E4}
+\definecolor{orange}{HTML}{9A6700}
+\definecolor{orangeclair}{HTML}{FFF3D6}
+\definecolor{rouge}{HTML}{B42318}
+\definecolor{rougeclair}{HTML}{FDE7E5}
+\definecolor{gris}{HTML}{57606A}
+\definecolor{grisclair}{HTML}{F3F4F6}
+
+\setkomafont{disposition}{\sffamily\bfseries\color{bleu}}
+\setkomafont{chapter}{\Huge}
+\setkomafont{descriptionlabel}{\sffamily\bfseries}
+\RedeclareSectionCommand[beforeskip=-1.2\baselineskip,afterskip=.6\baselineskip]{section}
+\RedeclareSectionCommand[beforeskip=-1\baselineskip,afterskip=.4\baselineskip]{subsection}
+
+% --- Tableaux, figures, listes -------------------------------------------------
+\usepackage{array,booktabs,tabularx,longtable,colortbl}
+\usepackage{graphicx}
+\graphicspath{{rapport/figures/}{docs/preuves/}}
+\usepackage[font=small,labelfont={sf,bf},format=hang,justification=raggedright,singlelinecheck=false]{caption}
+\usepackage{float}
+\usepackage{enumitem}
+\setlist{itemsep=2pt,topsep=3pt}
+\usepackage{pdflscape}
+\usepackage{tikz}
+\usetikzlibrary{positioning,shapes.geometric}
+\renewcommand{\arraystretch}{1.25}
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+% --- Hyperliens -----------------------------------------------------------------
+\usepackage[hidelinks,pdfusetitle,bookmarksnumbered]{hyperref}
+\hypersetup{
+  pdftitle={InfraReady — Rapport final},
+  pdfauthor={MIR Mahan, Jolan Allen, Kenzi Bendjelloul},
+  pdfsubject={Projet fil rouge B3 Cybersécurité : standardisation, automatisation et supervision},
+  pdfkeywords={Proxmox, Active Directory, Ansible, Prometheus, Grafana, GitHub Actions}
+}
+\usepackage{bookmark}
+
+% --- Commandes du rapport -------------------------------------------------------
+% Code en ligne : le contenu est pris tel quel (soulignés, points, barres obliques…) et peut être
+% coupé en fin de ligne après _ / . - (rapport/code-secable.lua), utile dans les colonnes étroites.
+\directlua{dofile(kpse.find_file('rapport/code-secable.lua') or 'rapport/code-secable.lua')}
+\DeclareRobustCommand{\code}[1]{\texttt{\directlua{codesecable("\luaescapestring{\detokenize{#1}}")}}}
+% Renvoi à une preuve du dépôt (docs/preuves/)
+\DeclareRobustCommand{\preuve}[1]{\textsf{\textbf{\color{bleu}#1}}}
+% Statuts
+\newcommand{\ok}{\textsf{\textbf{\color{vert}OK}}}
+\newcommand{\fait}{\textsf{\textbf{\color{vert}Fait}}}
+\newcommand{\partiel}{\textsf{\textbf{\color{orange}Partiel}}}
+\newcommand{\afaire}{\textsf{\textbf{\color{rouge}À faire}}}
+
+% Encadré coloré (non sécable) : \encadre{couleur fond}{couleur trait}{titre}{texte}
+\newcommand{\encadre}[4]{%
+  \par\smallskip\noindent
+  \begin{tikzpicture}
+    \node[fill=#1, draw=#2, line width=0.6pt, rounded corners=3pt,
+          inner sep=7pt, text width=\linewidth-26pt, align=left] (b) {%
+      {\sffamily\bfseries\color{#2}#3}\par\smallskip #4};
+    \fill[#2] ([xshift=0pt]b.north west) rectangle ([xshift=3pt]b.south west);
+  \end{tikzpicture}\par\smallskip}
+\newcommand{\info}[2]{\encadre{bleuclair}{bleu}{#1}{#2}}
+\newcommand{\succes}[2]{\encadre{vertclair}{vert}{#1}{#2}}
+\newcommand{\attention}[2]{\encadre{orangeclair}{orange}{#1}{#2}}
+\newcommand{\alerte}[2]{\encadre{rougeclair}{rouge}{#1}{#2}}
+
+% Figure standard : \figure{fichier}{largeur relative}{légende}{étiquette}
+\newcommand{\illustration}[4]{%
+  \begin{figure}[H]
+    \centering
+    \includegraphics[width=#2\linewidth,height=0.72\textheight,keepaspectratio]{#1}
+    \caption{#3}\label{#4}
+  \end{figure}}
+
+% Fiche de phase (objectif, responsables, dates, statut)
+\newcommand{\fiche}[4]{%
+  \info{Objectif}{#1\par\smallskip
+  \small\textbf{Responsables :} #2 \quad·\quad \textbf{Dates :} #3 \quad·\quad \textbf{Statut :} #4}}

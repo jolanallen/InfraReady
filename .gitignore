@@ -8,3 +8,5 @@ lab/build/
 *.iso
 *.ppm
 .obsidian/
+# Compilation LaTeX du rapport final (fichiers intermédiaires)
+rapport/build/
