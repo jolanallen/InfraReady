@@ -1,0 +1,87 @@
+% =============================================================================
+\chapter{Introduction}\label{chap:introduction}
+% =============================================================================
+
+\section{Contexte}
+
+InfraReady est une PME de services fictive qui prépare la mise en exploitation d'une petite
+infrastructure hybride. Son équipe informatique administre aujourd'hui ses serveurs à la main :
+les configurations divergent d'une machine à l'autre, les opérations ne sont pas reproductibles et
+les indisponibilités sont découvertes par les utilisateurs. Elle souhaite :
+\begin{itemize}
+  \item \textbf{standardiser} la configuration de ses serveurs Linux et Windows ;
+  \item \textbf{automatiser} les tâches d'administration et de maintenance ;
+  \item \textbf{superviser} l'état des serveurs pour détecter les anomalies avant les utilisateurs ;
+  \item \textbf{tracer} chaque changement dans un dépôt Git validé automatiquement, afin qu'un autre
+        administrateur puisse comprendre et réutiliser les configurations.
+\end{itemize}
+
+\section{Problématique}
+
+Comment construire, avec des outils libres ou d'évaluation, une infrastructure de laboratoire dont
+l'état est \emph{décrit par un dépôt} plutôt que par les manipulations de ses administrateurs, dont
+chaque changement est \emph{vérifiable} et dont le bon fonctionnement est \emph{observable} en
+continu — tout en restant isolée du réseau personnel et sans exposer aucun secret ?
+
+\section{Objectifs}
+
+\begin{table}[H]
+\centering
+\caption{Objectifs du projet et critère de réussite retenu}\label{tab:objectifs}
+\begin{tabularx}{\linewidth}{@{}P{3.6cm}LP{3.2cm}@{}}
+\toprule
+\textbf{Objectif} & \textbf{Critère de réussite} & \textbf{Où le vérifier} \\
+\midrule
+Laboratoire isolé & 3 VM joignables entre elles et vers Internet, réseau domestique bloqué & Phase A, \preuve{P-02} \\
+Annuaire et DNS & Domaine \code{infraready.test} fonctionnel, \code{dcdiag} réussi & Phase B, \preuve{P-12b} \\
+Administration Linux & Comptes, droits, service web, disque de test, journaux vérifiés & Phase C, \preuve{P-20} à \preuve{P-24} \\
+Automatisation & Playbooks Linux et Windows, second passage \code{changed=0} & Phase D, \preuve{P-32}, \preuve{P-34} \\
+Maintenance & Procédure outillée avec pré- et post-contrôles, rapports & Phase E, \preuve{P-40} à \preuve{P-43} \\
+Supervision & Métriques Linux et Windows, dashboard, alerte démontrée & Phase F, \preuve{P-50} à \preuve{P-56} \\
+Versionnement et CI & Pipeline GitHub Actions vert, aucun secret & Phase G, \preuve{P-60}, \preuve{P-64} \\
+Diagnostic & Incident reproduit, cause confirmée, retour à la normale prouvé & Phase H, \preuve{P-70} à \preuve{P-73} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Périmètre et contraintes}
+
+\begin{itemize}
+  \item \textbf{Laboratoire uniquement} : trois VM dédiées (VMID 100 à 102) ; les autres machines de
+        l'hôte ne sont jamais modifiées. Aucune donnée réelle : comptes, groupes et données sont fictifs.
+  \item \textbf{Isolation} : le réseau du laboratoire accède à Internet (mises à jour) mais ne peut
+        ouvrir aucune connexion vers le réseau domestique.
+  \item \textbf{Secrets} : aucun mot de passe en clair dans le dépôt ni dans ce document ; les
+        secrets vivent dans des fichiers Ansible Vault chiffrés.
+  \item \textbf{Réversibilité} : snapshot Proxmox avant chaque changement important ; toute panne
+        volontaire est contrôlée et réversible.
+\end{itemize}
+
+\section{Démarche et organisation du document}
+
+Le projet suit le découpage du sujet en huit phases (A à H), complété par les travaux pratiques des
+séances 4 (stockage, processus, scénarios de panne) et 6 (maintenance opérationnelle et
+supervision). Chaque phase suit le même cycle (chapitre~\ref{chap:organisation}) : planifier,
+protéger par un snapshot, réaliser de préférence avec Ansible, rejouer pour vérifier l'idempotence,
+capturer une preuve horodatée, documenter, puis livrer par une demande de fusion validée par la CI.
+
+Le document est organisé ainsi :
+\begin{itemize}
+  \item chapitre~\ref{chap:organisation} — organisation de l'équipe, méthode, planning et outils ;
+  \item chapitre~\ref{chap:architecture} — architecture cible et réellement déployée ;
+  \item chapitres~\ref{chap:phases-ac} et~\ref{chap:phases-dh} — réalisation des phases A à H : objectif,
+        réalisation, résultats mesurés, difficultés et retour arrière ;
+  \item chapitres~\ref{chap:seance4} et~\ref{chap:seance6} — travaux pratiques des séances 4 et 6 ;
+  \item chapitre~\ref{chap:securite} — sécurité, limites d'intervention et recette finale ;
+  \item chapitre~\ref{chap:bilan} — difficultés, écarts, limites, bilan et perspectives, conclusion ;
+  \item annexes — matrice des preuves, arborescence du dépôt, journal des changements, glossaire.
+\end{itemize}
+
+\info{Comment lire les renvois aux preuves}{%
+Chaque résultat cite une preuve \preuve{P-xx} : un fichier de \code{docs/preuves/} contenant la
+sortie horodatée des commandes exécutées (en-tête : date, hôte, commande) ou une capture d'écran.
+La numérotation suit les phases : A = P-0x, B = P-1x, C = P-2x, D = P-3x, E = P-4x, F = P-5x,
+G = P-6x, H = P-7x, séance 6 = P-8x. Un suffixe \og a \fg{} (P-10a, P-39a\ldots) désigne un premier
+essai en échec, conservé et expliqué. Les images nommées \code{*-rendu-*.png} sont des rendus
+visuels de sorties de commandes réelles ; leur texte intégral est dans la preuve \code{.txt}
+correspondante.}

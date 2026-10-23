@@ -1,0 +1,16 @@
+flowchart TD
+    A(["Fenêtre de maintenance<br/>LINUX01 — 23/10 09:45"]) --> B["Snapshot s09_avant_seance6"]
+    B --> C["controle_sante.yml -e sante_rapport=true<br/>rapport AVANT"]
+    C --> D{"ECHEC ou<br/>INACCESSIBLE ?"}
+    D -- "oui" --> STOP(["Arrêt : on ne maintient pas<br/>un serveur déjà en défaut"])
+    D -- "non (19 lignes OK/ATTENTION/NA)" --> E["linux_maintenance.yml --limit linux01<br/>pré-contrôles disque < 85 %, services actifs"]
+    E --> F["apt upgrade : 3 paquets<br/>5 reportés (phasage Ubuntu)"]
+    F --> G["post-contrôles : services, HTTP 200"]
+    G --> H["controle_sante.yml<br/>rapport APRÈS"]
+    H --> I{"diff des statuts<br/>avant / après"}
+    I -- "aucun écart" --> OK(["Maintenance validée"])
+    I -- "écart" --> RB["Diagnostic, sinon<br/>retour au snapshot"]
+    classDef ok fill:#238636,color:#fff,stroke:#238636
+    classDef bad fill:#da3633,color:#fff,stroke:#da3633
+    class OK ok
+    class STOP,RB bad

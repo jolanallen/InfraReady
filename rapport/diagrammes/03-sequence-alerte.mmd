@@ -1,0 +1,23 @@
+sequenceDiagram
+    autonumber
+    participant T as Timer systemd (LINUX01)
+    participant S as check-nginx.sh
+    participant F as infraready_controle.prom
+    participant N as node_exporter
+    participant P as Prometheus (OPS01)
+    participant G as Grafana
+    Note over S: 09:26:14 — nginx arrêté (test contrôlé)
+    T->>S: 09:27:12 exécution
+    S-->>T: code 1 « ECHEC : nginx n'est pas actif »
+    T->>F: succes=0, code=1 (écriture atomique)
+    P->>N: scrape toutes les 15 s
+    N-->>P: infraready_controle_succes = 0
+    Note over P: 09:27:23 SiteWebIndisponible = pending
+    Note over P: up(linux01) = 1 → InstanceDown reste inactive
+    P->>P: condition vraie pendant 2 min
+    Note over P: 09:29:22 SiteWebIndisponible = FIRING
+    P-->>G: ALERTS + panneau « ÉCHEC » en rouge
+    Note over S: 09:30:05 — nginx redémarré
+    T->>S: 09:30:12 exécution → code 0
+    T->>F: succes=1
+    Note over P: 09:30:32 alerte résolue (27 s)

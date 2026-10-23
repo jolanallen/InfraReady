@@ -1,0 +1,82 @@
+% =============================================================================
+\chapter{Organisation du projet}\label{chap:organisation}
+% =============================================================================
+
+\section{Équipe et répartition des rôles}
+
+\begin{table}[H]
+\centering
+\caption{Répartition des rôles dans l'équipe}\label{tab:equipe}
+\begin{tabularx}{\linewidth}{@{}P{4cm}L@{}}
+\toprule
+\textbf{Membre} & \textbf{Rôle et responsabilités} \\
+\midrule
+Jolan Allen & Chef de projet : planification, coordination, suivi, dépôt de remise
+              \code{jolanallen/InfraReady}, relecture et fusion des demandes de fusion ; script
+              d'idempotence, contrôles du vault, filtre d'hôte du dashboard (PR \#1 à \#5) \\
+Kenzi Bendjelloul & Automatisation : partie Ansible (phase D) \\
+MIR Mahan & Réalisation du laboratoire et des phases, preuves, documentation, travaux des séances 4 et 6 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Les phases A à C et E à H ont été réalisées conjointement par MIR Mahan et Jolan Allen ; les
+séances de travaux pratiques par les trois membres.
+
+\section{Méthode de travail}
+
+La figure~\ref{fig:methode} résume le cycle appliqué à chaque changement. Trois principes le
+guident :
+\begin{description}
+  \item[Le dépôt décrit le laboratoire.] Une modification faite à la main sur une VM est rejouée en
+        Ansible ; on ne corrige pas un fichier en place sur un serveur.
+  \item[Une preuve par résultat.] Les sorties de commandes sont capturées automatiquement avec
+        l'heure, l'hôte et la commande exécutée. Les échecs sont conservés.
+  \item[Un sujet, une branche, une demande de fusion.] Depuis le 20/10, aucune modification n'est
+        poussée directement sur \code{main} ; chaque demande de fusion est validée par la CI puis
+        relue et fusionnée par le chef de projet.
+\end{description}
+
+\illustration{00-methode.pdf}{0.62}{Cycle appliqué à chaque changement, du laboratoire au dépôt}{fig:methode}
+
+\section{Planning réel}
+
+Le projet s'est déroulé sur trois journées de travail effectif. La figure~\ref{fig:planning}
+montre l'enchaînement réel, reconstitué à partir du journal des changements (annexe~\ref{annexe:journal}).
+
+\illustration{00-planning.pdf}{1}{Planning réel du projet (19, 20 et 23 octobre 2026)}{fig:planning}
+
+\section{Outils et versions}
+
+\begin{table}[H]
+\centering
+\caption{Outils utilisés et versions réellement déployées}\label{tab:outils}
+\begin{tabularx}{\linewidth}{@{}P{3.4cm}P{4.4cm}L@{}}
+\toprule
+\textbf{Domaine} & \textbf{Outil (version)} & \textbf{Usage} \\
+\midrule
+Virtualisation & Proxmox VE 9.1.1 & Hôte \code{corsair1}, 3 VM, snapshots, API \\
+Systèmes & Windows Server 2025 Standard Evaluation ; Ubuntu Server 24.04.5 LTS & WIN-DC01 ; LINUX01 et OPS01 \\
+Automatisation & ansible-core 2.16.3, collections \code{ansible.windows} 2.2.0, \code{ansible.posix} 1.5.4, \code{community.general} 8.3.0, \code{community.windows} 2.1.0, \code{microsoft.ad} 1.4.1 & Playbooks depuis OPS01 (SSH et WinRM) \\
+Secrets & Ansible Vault (AES256) & Mots de passe Administrateur, DSRM, comptes AD, Grafana \\
+Supervision & Prometheus 2.45.3, node\_exporter 1.7.0, windows\_exporter 0.31.8, Grafana 13.2.4 & Collecte, alertes, tableau de bord \\
+Service & nginx 1.24 & Site web de LINUX01 \\
+Versionnement & Git, GitHub, GitHub Actions & Dépôt, demandes de fusion, pipeline de validation \\
+Qualité & yamllint, ansible-lint 24 (profil \emph{production}), promtool, jq, gitleaks 8.24 & Contrôles locaux et en CI \\
+Documentation & Obsidian (Markdown, Mermaid), LuaLaTeX & Dossier technique, ce rapport \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Conventions}
+
+\begin{itemize}
+  \item \textbf{Preuves} : \code{docs/preuves/P-<phase><n>-<description>.txt|png}, en-tête avec date, hôte
+        et commandes ; premiers essais en échec suffixés \og a \fg{}.
+  \item \textbf{Snapshots} : \code{s<nn>_<moment>} (par exemple \code{s04_avant_maj_windows},
+        \code{s09_avant_seance6}).
+  \item \textbf{Commits et demandes de fusion} : en français, sujet au présent, corps qui explique le
+        constat et la correction ; branches \code{fix/}, \code{feat/}, \code{docs/}, \code{ci/}.
+  \item \textbf{Secrets} : recherche des vraies valeurs dans les fichiers modifiés avant chaque commit,
+        puis gitleaks sur tout l'historique dans la CI.
+\end{itemize}

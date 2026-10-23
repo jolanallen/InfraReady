@@ -1,0 +1,211 @@
+% =============================================================================
+\chapter{Réalisation — phases A à C}\label{chap:phases-ac}
+% =============================================================================
+
+Chaque phase est présentée de la même façon : objectif, réalisation, résultats mesurés (avec la
+preuve correspondante), difficultés rencontrées et moyen de retour arrière.
+
+% -----------------------------------------------------------------------------
+\section{Phase A — Installation et réseau}\label{sec:phase-a}
+
+\fiche{Mettre en service les machines virtuelles, leurs noms, leurs adresses et la connectivité du laboratoire.}
+      {MIR Mahan, Jolan Allen}{19/10/2026}{\fait}
+
+\subsection{Réalisation}
+
+\paragraph{Réseau.} Après sauvegarde de \code{/etc/network/interfaces}, le pont \code{vmbr1}
+(\code{lab/proxmox/vmbr1.interfaces}) et une table nftables dédiée
+(\code{lab/proxmox/infraready-nat.nft}) ont été ajoutés sur l'hôte : traduction d'adresses
+(\emph{masquerade}) du laboratoire vers Internet, et rejet de toute nouvelle connexion du
+laboratoire vers \code{192.168.0.0/24}.
+
+\paragraph{Installations automatiques.} Aucune saisie manuelle n'a été nécessaire :
+\begin{itemize}
+  \item \textbf{LINUX01 et OPS01} : ISO Ubuntu 24.04.5 (empreinte SHA-256 vérifiée) et second lecteur
+        \og CIDATA \fg{} portant un fichier \emph{autoinstall} : nom, adresse fixe, LVM, clavier
+        français, compte d'administration avec mot de passe haché, SSH par clé uniquement, agent
+        invité QEMU, mises à jour de sécurité ;
+  \item \textbf{WIN-DC01} : ISO Windows Server 2025 et fichier \code{autounattend.xml} : image Standard
+        avec interface graphique, partitionnement UEFI/GPT, nom, adresse fixe, fuseau horaire, WinRM
+        et ping autorisés depuis le laboratoire uniquement.
+\end{itemize}
+Les fichiers de réponse contenant de vrais mots de passe ont été supprimés du stockage Proxmox
+après usage ; le dépôt ne contient que des modèles à variables (\code{lab/*.tpl}).
+
+\paragraph{DNS.} Une fois le domaine créé (phase B), les VM Linux interrogent le contrôleur de
+domaine (\code{nameservers 192.168.50.10}, domaine de recherche \code{infraready.test}).
+
+\illustration{P-03-win-dc01-installe-server-manager.png}{0.78}{WIN-DC01 installé automatiquement : Server Manager (\preuve{P-03})}{fig:p03}
+
+\subsection{Résultats}
+
+\begin{table}[H]
+\centering
+\caption{Phase A — vérifications et résultats}\label{tab:phase-a}
+\begin{tabularx}{\linewidth}{@{}P{2.8cm}LP{2.3cm}@{}}
+\toprule
+\textbf{Vérification} & \textbf{Résultat observé} & \textbf{Preuve} \\
+\midrule
+Trois VM & 3 VM \code{running}, snapshot \code{s01_installation_ok} ; Windows installé en environ 10 min, Ubuntu en 6 min & \preuve{P-01}, \preuve{P-03} \\
+Adressage & .10 / .20 / .30, passerelle .1, toutes sur \code{vmbr1} & \preuve{P-02}, \preuve{P-02b}, \preuve{P-04c} \\
+Connectivité & Ping entre les 3 VM et vers la passerelle ; Internet joignable (HTTP 200) & \preuve{P-02}, \preuve{P-02b} \\
+Isolation & \code{192.168.0.254} bloqué depuis le laboratoire mais joignable depuis l'hôte : le blocage vient bien de la règle nftables & \preuve{P-02} \\
+DNS & Enregistrements A, PTR et SRV LDAP résolus depuis les VM Linux et le DC & \preuve{P-04}, \preuve{P-04b}, \preuve{P-04c} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Difficultés et décisions}
+
+\begin{table}[H]
+\centering
+\caption{Phase A — difficultés rencontrées}\label{tab:phase-a-diff}
+\begin{tabularx}{\linewidth}{@{}P{3.6cm}P{3.6cm}L@{}}
+\toprule
+\textbf{Problème} & \textbf{Cause} & \textbf{Correction et résultat} \\
+\midrule
+ISO Ubuntu 26.04 attachée aux VM Linux & Mauvaise ISO à la création & ISO 24.04.5 téléchargée, empreinte vérifiée, remplacée \\
+Carte réseau e1000 sur WIN-DC01 & Pilote non garanti sous Windows Server 2025 & Passage en e1000e (même adresse MAC) \\
+L'installeur Ubuntu demande une confirmation & Mot-clé \code{autoinstall} absent de la ligne de commande & Réponse envoyée par \code{qm sendkey} \\
+Pas d'iptables sur l'hôte & Proxmox VE 9 repose sur nftables & Règles écrites en nftables \\
+Enregistrement PTR du DC absent & Zone inverse créée après la promotion & Enregistrement dynamique déclenché par \code{windows_base.yml} (phase D) \\
+Mot de passe sudo de l'hôte visible dans l'en-tête d'une preuve & Le script de capture recopiait la commande & Preuve nettoyée, script corrigé, recherche des secrets avant chaque commit \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Retour arrière :} snapshot \code{s01_installation_ok} des 3 VM, sauvegarde
+\code{interfaces.bak-infraready} sur l'hôte.
+
+% -----------------------------------------------------------------------------
+\section{Phase B — Administration Windows}\label{sec:phase-b}
+
+\fiche{Rendre l'annuaire et le DNS opérationnels, documenter comptes, groupes, droits et journaux.}
+      {MIR Mahan, Jolan Allen}{19/10/2026}{\fait}
+
+\subsection{Réalisation}
+
+Après le snapshot \code{s02_avant_adds}, toutes les actions ont été lancées depuis OPS01 par WinRM :
+\begin{itemize}
+  \item \textbf{Forêt AD} (\code{windows_adds.yml}) : forêt \code{infraready.test}, NetBIOS
+        \code{INFRAREADY}, niveau fonctionnel Windows 2025, DNS intégré à AD avec redirecteurs, NTP
+        externe (indispensable à Kerberos), mot de passe DSRM lu dans le vault chiffré ;
+  \item \textbf{Objets de l'annuaire} (\code{scripts/ad-objets.ps1}, rejouable) : unités
+        d'organisation, deux groupes globaux de sécurité et quatre comptes, avec changement de mot de
+        passe obligatoire à la première connexion.
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{Groupes, membres et droits attribués (principe du moindre privilège)}\label{tab:ad}
+\begin{tabularx}{\linewidth}{@{}P{3cm}P{3.2cm}L@{}}
+\toprule
+\textbf{Groupe} & \textbf{Membres} & \textbf{Droits sur le partage Comptabilité} \\
+\midrule
+\code{GG_Comptabilite} & l.petit, t.moreau & Modification (partage SMB \og Change \fg{}, NTFS \og Modify \fg{}) \\
+\code{GG_Support_IT} & j.martin, s.bernard & Lecture seule, pour dépanner \\
+Autres utilisateurs & — & Aucun accès : \texttt{BUILTIN\textbackslash Users} retiré, héritage désactivé, partage masqué \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Résultats}
+
+\begin{table}[H]
+\centering
+\caption{Phase B — vérifications et résultats}\label{tab:phase-b}
+\begin{tabularx}{\linewidth}{@{}P{2.6cm}LP{2.6cm}@{}}
+\toprule
+\textbf{Vérification} & \textbf{Résultat observé} & \textbf{Preuve} \\
+\midrule
+Domaine & \code{infraready.test}, DC \code{WIN-DC01.infraready.test}, catalogue global ; \code{dcdiag} : 10 tests fonctionnels réussis & \preuve{P-10}, \preuve{P-12}, \preuve{P-12b} \\
+Comptes et groupes & 2 groupes, 4 comptes, appartenances conformes & \preuve{P-11} \\
+DNS interne & A et SRV LDAP résolus, résolution externe par les redirecteurs, zones en mise à jour sécurisée & \preuve{P-12}, \preuve{P-04c} \\
+Journaux & Redémarrage de promotion (1074), démarrage d'AD DS (1000), zones DNS chargées, création des comptes et groupes tracée (4720, 4727, 4728) & \preuve{P-13} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Difficultés et décisions}
+
+\begin{table}[H]
+\centering
+\caption{Phase B — difficultés rencontrées}\label{tab:phase-b-diff}
+\begin{tabularx}{\linewidth}{@{}P{3.6cm}P{3.8cm}L@{}}
+\toprule
+\textbf{Problème} & \textbf{Cause} & \textbf{Correction et résultat} \\
+\midrule
+1\textsuperscript{er} lancement de \code{windows_adds.yml} en échec & Paramètre \code{reboot_timeout} absent de \code{microsoft.ad} 1.4.1 & Paramètre retiré ; forêt créée au 2\textsuperscript{e} lancement (\preuve{P-10a} → \preuve{P-10}) \\
+DC synchronisé sur sa propre horloge & Configuration par défaut & NTP externe : strate 2 (\preuve{P-12b}) \\
+Événements horodatés dans le futur & Hypothèse : saut d'horloge pendant la promotion, avant NTP & Heure vérifiée identique à OPS01 ; plus de dérive \\
+« Le DC utilise son propre DNS » signale un changement à chaque passage & \code{win_dns_client} retire \code{::1} que Windows remet sur un DC & Liste \code{127.0.0.1} et \code{::1} : 2\textsuperscript{e} passage \code{changed=0} (\preuve{P-15}) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Retour arrière :} snapshots \code{s02_avant_adds} et \code{s03_avant_ansible} de WIN-DC01.
+
+% -----------------------------------------------------------------------------
+\section{Phase C — Administration Linux}\label{sec:phase-c}
+
+\fiche{Gérer identités, permissions, service, stockage, mises à jour et journaux sur Ubuntu.}
+      {MIR Mahan, Jolan Allen}{19/10/2026}{\fait}
+
+\subsection{Réalisation}
+
+Réalisée d'abord à la main sur LINUX01 (commandes conservées dans les preuves), puis reprise par
+Ansible en phase D.
+
+\begin{table}[H]
+\centering
+\caption{Comptes, groupes et permissions sur LINUX01}\label{tab:linux-droits}
+\begin{tabularx}{\linewidth}{@{}P{3.4cm}P{3.6cm}L@{}}
+\toprule
+\textbf{Élément} & \textbf{Configuration} & \textbf{Effet} \\
+\midrule
+alice, bruno & groupe \code{webadmins} & Mettent à jour le site web \\
+chloe & groupes \code{auditeurs}, \code{systemd-journal} & Lit les journaux et rapports, sans droit d'écriture \\
+ansible & sudo sans mot de passe, clé SSH & Compte de service de l'automatisation \\
+\code{/var/www/infraready} & \code{root:webadmins}, mode 2775 (setgid) & Les webadmins écrivent, les fichiers héritent du groupe \\
+\code{/data/rapports} & \code{root:auditeurs}, mode 2750 & Les auditeurs lisent, les autres n'ont aucun accès \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{itemize}
+  \item \textbf{Service} : nginx 1.24 avec un site dédié et des journaux séparés ; \code{nginx -t} avant
+        chaque rechargement.
+  \item \textbf{Stockage} : disque de 10 Go ajouté à chaud et identifié par son \textbf{numéro de série}
+        (\code{INFRA-DATA01}), et non par un nom de périphérique supposé. Le formatage n'a lieu que si cinq
+        contrôles sont conformes (taille, aucune signature, aucune partition, non monté, différent du
+        disque système). Système de fichiers ext4 monté sur \code{/data} par UUID avec \code{nofail}.
+  \item \textbf{Mise à jour contrôlée} : snapshot, pré-contrôles, simulation \code{apt-get -s upgrade},
+        mise à jour sans suppression de paquet, contrôle de l'historique apt et du besoin de redémarrage.
+\end{itemize}
+
+\subsection{Résultats}
+
+\begin{table}[H]
+\centering
+\caption{Phase C — vérifications et résultats}\label{tab:phase-c}
+\begin{tabularx}{\linewidth}{@{}P{2.6cm}LP{2.3cm}@{}}
+\toprule
+\textbf{Vérification} & \textbf{Résultat observé} & \textbf{Preuve} \\
+\midrule
+Permissions & alice écrit dans le site, chloe est refusée ; chloe lit le journal et \code{/data/rapports}, alice est refusée & \preuve{P-20}, \preuve{P-22} \\
+Service web & Actif et activé, port 80 en écoute, HTTP 200 depuis OPS01 ; arrêt → HTTP 000, redémarrage → nouveau processus maître & \preuve{P-21} \\
+Stockage & Contrôles conformes, \code{/dev/sdb} ext4 monté sur \code{/data} par UUID, remontage par fstab réussi & \preuve{P-22} \\
+Mises à jour & 20 paquets mis à jour, code retour 0, pas de redémarrage requis & \preuve{P-23} \\
+Journaux & Tentative SSH \og pirate \fg{} refusée, requête 404 tracée, ajout à chaud du disque tracé, aucune erreur & \preuve{P-24} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\attention{Difficulté : chemin de disque deviné}{%
+Les premiers contrôles avant formatage visaient un chemin \code{/dev/disk/by-id/...} supposé, qui
+n'existait pas. Aucun formatage n'avait lieu dans ce premier script. Correction : lecture du nom
+réel et arrêt automatique si un contrôle n'est pas conforme. Le formatage a ainsi visé uniquement
+le bon disque.}
+
+\textbf{Retour arrière :} snapshot \code{s02_avant_maj_c} (disque de test compris), sauvegarde de
+la configuration réseau dans \code{/root/}.

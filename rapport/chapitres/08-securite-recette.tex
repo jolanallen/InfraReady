@@ -1,0 +1,84 @@
+% =============================================================================
+\chapter{Sécurité, limites d'intervention et recette}\label{chap:securite}
+% =============================================================================
+
+\section{Mesures de sécurité appliquées}
+
+\begin{table}[H]
+\centering
+\caption{Mesures de sécurité et de maîtrise des risques}\label{tab:securite}
+\begin{tabularx}{\linewidth}{@{}P{3.8cm}L@{}}
+\toprule
+\textbf{Principe} & \textbf{Mise en œuvre} \\
+\midrule
+Périmètre limité & Seules les VM 100 à 102 ont été modifiées ; les autres machines de l'hôte n'ont pas été touchées \\
+Isolation réseau & Laboratoire sans accès au réseau domestique (nftables), accès Internet par traduction d'adresses \\
+Retour arrière & Snapshots avant chaque changement important : \code{s01} à \code{s09} (installation, AD DS, mises à jour, supervision, Ansible, maintenance, séances 4 et 6) \\
+Cible vérifiée avant toute opération destructive & Disque de test identifié par son numéro de série, cinq contrôles avant formatage, garde-fou dans \code{linux_quotas.yml} \\
+Moindre privilège & Comptes Linux verrouillés, droits par groupe, support informatique en lecture seule, compte de service \code{ansible} dédié, service du contrôle planifié sans capacité \\
+Ports au strict besoin & UFW en refus par défaut sur les VM Linux, WinRM et ICMP limités au laboratoire, exporters ouverts à OPS01 seulement \\
+Secrets & Ansible Vault AES256 ; modèles d'installation à variables ; fichiers de réponse supprimés après usage ; recherche des secrets avant chaque commit ; gitleaks et contrôle du chiffrement des vaults en CI \\
+Changements perturbateurs documentés & Redémarrage de promotion du DC, réseau de l'hôte (sauvegarde), DNS des VM Linux (sauvegarde netplan) \\
+Validation des changements sensibles & La correction de l'incident du DC n'est pas appliquée sans accord explicite de l'équipe \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Limites connues}
+
+\begin{itemize}
+  \item WinRM en HTTP (chiffrement NTLM du message, sans certificat TLS) ; Prometheus et Grafana sans TLS
+        (laboratoire isolé) ; Grafana consultable sans compte en lecture seule depuis le laboratoire.
+  \item Pas d'Alertmanager : les alertes sont visibles dans Prometheus et Grafana mais ne déclenchent
+        aucune notification.
+  \item La supervision est hébergée sur le même hôte que les serveurs supervisés : elle ne voit pas les
+        arrêts de l'hôte (incident UC-05).
+  \item Mot de passe sudo de l'hôte Proxmox faible, à changer ; jeton API Proxmox utilisé pendant la
+        séance 6 à révoquer.
+  \item La mise à jour KB5007651 est exclue de l'installation automatique et doit être suivie à la main.
+\end{itemize}
+
+\section{Recette finale}
+
+\begin{table}[H]
+\centering
+\caption{Recette finale par phase}\label{tab:recette}
+\begin{tabularx}{\linewidth}{@{}P{1.6cm}LP{2.8cm}P{2.8cm}@{}}
+\toprule
+\textbf{Phase} & \textbf{Validation finale} & \textbf{État} & \textbf{Preuves} \\
+\midrule
+A & VM, adresses, réseau, isolation, DNS & \fait & P-01 à P-05 \\
+B & AD DS, groupes, comptes, DNS, journaux & \fait & P-10 à P-15 \\
+C & Permissions, service, stockage, journaux & \fait & P-20 à P-26 \\
+D & Playbooks Linux et Windows, idempotence & \fait & P-30 à P-39 \\
+E & Mises à jour, maintenance & \fait & P-40 à P-43 \\
+F & Exporters, dashboard, alerte & \fait & P-50 à P-56 \\
+G & Pipeline GitHub Actions vert & \fait{} (contributions à compléter) & P-60 à P-64 \\
+H & Incident corrigé, retour à la normale & \fait & P-70 à P-73 \\
+Séance 4 & Scripts, processus, 6 scénarios de panne, mode check & \fait{} (bilans à rédiger) & P-14, P-25, P-26, P-38, P-39, P-74 à P-79 \\
+Séance 6 & État initial, collecte, dashboard, alertes, contrôle de santé, tâche planifiée, maintenance, tendance, quotas & \fait{} ; UC-05 \partiel & P-80 à P-89, P-64 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Checklist de fin de séance 6 (support, section 6.1)}
+
+\begin{table}[H]
+\centering
+\caption{Checklist de fin de séance 6}\label{tab:checklist-s6}
+\begin{tabularx}{\linewidth}{@{}LP{2.2cm}@{}}
+\toprule
+\textbf{Exigence} & \textbf{État} \\
+\midrule
+État initial documenté pour les systèmes du périmètre & \fait \\
+Collecte des métriques Linux et Windows vérifiée & \fait \\
+Tableau de bord avec indicateurs lisibles et unités explicites & \fait \\
+Au moins une alerte définie et testée & \fait{} (2) \\
+Incident analysé avec journaux, hypothèse, correction et test de retour au service & \partiel \\
+Résultats, configurations et documentation intégrés au dépôt & \fait \\
+Pipeline CI vérifié, sans prétendre qu'il déploie dans le réseau privé & \fait \\
+Aucun secret publié ; captures et journaux expurgés & \fait \\
+Compléments et défi avancé & \fait \\
+\bottomrule
+\end{tabularx}
+\end{table}

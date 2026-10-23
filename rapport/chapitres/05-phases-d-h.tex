@@ -1,0 +1,261 @@
+% =============================================================================
+\chapter{Réalisation — phases D à H}\label{chap:phases-dh}
+% =============================================================================
+
+% -----------------------------------------------------------------------------
+\section{Phase D — Automatisation avec Ansible}\label{sec:phase-d}
+
+\fiche{Fournir des playbooks Linux et Windows reproductibles et idempotents.}
+      {Kenzi Bendjelloul}{19/10/2026}{\fait}
+
+\subsection{Réalisation}
+
+Ansible est installé sur OPS01 avec les collections du dépôt (\code{ansible/requirements.yml}).
+Un compte de service \code{ansible} dédié (clé ed25519, sudo sans mot de passe validé par
+\code{visudo -c}) administre LINUX01 par SSH ; WIN-DC01 est administré par WinRM (HTTP 5985, NTLM)
+avec le mot de passe Administrateur lu dans un \textbf{vault chiffré AES256}.
+
+\begin{table}[H]
+\centering
+\caption{Playbooks du dépôt}\label{tab:playbooks}
+\begin{tabularx}{\linewidth}{@{}P{3.4cm}P{1.9cm}LP{3.6cm}@{}}
+\toprule
+\textbf{Playbook} & \textbf{Cible} & \textbf{Actions} & \textbf{Vérifications intégrées} \\
+\midrule
+\code{windows_adds.yml} & WIN-DC01 & Rôle AD DS, forêt, NTP, redirecteurs, client DNS & Services AD, état du domaine \\
+\code{windows_base.yml} & WIN-DC01 & OU, groupes, comptes, partage SMB et ACL NTFS, zone inverse, enregistrements A/PTR, windows\_exporter 0.31.8, pare-feu 9182 limité à OPS01 & Services critiques démarrés, \code{/metrics} joignable \\
+\code{linux_base.yml} & LINUX01 & Paquets, comptes, droits, site nginx (modèle + rechargement), \code{/data} par UUID, pare-feu UFW, node\_exporter, contrôle planifié (séance 6) & HTTP 200, contenu publié, \code{/metrics} \\
+\code{ops01_monitoring.yml} & OPS01 & Prometheus, règles, Grafana provisionné & Toutes les cibles \code{up}, compte admin Grafana \\
+\code{linux_maintenance.yml} & Linux & Maintenance (phase E) & Pré- et post-contrôles \\
+\code{windows_maintenance.yml} & WIN-DC01 & Windows Update (phase E) & Pré- et post-contrôles \\
+\code{controle_sante.yml} & 3 serveurs & Aucune : contrôle de santé en lecture seule (séance 6) & Tableau OK / ATTENTION / ECHEC \\
+\code{linux_quotas.yml} & LINUX01 & Quotas sur le disque de test (séance 6) & Garde-fou sur le numéro de série \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Deux contrôles ont été ajoutés le 20/10 par le chef de projet : chaque playbook Windows et la
+supervision commencent par vérifier que les variables du vault sont disponibles, \emph{avant toute
+modification} ; le script \code{scripts/verif-idempotence.sh} enchaîne deux exécutions et renvoie
+0 si le second passage est à \code{changed=0}, 1 s'il reste des changements, 2 en cas d'échec.
+
+\subsection{Résultats}
+
+\begin{table}[H]
+\centering
+\caption{Phase D — vérifications et résultats}\label{tab:phase-d}
+\begin{tabularx}{\linewidth}{@{}P{3cm}LP{2.6cm}@{}}
+\toprule
+\textbf{Vérification} & \textbf{Résultat observé} & \textbf{Preuve} \\
+\midrule
+Inventaire et connexions & 3 hôtes, 3 groupes ; \code{ping: pong} et \code{win_ping: pong} & \preuve{P-30} \\
+1\textsuperscript{er} passage & Linux : 22 tâches OK dont 10 changements ; Windows : 21 tâches OK dont 12 changements ; aucun échec & \preuve{P-31}, \preuve{P-33} \\
+2\textsuperscript{e} passage (idempotence) & Linux \code{changed=0}, Windows \code{changed=0} & \preuve{P-32}, \preuve{P-34} \\
+Script d'idempotence & Code 0 sur les playbooks réels, 1 sur un playbook non idempotent, 2 sur un playbook en échec & \preuve{P-61}, \preuve{P-62} \\
+Contrôle du vault & Arrêt avant toute tâche si le vault est absent ou invalide & \preuve{P-62} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Difficultés et décisions}
+
+\begin{table}[H]
+\centering
+\caption{Phase D — difficultés rencontrées}\label{tab:phase-d-diff}
+\begin{tabularx}{\linewidth}{@{}P{3.8cm}P{4cm}L@{}}
+\toprule
+\textbf{Problème} & \textbf{Cause} & \textbf{Correction et résultat} \\
+\midrule
+L'option MSI de windows\_exporter ouvre le port 9182 à tous & Comportement de l'installeur & Option retirée, règle dédiée limitée à OPS01 \\
+Le PTR du DC repasse en \code{changed} & Le DC réenregistre lui-même son PTR (dynamique, TTL 20 min) ; le playbook le réécrivait en statique : chacun écrasait l'autre & Le playbook déclenche seulement l'enregistrement du DC s'il manque : \code{changed=0} même après réenregistrement forcé (\preuve{P-36b}, \preuve{P-37}) \\
+Test négatif du vault exécuté réellement & \code{--vault-password-file} s'ajoute au fichier configuré au lieu de le remplacer & Impact vérifié (valeur inchangée) ; test refait avec \code{ANSIBLE_VAULT_PASSWORD_FILE} ; défaut d'idempotence révélé puis corrigé (\preuve{P-62}, \preuve{P-15}) \\
+1\textsuperscript{er} pipeline CI en échec & Dashboard absent, ligne trop longue, 7 remarques ansible-lint & Corrigé ; mêmes outils installés en local pour valider avant de pousser \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% -----------------------------------------------------------------------------
+\section{Phase E — Maintenance et mises à jour}\label{sec:phase-e}
+
+\fiche{Formaliser et tester une maintenance sûre et traçable sur les deux systèmes.}
+      {MIR Mahan, Jolan Allen}{19/10/2026}{\fait}
+
+La procédure (\code{docs/procedure-maintenance.md}) fixe la fenêtre, l'ordre (LINUX01, puis
+OPS01, puis WIN-DC01 en dernier car tout le laboratoire en dépend), les précautions et le retour
+arrière. Elle est outillée par deux playbooks qui \textbf{refusent de continuer} si un pré-contrôle
+échoue.
+
+\begin{table}[H]
+\centering
+\caption{Étapes de la maintenance outillée}\label{tab:maintenance}
+\begin{tabularx}{\linewidth}{@{}P{2.4cm}LL@{}}
+\toprule
+\textbf{Étape} & \textbf{Linux (\code{linux_maintenance.yml})} & \textbf{Windows (\code{windows_maintenance.yml})} \\
+\midrule
+Retour arrière & Snapshot \code{s04_avant_maintenance_e} & Snapshot \code{s04_avant_maj_windows} \\
+Pré-contrôles & Systèmes de fichiers < 85 \% ; services attendus actifs & Volumes fixes < 85 \% ; services AD démarrés ; aucun redémarrage en attente \\
+Mises à jour & \code{unattended-upgrades} (sécurité quotidienne) ; \code{apt upgrade} sans suppression & Recherche, puis installation seulement avec \code{-e maintenance_apply=true} \\
+Redémarrage & Seulement s'il est requis \textbf{et} autorisé (\code{-e allow_reboot=true}) & Seulement avec \code{-e allow_reboot=true} \\
+Post-contrôles & Services actifs ; site HTTP 200 & Services critiques ; domaine et DNS ; historique Windows Update \\
+Trace & Rapport par serveur dans \code{~/infraready-logs/} & Idem + journal Windows Update \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Phase E — vérifications et résultats}\label{tab:phase-e}
+\begin{tabularx}{\linewidth}{@{}P{2.6cm}LP{2.7cm}@{}}
+\toprule
+\textbf{Vérification} & \textbf{Résultat observé} & \textbf{Preuve} \\
+\midrule
+Mise à jour Linux & OPS01 mis à jour ; aucun redémarrage requis ; mises à jour de sécurité automatiques actives & \preuve{P-40}, \preuve{P-43} \\
+Mise à jour Windows & 5 mises à jour installées en 1 h 13 avec redémarrage du DC (cumulative KB5126646, .NET, MSRT, Defender) ; passage complet après exclusion de KB5007651 & \preuve{P-41}, \preuve{P-42}, \preuve{P-42c} \\
+Capacité disque & Tous les volumes < 85 \% ; \code{C:} de 24,2 \% à 37,2 \% après la cumulative & \preuve{P-40b}, \preuve{P-42c} \\
+Services & Tous actifs avant et après ; site HTTP 200 & \preuve{P-40}, \preuve{P-40b} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\attention{Difficulté : boucle Windows Update sur KB5007651}{%
+L'installation se termine en échec après 1 h 13 alors que cinq mises à jour sont installées : la
+plateforme Windows Security KB5007651 est marquée « installée » trois fois de suite mais toujours
+reproposée, et le module \code{win_updates} arrête la tâche. Diagnostic par l'historique Windows
+Update, le journal Système et \code{Get-MpComputerStatus} (plateforme bien à jour). Décision :
+exclusion de KB5007651 (\code{reject_list}), à suivre manuellement ; passage suivant complet,
+\code{failed=0} (\preuve{P-42} → \preuve{P-42b} → \preuve{P-42c}). Autre difficulté corrigée : un
+lecteur CD vide était vu comme un volume plein à 100 \% (\preuve{P-41a}).}
+
+% -----------------------------------------------------------------------------
+\section{Phase F — Supervision avec Prometheus et Grafana}\label{sec:phase-f}
+
+\fiche{Collecter et visualiser les métriques réelles des serveurs et démontrer une alerte.}
+      {MIR Mahan, Jolan Allen}{19/10/2026}{\fait}
+
+\subsection{Réalisation}
+
+Tout est déployé par \code{ops01_monitoring.yml} à partir des fichiers versionnés dans
+\code{monitoring/} : configuration et règles de Prometheus (validées par \code{promtool} avant tout
+redémarrage), source de données et tableau de bord Grafana provisionnés, mot de passe
+administrateur Grafana lu dans le vault, accès anonyme en lecture seule. Les exporters sont
+installés par \code{linux_base.yml} et \code{windows_base.yml} ; leurs ports ne sont ouverts qu'à
+OPS01 (figure~\ref{fig:flux-f}).
+
+\illustration{00-flux-metriques-phase-f.pdf}{0.95}{Origine, ports et cheminement des métriques (phase F)}{fig:flux-f}
+
+\begin{table}[H]
+\centering
+\caption{Règles d'alerte (5 en phase F, 7 après la séance 6)}\label{tab:regles}
+\begin{tabularx}{\linewidth}{@{}P{4.3cm}LP{1.2cm}P{1.6cm}@{}}
+\toprule
+\textbf{Alerte} & \textbf{Condition} & \textbf{Durée} & \textbf{Sévérité} \\
+\midrule
+\code{InstanceDown} & Cible Linux ou Windows injoignable (\code{up == 0}) & 1 min & critical \\
+\code{ServiceWindowsCritiqueArrete} & Service DNS, NTDS, Netlogon ou Kdc arrêté & 1 min & critical \\
+\code{CpuEleve} & CPU > 80 \% & 2 min & warning \\
+\code{MemoireElevee} & Mémoire > 90 \% & 5 min & warning \\
+\code{DisquePresquePlein} & Volume > 85 \% & 5 min & warning \\
+\code{SiteWebIndisponible} (séance 6) & Contrôle planifié du site en échec & 2 min & critical \\
+\code{ControlePlanifieEnRetard} (séance 6) & Contrôle planifié non exécuté depuis 5 min & 5 min & warning \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Résultats}
+
+\illustration{P-51-prometheus-targets.png}{0.9}{Cibles Prometheus : 4/4 \code{up} (\preuve{P-51})}{fig:p51}
+
+\begin{table}[H]
+\centering
+\caption{Phase F — vérifications et résultats}\label{tab:phase-f}
+\begin{tabularx}{\linewidth}{@{}P{2.6cm}LP{2.6cm}@{}}
+\toprule
+\textbf{Vérification} & \textbf{Résultat observé} & \textbf{Preuve} \\
+\midrule
+Collecte Linux & LINUX01 \code{up} (1 709 métriques) ; CPU 0,2 \%, mémoire 11,3 \%, \code{/} 29,1 \% & \preuve{P-51}, \preuve{P-52} \\
+Collecte Windows & WIN-DC01 \code{up} (3 263 métriques) ; CPU 1,0 \%, mémoire 26,7 \%, \code{C:} 24,2 \% ; services AD à 1 & \preuve{P-51}, \preuve{P-52} \\
+Tableau de bord & 3 serveurs « EN LIGNE », CPU, mémoire, stockage, alertes ; version 2 avec filtre d'hôte (PR \#3) & \preuve{P-53}, \preuve{P-56} \\
+Alerte démontrée & \code{InstanceDown} pending à +10 s, firing à +60 s, résolue 16 s après le retour du service & \preuve{P-54}, \preuve{P-55} \\
+Idempotence & \code{ops01_monitoring.yml} : \code{changed=0} au 2\textsuperscript{e} passage & \preuve{P-50b} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\illustration{P-55-grafana-dashboard-alerte-linux01-hors-ligne.png}{0.95}{Dashboard Grafana (version 1) pendant la démonstration : LINUX01 hors ligne et alerte active (\preuve{P-55})}{fig:p55}
+
+\attention{Difficulté : mot de passe Grafana tronqué}{%
+Après le premier passage, le compte administrateur Grafana était refusé : le mot de passe contenait
+\og \# \fg{}, lu comme un début de commentaire dans \code{grafana.ini}. Correction : mot de passe sans
+caractère ambigu, contrôle \code{assert} dans le playbook et vérification sur l'API
+d'administration (\preuve{P-50a} → \preuve{P-50}).}
+
+% -----------------------------------------------------------------------------
+\section{Phase G — GitHub et intégration continue}\label{sec:phase-g}
+
+\fiche{Versionner les livrables et valider le dépôt automatiquement.}
+      {MIR Mahan, Jolan Allen}{19--23/10/2026}{\fait}
+
+Le dépôt \code{jolanallen/InfraReady} regroupe playbooks, scripts, supervision, modèles
+d'installation, documentation et preuves (annexe~\ref{annexe:arborescence}). Le workflow
+\code{.github/workflows/validation.yml} s'exécute à chaque push et à chaque demande de fusion.
+
+\begin{table}[H]
+\centering
+\caption{Jobs du pipeline GitHub Actions}\label{tab:ci}
+\begin{tabularx}{\linewidth}{@{}P{3.6cm}L@{}}
+\toprule
+\textbf{Job} & \textbf{Contrôles} \\
+\midrule
+Arborescence attendue & Présence des livrables (README, inventaire, playbooks, supervision) \\
+YAML + Ansible & \code{yamllint --strict}, \code{ansible-playbook --syntax-check} de chaque playbook, \code{ansible-lint} \\
+Prometheus + Grafana & \code{promtool check config} (configuration et règles), JSON du dashboard valide \\
+Aucun secret en clair & gitleaks sur tout l'historique ; fichiers vault obligatoirement chiffrés \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{itemize}
+  \item Premier run en échec (dashboard absent, lint) puis vert sur le dépôt de travail
+        (\preuve{P-60a}) ; historique migré le 20/10 vers le dépôt de l'équipe, run vert
+        (\preuve{P-60}).
+  \item Depuis le 20/10, toute modification passe par une branche et une demande de fusion
+        (16 au 23/10), relue et fusionnée par le chef de projet ; la CI est verte sur chacune
+        (\preuve{P-61} à \preuve{P-64}).
+  \item \textbf{Limite assumée} : la CI valide les fichiers mais ne déploie rien ; un runner hébergé par
+        GitHub ne peut pas joindre le réseau privé du laboratoire. Le déploiement se fait depuis OPS01.
+\end{itemize}
+
+% -----------------------------------------------------------------------------
+\section{Phase H — Diagnostic d'incident}\label{sec:phase-h}
+
+\fiche{Reproduire un incident contrôlé, en trouver la cause et prouver le retour à la normale.}
+      {MIR Mahan, Jolan Allen}{19/10/2026}{\fait}
+
+\paragraph{Incident INC-2026-10-19-01.} À 19:27, la directive \code{root} du site nginx de
+LINUX01 est modifiée vers un répertoire inexistant (\og mise en production \fg{} simulée,
+sauvegarde préalable). \code{nginx -t} ne vérifie pas l'existence du répertoire : le rechargement
+réussit et le site répond 404 pour toutes les pages.
+
+\illustration{00-incident-phase-h.pdf}{0.42}{Chronologie de l'incident de la phase H}{fig:incident-h}
+
+\begin{table}[H]
+\centering
+\caption{Phase H — démarche et résultats}\label{tab:phase-h}
+\begin{tabularx}{\linewidth}{@{}P{2.4cm}LP{2.2cm}@{}}
+\toprule
+\textbf{Étape} & \textbf{Constat} & \textbf{Preuve} \\
+\midrule
+Symptôme & HTTP 404 depuis OPS01 par adresse et par nom ; VM joignable, port 80 ouvert & \preuve{P-70} \\
+Diagnostic & Trois hypothèses écartées (service, pare-feu, contenu) ; \code{nginx -T} révèle le mauvais \code{root} ; \code{stat}, \code{diff} et le journal sudo datent et attribuent le changement & \preuve{P-71} \\
+Correction & Rejeu de la configuration de référence par \code{linux_base.yml} plutôt qu'une correction manuelle & \preuve{P-72a}, \preuve{P-72} \\
+Retour à la normale & HTTP 200 par adresse et par nom ; 2\textsuperscript{e} passage \code{changed=0} & \preuve{P-73} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\alerte{Défaut révélé dans le playbook}{%
+La première correction restaurait bien le fichier mais le site restait en 404 : la vérification
+HTTP échouait avant la fin du play, et Ansible n'exécute les gestionnaires (ici, le rechargement de
+nginx) qu'en fin de play. Correction : \code{meta: flush_handlers} avant les vérifications.
+L'incident a été reproduit une seconde fois pour prouver que le playbook corrigé le résout en un
+seul passage. Rapport complet : \code{docs/rapport-incident.md}.}

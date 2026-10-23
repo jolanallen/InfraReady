@@ -1,0 +1,14 @@
+flowchart LR
+    LAB["Lab (OPS01)<br/>tests réels, 2 passages,<br/>preuves P-80…P-89"] --> BR["7 branches depuis main<br/>fix/… feat/… docs/…"]
+    BR --> PR["PR #8 → #14<br/>titre et corps en français"]
+    PR --> CI{"GitHub Actions<br/>validation.yml"}
+    CI --> J1["Arborescence"]
+    CI --> J2["yamllint · syntax-check<br/>ansible-lint"]
+    CI --> J3["promtool · JSON dashboard"]
+    CI --> J4["gitleaks · vault chiffré"]
+    J1 & J2 & J3 & J4 --> V(["12 runs verts"])
+    V --> REV["Relecture et fusion<br/>par Jolan Allen"]
+    REV --> MAIN["main"]
+    MAIN -. "copie vers OPS01<br/>(la CI ne déploie pas :<br/>réseau privé)" .-> LAB
+    classDef ok fill:#238636,color:#fff,stroke:#238636
+    class V ok

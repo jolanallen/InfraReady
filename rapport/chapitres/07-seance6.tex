@@ -1,0 +1,210 @@
+% =============================================================================
+\chapter{Séance 6 — Maintenance opérationnelle et supervision}\label{chap:seance6}
+% =============================================================================
+
+\fiche{En tant que techniciens d'exploitation, contrôler l'état de la plateforme, fiabiliser la
+maintenance, rendre les anomalies observables et conserver des preuves vérifiables : socle
+obligatoire UC-01 à UC-06, compléments UC-C1 à UC-C4 et un défi avancé (UC-A3).}
+{MIR Mahan, Jolan Allen, Kenzi Bendjelloul}{23/10/2026}{\fait{} — UC-05 \partiel}
+
+\section{Déroulé et bilan}
+
+La séance a commencé par un blocage : l'hôte Proxmox avait été redémarré et les VM, sans démarrage
+automatique, étaient éteintes. Une fois les VM démarrées, un snapshot \code{s09_avant_seance6} a
+été pris avant toute modification (figure~\ref{fig:s6-chrono}).
+
+\illustration{01-chronologie.pdf}{1}{Déroulé réel de la séance 6 (en rouge : blocage et tests de panne contrôlés)}{fig:s6-chrono}
+
+\begin{table}[H]
+\centering
+\caption{Bilan de la séance 6 par use case}\label{tab:s6-bilan}
+\begin{tabularx}{\linewidth}{@{}P{3.6cm}LP{1.4cm}P{2.1cm}@{}}
+\toprule
+\textbf{Use case} & \textbf{Réalisation} & \textbf{Statut} & \textbf{Preuves} \\
+\midrule
+UC-01 État de santé & Fiche d'état initial datée avant toute modification ; 5 écarts relevés & \fait & \preuve{P-80}, \preuve{P-80c} \\
+UC-02 Métriques & 4/4 cibles collectées ; écart de règles et vérification du playbook corrigés & \fait & \preuve{P-81} \\
+UC-03 Tableau de bord & Dashboard v3 : unités, descriptions, données absentes distinguées de zéro & \fait & \preuve{P-85} \\
+UC-04 Alerte & 2 alertes déclenchées puis résolues par des pannes contrôlées & \fait & \preuve{P-84} \\
+UC-05 Incident & Arrêt brutal du DC : cause confirmée, correction préparée & \partiel & \preuve{P-86} \\
+UC-06 Livrables & Code, CI, README, dossier ; validé / partiel / bloqué listé & \fait & \preuve{P-64} \\
+UC-C1 Maintenance & Maintenance de LINUX01 entre deux contrôles de santé & \fait & \preuve{P-87} \\
+UC-C2 Contrôle Ansible & \code{controle_sante.yml} en lecture seule & \fait & \preuve{P-82} \\
+UC-C3 Tendance & Mesure ponctuelle comparée à 4 jours d'historique & \fait & \preuve{P-88} \\
+UC-C4 Tâche planifiée & Timer systemd tracé dans le journal et dans Prometheus & \fait & \preuve{P-83} \\
+UC-A3 Quotas (défi) & Quotas sur le disque de test \code{/data} & \fait & \preuve{P-89} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% -----------------------------------------------------------------------------
+\section{UC-01 — État de santé vérifiable}
+
+Le relevé initial (09:06) couvre l'identité, l'heure, les disques, les services, les unités en
+échec, les erreurs récentes et un test fonctionnel par service (résolution DNS, page HTTP avec
+contrôle du contenu, API Prometheus et Grafana, requête Active Directory). Sous Linux, il utilise
+\code{hostnamectl}, \code{timedatectl}, \code{df}, \code{systemctl}, \code{journalctl},
+\code{getent} et \code{curl} ; sous Windows, un script PowerShell en lecture seule exécuté par WinRM.
+
+\begin{table}[H]
+\centering
+\caption{Écarts relevés par l'état initial et suite donnée}\label{tab:s6-ecarts}
+\begin{tabularx}{\linewidth}{@{}P{0.4cm}P{4.6cm}LP{1.6cm}@{}}
+\toprule
+\textbf{\#} & \textbf{Écart} & \textbf{Cause et suite} & \textbf{Statut} \\
+\midrule
+1 & VM éteintes après le redémarrage de l'hôte & Pas de démarrage automatique ; VM démarrées à la main & Levé \\
+2 & Jeton API Proxmox sans droit & Séparation des privilèges ; retirée par l'étudiant & Levé \\
+3 & 4 règles d'alerte chargées au lieu de 5 & Copie du projet sur OPS01 non resynchronisée ; supervision redéployée & Corrigé \\
+4 & \code{openipmi.service} en échec sur les VM Linux & Paquet recommandé installé par nos playbooks, sans matériel IPMI ; service désactivé par Ansible & Corrigé \\
+5 & WIN-DC01 : événements 41 et 6008 & Arrêt non propre à chaque arrêt de l'hôte : incident UC-05 & Diagnostiqué \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\illustration{P-80c-rendu-proxmox-snapshots-s09.png}{0.95}{Snapshots des trois VM, dont \code{s09_avant_seance6} (rendu de la sortie de l'API, \preuve{P-80c})}{fig:s6-snap}
+
+% -----------------------------------------------------------------------------
+\section{UC-02 — Métriques Linux et Windows collectables}
+
+La collecte a été vérifiée de bout en bout : configuration chargée, connexions TCP établies vers
+les exporters, endpoints \code{/metrics} en HTTP 200, puis valeurs lues dans la base de Prometheus
+(figure~\ref{fig:s6-flux}).
+
+\illustration{02-flux-supervision.pdf}{1}{Architecture de supervision après la séance 6 (en bleu : éléments ajoutés)}{fig:s6-flux}
+
+\illustration{P-81-prometheus-cibles-up.png}{0.85}{Prometheus : 4/4 cibles \code{up} après correction (\preuve{P-81})}{fig:s6-cibles}
+
+\attention{Défaut révélé : vérification des cibles qui réussissait sans cible}{%
+Juste après un redémarrage de Prometheus, la liste des cibles est vide : l'assertion du playbook
+réussissait alors sans rien vérifier (\og 0 cibles up \fg{}). Au passage suivant, une cible encore
+\og unknown \fg{} la faisait échouer. Correction : attendre le premier scrape (8 tentatives de 5 s)
+et exiger une liste non vide ; le cas défaillant a été rejoué avec succès (\preuve{P-81a} → \preuve{P-81b}).}
+
+% -----------------------------------------------------------------------------
+\section{UC-03 — Tableau de bord d'exploitation}
+
+Le dashboard \og InfraReady — Serveurs \fg{} passe en version 3 : description d'usage, période de
+6 heures, une description \og ce que le panneau permet de décider \fg{} sur chacun des 9 panneaux,
+des unités explicites, et surtout la distinction entre une \textbf{donnée absente} (\og NON
+COLLECTÉ \fg{}, courbes interrompues) et une \textbf{valeur réellement nulle}. Trois panneaux sont
+ajoutés : contrôle planifié du site, maintenance Linux et évolution du stockage.
+
+\illustration{P-85-grafana-dashboard-v3-exploitation.png}{0.82}{Dashboard Grafana v3 : le laboratoire était éteint avant 9 h, d'où les zones vides plutôt que des zéros (\preuve{P-85})}{fig:s6-dash}
+
+% -----------------------------------------------------------------------------
+\section{UC-04 et UC-C4 — Tâche planifiée et alertes testées}
+
+L'incident de la phase H avait montré qu'un site indisponible ne déclenchait aucune alerte, puisque
+seul l'exporter était surveillé. Un \textbf{timer systemd} lance désormais \code{check-nginx.sh}
+chaque minute sur LINUX01 et publie le résultat pour Prometheus via le collecteur \og textfile \fg{}
+de node\_exporter. Le service tourne en root \textbf{sans aucune capacité}, avec un système de
+fichiers en lecture seule sauf le dossier des métriques.
+
+\illustration{03-sequence-alerte.pdf}{0.95}{Chaîne de détection pendant le test 1 (nginx arrêté)}{fig:s6-seq}
+
+\begin{table}[H]
+\centering
+\caption{Les deux alertes ajoutées}\label{tab:s6-alertes}
+\begin{tabularx}{\linewidth}{@{}P{2.6cm}LL@{}}
+\toprule
+ & \code{SiteWebIndisponible} & \code{ControlePlanifieEnRetard} \\
+\midrule
+Condition & Contrôle du site en échec (\code{infraready_controle_succes == 0}) & Dernier contrôle de plus de 300 s, ou métrique absente \\
+Durée, gravité & 2 min (deux contrôles consécutifs), critical & 5 min, warning \\
+Première action & Journal du contrôle, puis état de nginx & État du timer, puis journal du contrôle \\
+Test contrôlé & nginx arrêté de 09:26 à 09:30 & Timer arrêté de 09:54 à 10:04 \\
+Résultat & Firing à +3 min 08 ; \code{InstanceDown} reste inactive ; résolue 27 s après & Firing à 10:04:01 ; résolue à 10:04:17 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\illustration{04-etats-alertes.pdf}{0.42}{Cycle de vie des deux alertes pendant les tests}{fig:s6-etats}
+
+\illustration{P-84-grafana-dashboard-site-en-echec.png}{0.78}{Dashboard figé à 09:29:40 : contrôle du site en ÉCHEC et alerte \code{SiteWebIndisponible} active, alors que LINUX01 reste EN LIGNE (\preuve{P-84})}{fig:s6-echec}
+
+\illustration{P-84-prometheus-historique-controle-succes.png}{0.85}{Prometheus : \code{infraready_controle_succes} tombe à 0 pendant l'arrêt de nginx (axe horaire en UTC, soit l'heure de Paris moins 2 h)}{fig:s6-histo}
+
+\illustration{P-83-rendu-timer-journal-metriques.png}{0.95}{Timer, journal du contrôle et métriques publiées sur LINUX01 (rendu de la sortie, \preuve{P-83})}{fig:s6-timer}
+
+% -----------------------------------------------------------------------------
+\section{UC-05 — Incident : arrêt brutal du contrôleur de domaine}
+
+\paragraph{Symptôme.} Au démarrage du 23/10, WIN-DC01 journalise les événements 41 (Kernel-Power)
+et 6008 (\og l'arrêt précédent du système était inattendu \fg{}). Le même couple d'événements
+existe après l'arrêt du 19/10 : l'incident est systématique. \textbf{Impact supposé :} risque
+d'incohérence de la base Active Directory et des zones DNS à chaque arrêt de l'hôte.
+
+\illustration{P-80-rendu-win-dc01-evenements-arret.png}{0.95}{Événements 41 et 6008 de WIN-DC01 (rendu de la sortie, \preuve{P-80})}{fig:s6-evt}
+
+\illustration{05-diagnostic-dc.pdf}{0.48}{Démarche de diagnostic de l'incident INC-2026-10-23-01}{fig:s6-diag}
+
+\illustration{06-arret-sequence.pdf}{0.8}{Ce qui se passe à l'arrêt de l'hôte}{fig:s6-arret}
+
+\illustration{P-86-rendu-proxmox-arrets-vm100-reproduction.png}{0.95}{Journal des tâches Proxmox : la VM 100 tuée après 182–183 s, puis la reproduction contrôlée qui échoue sur délai (rendu de la sortie, \preuve{P-86})}{fig:s6-pve}
+
+\begin{itemize}
+  \item \textbf{Cause confirmée :} Windows Server ignore la demande d'arrêt ACPI à l'écran d'ouverture
+        de session lorsque la stratégie \code{ShutdownWithoutLogon} vaut 0, ce qui est sa valeur par
+        défaut ; Proxmox attend 180 s puis tue la VM.
+  \item \textbf{Limite mise en évidence :} Prometheus tourne sur OPS01, arrêtée en même temps : la
+        supervision ne peut pas observer cet incident.
+  \item \textbf{Correction proposée :} passer \code{ShutdownWithoutLogon} à 1 par \code{windows_base.yml}
+        (retour arrière : valeur 0), puis valider par un arrêt ACPI réel et l'absence d'événements 41/6008.
+\end{itemize}
+
+\attention{Correction non appliquée}{%
+La correction modifie le contrôleur de domaine partagé : elle attend une validation explicite de
+l'équipe. Rapport complet : \code{docs/rapport-incident.md} (INC-2026-10-23-01).}
+
+% -----------------------------------------------------------------------------
+\section{UC-06 — Intégration aux livrables}
+
+\illustration{11-git-ci.pdf}{1}{Du laboratoire au dépôt : branches, demandes de fusion, CI et fusion}{fig:s6-git}
+
+\illustration{P-64-github-pr-seance6-fusionnees.png}{0.8}{Demandes de fusion de la séance 6, fusionnées avec des contrôles CI 8/8 (\preuve{P-64})}{fig:s6-pr}
+
+% -----------------------------------------------------------------------------
+\section{UC-C1 et UC-C2 — Maintenance encadrée par un contrôle de santé}
+
+Le playbook \code{controle_sante.yml} contrôle les trois serveurs en lecture seule
+(\code{changed=0}, y compris en \code{--check}) et produit un tableau OK / ATTENTION / ECHEC / NON
+APPLICABLE / INACCESSIBLE ; il échoue (code 2) s'il reste un échec, ce qui permet de l'utiliser
+comme critère d'arrêt d'une maintenance.
+
+\illustration{08-controle-sante.pdf}{1}{Structure du playbook \code{controle_sante.yml}}{fig:s6-cs}
+
+\illustration{P-82-rendu-tableau-controle-sante.png}{0.98}{Contrôle de santé des trois serveurs : 23 OK, 3 ATTENTION, 1 NON APPLICABLE, 0 ECHEC (rendu de la sortie, \preuve{P-80b} / \preuve{P-82})}{fig:s6-cstab}
+
+\illustration{07-maintenance.pdf}{0.5}{Processus de maintenance suivi, avec ses points d'arrêt}{fig:s6-maint}
+
+\illustration{P-87-rendu-maintenance-avant-apres.png}{0.95}{Maintenance de LINUX01 : 3 paquets installés, 5 reportés par le phasage d'Ubuntu, aucun écart de statut avant / après (rendu de la sortie, \preuve{P-87})}{fig:s6-maintres}
+
+% -----------------------------------------------------------------------------
+\section{UC-C3 — Observation ponctuelle et suivi dans le temps}
+
+La mesure du jour (OPS01 \code{/} à 26,3 \%) ne dit rien d'une tendance. L'historique de Prometheus
+ne couvre que 15 heures sur 91, car le laboratoire était éteint le reste du temps
+(figure~\ref{fig:s6-couv}) : OPS01 gagne environ 0,12 Gio sur 15 heures de fonctionnement, LINUX01
+reste stable. Une pente calculée par Prometheus sur 45 minutes de données annonçait au contraire
+LINUX01 à 4,7 \% dans 30 jours : \textbf{une pente calculée sur si peu de données n'est pas une
+tendance}. Une alerte prédictive est proposée, à valider après une semaine de fonctionnement continu.
+
+\illustration{09-couverture-donnees.pdf}{1}{Périodes couvertes par l'historique Prometheus}{fig:s6-couv}
+
+\illustration{P-88-grafana-evolution-stockage-19-23-oct.png}{0.95}{Évolution du stockage du 19 au 23/10 : trois îlots de données ; on y voit aussi \code{C:} de WIN-DC01 passer de 24 \% à 43 \% puis 37 \% pendant Windows Update (\preuve{P-88})}{fig:s6-stock}
+
+% -----------------------------------------------------------------------------
+\section{UC-A3 (défi) — Quotas sur le disque de test}
+
+Des quotas ont été préférés à un RAID de démonstration, faute de disques supplémentaires réservés au
+TP. Le playbook \code{linux_quotas.yml} vérifie d'abord le numéro de série du disque et ses options
+de montage, et s'arrête avant toute modification si ce n'est pas le disque de test.
+
+\illustration{10-quotas.pdf}{0.95}{Comportement des quotas observé}{fig:s6-quotas}
+
+\illustration{P-89-rendu-test-quotas-alice.png}{0.95}{Test réel : alice acceptée à 220 Mio avec délai de grâce, puis bloquée à 250 Mio (rendu de la sortie, \preuve{P-89})}{fig:s6-quotatest}
+
+\textbf{Limites :} root n'est pas soumis aux quotas ; \code{repquota} lit un fichier mis à jour en
+différé, alors que \code{quota -u} interroge le noyau. Le premier essai n'était pas idempotent
+(\code{repquota} sans \code{-v} masque les comptes sans occupation) : corrigé (\preuve{P-89a} → \preuve{P-89}).

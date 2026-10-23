@@ -1,0 +1,45 @@
+% --- Résumé ----------------------------------------------------------------------
+\addchap{Résumé}
+
+L'entreprise fictive \emph{InfraReady} souhaite standardiser la configuration de ses serveurs,
+automatiser leur administration et les superviser. Le projet consistait à concevoir, déployer et
+documenter un laboratoire représentatif : trois machines virtuelles sur un hyperviseur Proxmox VE,
+dans un réseau isolé \code{192.168.50.0/24} — un contrôleur de domaine Windows Server 2025
+(\textbf{WIN-DC01}, Active Directory et DNS), un serveur Ubuntu 24.04 hébergeant un service web
+(\textbf{LINUX01}) et un serveur d'exploitation Ubuntu 24.04 portant Ansible, Prometheus et
+Grafana (\textbf{OPS01}).
+
+Le travail a été mené en huit phases (A à H) puis complété par deux séances de travaux pratiques.
+Les installations sont automatiques, la configuration des serveurs est décrite par des playbooks
+Ansible rejoués deux fois pour prouver leur idempotence, les secrets sont chiffrés par Ansible
+Vault, et les métriques des trois serveurs sont collectées par Prometheus et présentées dans un
+tableau de bord Grafana. Un dépôt GitHub versionne l'ensemble ; chaque modification passe par une
+branche et une demande de fusion validée par un pipeline GitHub Actions (lint, syntaxe, règles
+Prometheus, recherche de secrets).
+
+La séance 6, consacrée à la maintenance opérationnelle et à la supervision, a ajouté un contrôle de
+santé automatisé en lecture seule, une tâche planifiée qui teste le site web chaque minute, deux
+alertes vérifiées par des pannes contrôlées, un tableau de bord d'exploitation, des quotas disque et
+le diagnostic d'un incident réel : l'arrêt brutal du contrôleur de domaine à chaque arrêt de
+l'hyperviseur.
+
+\info{Résultats clés}{%
+\begin{itemize}[leftmargin=1.2em]
+  \item 3 serveurs opérationnels, domaine \code{infraready.test} fonctionnel, isolation réseau vérifiée ;
+  \item 8 playbooks Ansible ; ceux de configuration sont idempotents (second passage \code{changed=0}) ;
+  \item 4/4 cibles Prometheus collectées, 7 règles d'alerte, dashboard Grafana de 9 panneaux ;
+  \item 16 demandes de fusion (PR), pipeline CI vert, gitleaks sans alerte sur tout l'historique ;
+  \item plus de 100 preuves horodatées ; tous les échecs rencontrés sont documentés avec leur cause et leur correction.
+\end{itemize}}
+
+\attention{Points ouverts à la remise}{%
+La correction de l'arrêt non propre du contrôleur de domaine (incident INC-2026-10-23-01) est
+diagnostiquée, reproduite et préparée mais n'est pas appliquée : elle modifie le contrôleur de
+domaine partagé et attend la validation de l'équipe. Les bilans individuels restent à rédiger par
+chaque membre. L'emploi de Proxmox VE à la place de VMware Workstation doit être validé par le
+formateur.}
+
+\medskip
+\noindent\textbf{Mots-clés :} Proxmox VE, Windows Server 2025, Active Directory, Ubuntu Server,
+Ansible, idempotence, Ansible Vault, Prometheus, Grafana, node\_exporter, windows\_exporter,
+GitHub Actions, maintenance, supervision, diagnostic d'incident.
