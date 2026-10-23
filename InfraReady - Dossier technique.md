@@ -1347,7 +1347,7 @@ InfraReady/
 ## 17. Checklist de remise
 
 - [ ] Dépôt GitHub prêt, avec contributions de l'équipe
-- [ ] Dossier technique exporté en PDF + lien du dépôt
+- [x] Rapport final en PDF à la racine du dépôt (`InfraReady-Rapport-final.pdf`, sources LaTeX dans `rapport/`) + lien du dépôt
 - [x] Captures et sorties de commandes classées (`docs/preuves/`, numérotation par phase)
 - [x] Rapport d'incident distinct rédigé (`docs/rapport-incident.md`)
 - [ ] PowerPoint final préparé selon modalités du formateur

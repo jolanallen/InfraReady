@@ -12,6 +12,7 @@ Laboratoire : 3 VM sur Proxmox VE, réseau isolé `192.168.50.0/24`.
 
 ## Documents
 
+- **Rapport final (PDF)** : [InfraReady-Rapport-final.pdf](InfraReady-Rapport-final.pdf) — compte rendu du projet généré en LaTeX (sources : `InfraReady-Rapport-final.tex` et `rapport/`, compilation : `./rapport/build.sh`)
 - **Dossier technique** : [InfraReady - Dossier technique.md](InfraReady%20-%20Dossier%20technique.md) (phases A à H, TP de la séance 4 en section 11, TP de la séance 6 en section 12, preuves, écarts)
 - **Séance 6, note de synthèse illustrée** : [InfraReady - Séance 6.md](InfraReady%20-%20S%C3%A9ance%206.md) (bilan par use case et captures)
 - **Procédure de maintenance** : [docs/procedure-maintenance.md](docs/procedure-maintenance.md)
@@ -26,6 +27,7 @@ lab/          modèles d'installation automatique (Ubuntu autoinstall, Windows a
 monitoring/   configuration Prometheus (cibles, règles d'alerte) et provisioning Grafana (source, dashboard)
 scripts/      scripts d'amorçage, de vérification et de diagnostic (bash, PowerShell)
 docs/         procédure de maintenance, rapport d'incident, preuves
+rapport/      sources LaTeX du rapport final (chapitres, schémas Mermaid, figures, script de compilation)
 .github/      workflow de validation (yamllint, ansible-lint, syntax-check, promtool, gitleaks, vault chiffré)
 ```
 
