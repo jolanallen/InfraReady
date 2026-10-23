@@ -1,0 +1,102 @@
+---
+# Séance 6, défi UC-A3 — quotas disque par utilisateur sur le disque de TEST /data de LINUX01.
+# Le play s'arrête avant toute modification si /data n'est pas le disque de test (numéro de série INFRA-DATA01)
+# ou n'est pas monté avec usrquota,grpquota (options posées par linux_base.yml) : jamais / ni un disque de données réel.
+# Prérequis : linux_base.yml rejoué, snapshot Proxmox préalable. Rejouable : un second passage affiche changed=0.
+# Retour arrière (manuel, documenté dans le dossier) : quotaoff -ug /data ; retirer usrquota,grpquota de data_mount_opts
+# (linux_base.yml) et le rejouer ; rm /data/aquota.user /data/aquota.group.
+- name: LINUX01 - quotas sur le disque de test /data
+  hosts: linux01
+  gather_facts: false
+
+  vars:
+    data_mount: /data
+    data_serie: INFRA-DATA01
+    quota_partage: /data/partage-web          # espace commun des webadmins, soumis aux quotas
+    quotas_utilisateurs:                      # limites en Mio : avertissement (souple, 7 jours de grâce) / blocage (strict)
+      - { nom: alice, souple: 200, strict: 250 }
+      - { nom: bruno, souple: 200, strict: 250 }
+
+  tasks:
+    # --- Garde-fous (lecture seule) -------------------------------------------------
+    - name: Périphérique et options de montage de /data
+      ansible.builtin.command: findmnt -no SOURCE,OPTIONS {{ data_mount }}
+      register: quota_montage
+      changed_when: false
+      check_mode: false
+
+    - name: Numéro de série du disque monté sur /data
+      ansible.builtin.command: lsblk -dno SERIAL {{ quota_montage.stdout.split()[0] }}
+      register: quota_serie
+      changed_when: false
+      check_mode: false
+
+    - name: /data est le disque de test et accepte les quotas
+      ansible.builtin.assert:
+        that:
+          - quota_serie.stdout | trim == data_serie
+          - "'usrquota' in quota_montage.stdout and 'grpquota' in quota_montage.stdout"
+        fail_msg: >-
+          Arrêt : {{ data_mount }} = {{ quota_montage.stdout }} (série « {{ quota_serie.stdout | trim }} ») —
+          attendu le disque {{ data_serie }} monté avec usrquota,grpquota (rejouer linux_base.yml).
+        success_msg: "{{ data_mount }} = disque de test {{ data_serie }}, options {{ quota_montage.stdout.split()[1] }}"
+
+    # --- Activation ---------------------------------------------------------------
+    - name: Outils de gestion des quotas
+      ansible.builtin.apt:
+        name: quota
+        state: present
+
+    - name: Fichiers de quotas initialisés (comptage de l'occupation existante)
+      ansible.builtin.command: quotacheck -cugm {{ data_mount }}
+      args:
+        creates: "{{ data_mount }}/aquota.user"
+
+    - name: État d'application des quotas
+      ansible.builtin.command: quotaon -pug {{ data_mount }}
+      register: quota_etat
+      changed_when: false
+      failed_when: false   # quotaon -p renvoie un code non nul quand les quotas sont actifs
+      check_mode: false
+
+    - name: Application des quotas utilisateurs et groupes
+      ansible.builtin.command: quotaon -ug {{ data_mount }}
+      when: "'is off' in quota_etat.stdout"
+      changed_when: true
+
+    - name: Espace partagé des webadmins (soumis aux quotas)
+      ansible.builtin.file:
+        path: "{{ quota_partage }}"
+        state: directory
+        owner: root
+        group: webadmins
+        mode: "2775"
+
+    # --- Limites (comparées avant écriture : idempotent) --------------------------------
+    - name: Limites actuelles de tous les comptes (repquota, en Kio)
+      ansible.builtin.command: repquota -uv -O csv {{ data_mount }}   # -v : aussi les comptes sans occupation
+      register: quota_rapport
+      changed_when: false
+      check_mode: false
+
+    - name: Limites par utilisateur
+      vars:
+        ligne: "{{ quota_rapport.stdout_lines | select('match', item.nom ~ ',') | first | default('') }}"
+        actuel: "{{ (ligne.split(',')[4:6] | map('int') | list) if ligne else [0, 0] }}"
+        voulu: "{{ [item.souple * 1024, item.strict * 1024] }}"
+      ansible.builtin.command: setquota -u {{ item.nom }} {{ voulu[0] }} {{ voulu[1] }} 0 0 {{ data_mount }}
+      when: actuel | map('int') | list != voulu | map('int') | list
+      changed_when: true
+      loop: "{{ quotas_utilisateurs }}"
+      loop_control:
+        label: "{{ item.nom }} : {{ item.souple }} / {{ item.strict }} Mio"
+
+    - name: Rapport des quotas
+      ansible.builtin.command: repquota -uvs {{ data_mount }}
+      register: quota_final
+      changed_when: false
+      check_mode: false
+
+    - name: Quotas en place
+      ansible.builtin.debug:
+        msg: "{{ quota_final.stdout_lines }}"

@@ -17,6 +17,8 @@
     site_message: "Site InfraReady déployé par Ansible depuis OPS01"
     data_label: DATA
     data_mount: /data
+    # usrquota,grpquota : quotas possibles sur le disque de TEST (séance 6, défi UC-A3, activés par linux_quotas.yml)
+    data_mount_opts: defaults,nofail,usrquota,grpquota
 
   tasks:
     - name: Fuseau horaire
@@ -112,7 +114,7 @@
             path: "{{ data_mount }}"
             src: "UUID={{ data_uuid.stdout }}"
             fstype: ext4
-            opts: defaults,nofail
+            opts: "{{ data_mount_opts }}"
             state: mounted
 
         - name: Dossier des rapports - lecture pour auditeurs uniquement
