@@ -1,0 +1,45 @@
+# Preuve : P-85-grafana-dashboard-v3-deploiement
+# Séance 6, UC-03 — dashboard « InfraReady — Serveurs » v3 (monitoring/grafana/dashboards/infraready.json) :
+#   description d'usage et période par défaut (6 h), description « ce que le panneau permet de décider » sur chaque panneau,
+#   unités explicites, données absentes ≠ zéro (noValue « NON COLLECTÉ » / « Aucune donnée », courbes sans relier les trous),
+#   3 nouveaux panneaux : contrôle planifié du site (UC-C4), maintenance Linux (collecteur apt), évolution du stockage (UC-C3).
+# Déploiement par ops01_monitoring.yml (2 passages) puis vérification par l'API Grafana. Capture : P-85-grafana-dashboard-v3-exploitation.png
+#   (09:44, 6 dernières heures : les courbes commencent à 09:01, labo éteint avant → trous, pas des zéros ; pics CPU de 09:01-09:05
+#   = démarrage des VM).
+# 2026-10-23 09:43:12 CEST — $ ../scripts/verif-idempotence.sh playbooks/ops01_monitoring.yml
+== 1er passage : mise à jour de l'état si nécessaire
+TASK [Dossiers de provisioning et de dashboards] *******************************
+ok: [ops01] => (item={'path': '/etc/grafana/provisioning/dashboards', 'owner': 'root'})
+ok: [ops01] => (item={'path': '/var/lib/grafana/dashboards/infraready', 'owner': 'grafana'})
+TASK [Source de données et fournisseur de dashboards (provisioning)] ***********
+ok: [ops01] => (item=dashboards/infraready.yml)
+changed: [ops01]
+    msg: Grafana OK — 1 dashboard(s), source 'Prometheus' -> http://localhost:9090
+ops01                      : ok=28   changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+Source de données et fournisseur de dashboards (provisioning) ----------- 0.74s
+Dossiers de provisioning et de dashboards ------------------------------- 0.61s
+== 2e passage : doit afficher changed=0
+TASK [Dossiers de provisioning et de dashboards] *******************************
+ok: [ops01] => (item={'path': '/etc/grafana/provisioning/dashboards', 'owner': 'root'})
+ok: [ops01] => (item={'path': '/var/lib/grafana/dashboards/infraready', 'owner': 'grafana'})
+TASK [Source de données et fournisseur de dashboards (provisioning)] ***********
+ok: [ops01] => (item=dashboards/infraready.yml)
+    msg: Grafana OK — 1 dashboard(s), source 'Prometheus' -> http://localhost:9090
+ops01                      : ok=28   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+Source de données et fournisseur de dashboards (provisioning) ----------- 0.76s
+Dossiers de provisioning et de dashboards ------------------------------- 0.60s
+IDEMPOTENT : 2e passage sans changement (changed=0, failed=0, unreachable=0)
+code retour : 0
+
+# Vérification par l'API Grafana (lecture anonyme) — 09:43:47
+$ curl -s localhost:3000/api/dashboards/uid/infraready-serveurs | <version, titre, période, panneaux>
+version 3 | InfraReady — Serveurs | période {'from': 'now-6h', 'to': 'now'} | 9 panneaux
+  Disponibilité des serveurs                    unité=-        noValue=NON COLLECTÉ           description=oui
+  Uptime                                        unité=s        noValue=NON COLLECTÉ           description=oui
+  CPU (%)                                       unité=percent  noValue=Aucune donnée          description=oui
+  Mémoire utilisée (%)                          unité=percent  noValue=Aucune donnée          description=oui
+  Stockage utilisé (%) par volume               unité=percent  noValue=NON COLLECTÉ           description=oui
+  Alertes Prometheus actives                    unité=-        noValue=Aucune alerte active   description=oui
+  Contrôle planifié du site web (LINUX01)       unité=-        noValue=NON COLLECTÉ           description=oui
+  Maintenance Linux (paquets et redémarrage)    unité=none     noValue=NON COLLECTÉ           description=oui
+  Stockage utilisé (%) — évolution              unité=percent  noValue=Aucune donnée          description=oui

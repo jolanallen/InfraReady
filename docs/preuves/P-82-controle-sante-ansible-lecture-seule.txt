@@ -1,0 +1,122 @@
+# Preuve : P-82-controle-sante-ansible-lecture-seule
+# Séance 6, UC-C2 (et UC-01 automatisé) — playbook ansible/playbooks/controle_sante.yml, inventaire du projet (inventory/hosts.yml)
+#   Contrôles par hôte : identité, heure/NTP, espace disque (seuil 85 %), /data, services attendus, unités systemd en échec,
+#   erreurs du journal sur 24 h, DNS du domaine, tests fonctionnels (site web par le nom DNS ; cibles Prometheus ; API Grafana ;
+#   AD, DNS local et windows_exporter sur WIN-DC01). Statuts : OK / ATTENTION / ECHEC / NON APPLICABLE / INACCESSIBLE.
+#   Le dernier play échoue (code 2) s'il reste un ECHEC ou un INACCESSIBLE : résultat exploitable par un script ou une tâche planifiée.
+# Lecture seule : changed=0 sur les trois serveurs, en exécution normale comme en --check. Identifiants : vault chiffré (WinRM).
+# Hôte : ops01 (utilisateur ansible, ~/infraready/ansible) — 2026-10-23
+# 1) détecte deux ECHEC réels (openipmi.service, voir P-80b) ; 3) puis 3b) : test d'hôte injoignable et correctif --limit.
+# 1) Exécution normale — 2026-10-23 09:31:48 CEST
+$ ansible-playbook playbooks/controle_sante.yml ; echo "code retour : $?"
+PLAY [Contrôle de santé - serveurs Linux] **************************************
+TASK [Gathering Facts] *********************************************************
+TASK [Pourcentage utilisé par système de fichiers] *****************************
+TASK [Synchronisation de l'heure (NTP)] ****************************************
+TASK [État des services] *******************************************************
+TASK [Unités systemd en échec] *************************************************
+TASK [Erreurs du journal système sur 24 h] *************************************
+TASK [Résolution DNS du contrôleur de domaine] *********************************
+TASK [Site web de LINUX01 - HTTP et contenu (depuis OPS01, par le nom DNS)] ****
+TASK [Prometheus - état des cibles collectées] *********************************
+TASK [Grafana - santé de l'API] ************************************************
+TASK [Synthèse des contrôles Linux] ********************************************
+PLAY [Contrôle de santé - WIN-DC01] ********************************************
+TASK [Relevé en lecture seule (PowerShell)] ************************************
+TASK [Synthèse des contrôles Windows] ******************************************
+PLAY [Contrôle de santé - synthèse] ********************************************
+TASK [Construire le tableau (un hôte sans résultat est INACCESSIBLE)] **********
+TASK [Résultat du contrôle de santé] *******************************************
+    msg: |-
+        linux01   Identité                   OK              linux01 192.168.50.20, Ubuntu 24.04, noyau 6.8.0-147-generic, démarré depuis 0.5 h
+        linux01   Heure                      OK              2026-10-23 09:31:49 CEST, NTP synchronisé : yes
+        linux01   Espace disque              OK              / 29.2 %  /data 5.3 %  /boot 11.4 %  (seuil 85 %)
+        linux01   Disque de données /data    OK              /data monté
+        linux01   Services attendus          OK              ssh, nginx, prometheus-node-exporter actifs
+        linux01   Unités systemd en échec    ECHEC           openipmi.service
+        linux01   Journal (erreurs 24 h)     ATTENTION       4 ligne(s) ; dernière : 2026-10-23T09:29:12+02:00 linux01 systemd[1]: Failed to start infraready-controle-site.service - InfraReady - contrôle du site web (check-nginx.sh) publié pour Prometheus.
+        linux01   DNS du domaine             OK              win-dc01.infraready.test -> 192.168.50.10
+        linux01   Site web (HTTP + contenu)  OK              http://linux01.infraready.test/ -> HTTP 200
+        ops01     Identité                   OK              ops01 192.168.50.30, Ubuntu 24.04, noyau 6.8.0-147-generic, démarré depuis 0.5 h
+        ops01     Heure                      OK              2026-10-23 09:31:49 CEST, NTP synchronisé : yes
+        ops01     Espace disque              OK              / 26.3 %  /boot 11.4 %  (seuil 85 %)
+        ops01     Disque de données /data    NON APPLICABLE  pas de disque de données sur cet hôte
+        ops01     Services attendus          OK              prometheus, grafana-server, prometheus-node-exporter actifs
+        ops01     Unités systemd en échec    ECHEC           openipmi.service
+        ops01     Journal (erreurs 24 h)     ATTENTION       2 ligne(s) ; dernière : 2026-10-23T09:03:23+02:00 ops01 sudo[1795]: infraadmin : a password is required ; PWD=/home/infraadmin ; USER=root ; COMMAND=/usr/bin/true
+        ops01     DNS du domaine             OK              win-dc01.infraready.test -> 192.168.50.10
+        ops01     Prometheus - cibles        OK              4/4 cibles up
+        ops01     Grafana - API              OK              base ok, version 13.2.4
+        win-dc01  Identité                   OK              WIN-DC01 192.168.50.10, Microsoft Windows Server 2025 Standard Evaluation (build 26100), démarré depuis 0.5 h
+        win-dc01  Heure                      OK              2026-10-23T09:31:57+02:00, source NTP : 0.fr.pool.ntp.org,0x8
+        win-dc01  Espace disque              OK              C: 37.3 %  (seuil 85 %)
+        win-dc01  Services attendus          OK              NTDS, DNS, Netlogon, Kdc, W32Time, WinRM, windows_exporter actifs
+        win-dc01  Journal (erreurs 24 h)     ATTENTION       2 événement(s) System ; 2026-10-23 09:01 41 Microsoft-Windows-Kernel-Power | 2026-10-23 09:01 6008 EventLog
+        win-dc01  DNS du domaine             OK              linux01.infraready.test -> 192.168.50.20 (serveur DNS local)
+        win-dc01  Active Directory           OK              domaine infraready.test
+        win-dc01  windows_exporter           OK              http://localhost:9182/metrics -> HTTP 200
+TASK [Dossier des rapports] ****************************************************
+TASK [Rapport de contrôle de santé] ********************************************
+TASK [Aucun contrôle en échec et aucun hôte inaccessible] **********************
+fatal: [localhost]: FAILED! => 
+    assertion: sante_lignes | selectattr('statut', 'in', ['ECHEC', 'INACCESSIBLE']) |
+        list | length == 0
+    changed: false
+    evaluated_to: false
+    msg: 'linux01 : Unités systemd en échec ; ops01 : Unités systemd en échec'
+PLAY RECAP *********************************************************************
+linux01                    : ok=9    changed=0    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
+localhost                  : ok=2    changed=0    unreachable=0    failed=1    skipped=2    rescued=0    ignored=0   
+ops01                      : ok=10   changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+win-dc01                   : ok=2    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+code retour : 2
+
+# 2) Simulation --check (aucune modification possible) — 09:31:59
+$ ansible-playbook playbooks/controle_sante.yml --check ; echo "code retour : $?"
+PLAY RECAP *********************************************************************
+linux01                    : ok=9    changed=0    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
+localhost                  : ok=2    changed=0    unreachable=0    failed=1    skipped=2    rescued=0    ignored=0   
+ops01                      : ok=10   changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+win-dc01                   : ok=2    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+code retour : 2
+
+# 3) Hôte inaccessible simulé sans toucher au serveur : WinRM interrogé sur un port fermé (5986) — 09:32:09
+$ ansible-playbook playbooks/controle_sante.yml -e ansible_port=5986 --limit win-dc01,localhost ; echo "code retour : $?"
+TASK [Résultat du contrôle de santé] *******************************************
+ok: [localhost] => 
+    msg: |-
+        linux01   Connexion                  INACCESSIBLE    aucun résultat (hôte injoignable ou erreur de privilèges : voir PLAY RECAP)
+        ops01     Connexion                  INACCESSIBLE    aucun résultat (hôte injoignable ou erreur de privilèges : voir PLAY RECAP)
+        win-dc01  Relevé WinRM               INACCESSIBLE    ntlm: HTTPConnectionPool(host='192.168.50.10', port=5986): Max retries exceeded with url: /wsman (Caused by...
+TASK [Dossier des rapports] ****************************************************
+skipping: [localhost]
+TASK [Rapport de contrôle de santé] ********************************************
+skipping: [localhost]
+TASK [Aucun contrôle en échec et aucun hôte inaccessible] **********************
+fatal: [localhost]: FAILED! => 
+    assertion: sante_lignes | selectattr('statut', 'in', ['ECHEC', 'INACCESSIBLE']) |
+        list | length == 0
+    changed: false
+    evaluated_to: false
+    msg: 'linux01 : Connexion ; ops01 : Connexion ; win-dc01 : Relevé WinRM'
+PLAY RECAP *********************************************************************
+localhost                  : ok=2    changed=0    unreachable=0    failed=1    skipped=2    rescued=0    ignored=0   
+win-dc01                   : ok=2    changed=0    unreachable=0    failed=0    skipped=0    rescued=1    ignored=1   
+code retour : 2
+
+# 3b) Même test après correctif (hôtes exclus par --limit ignorés) — 09:34:22
+$ ansible-playbook playbooks/controle_sante.yml -e ansible_port=5986 --limit win-dc01,localhost ; echo "code retour : $?"
+TASK [Résultat du contrôle de santé] *******************************************
+    msg: |-
+        win-dc01  Relevé WinRM               INACCESSIBLE    ntlm: HTTPConnectionPool(host='192.168.50.10', port=5986): Max retries exceeded with url: /wsman (Caused by...
+TASK [Aucun contrôle en échec et aucun hôte inaccessible] **********************
+fatal: [localhost]: FAILED! => 
+    assertion: sante_lignes | selectattr('statut', 'in', ['ECHEC', 'INACCESSIBLE']) |
+        list | length == 0
+    changed: false
+    evaluated_to: false
+    msg: 'win-dc01 : Relevé WinRM'
+PLAY RECAP *********************************************************************
+localhost                  : ok=2    changed=0    unreachable=0    failed=1    skipped=2    rescued=0    ignored=0   
+win-dc01                   : ok=2    changed=0    unreachable=0    failed=0    skipped=0    rescued=1    ignored=1   
+code retour : 2

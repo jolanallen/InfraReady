@@ -1,0 +1,138 @@
+# Preuve : P-83-controle-planifie-timer-systemd
+# Séance 6, UC-C4 — tâche planifiée de contrôle du site : timer systemd infraready-controle-site (chaque minute) déployé par
+#   linux_base.yml ; script check-nginx.sh (lecture seule) ; résultat publié pour Prometheus (collecteur textfile de node_exporter)
+#   et sortie dans le journal systemd. Compte d'exécution : root sans aucune capacité (CapabilityBoundingSet vide),
+#   système de fichiers en lecture seule sauf /var/lib/prometheus/node-exporter.
+# 1) Déploiement : linux_base.yml (2 passages) et ops01_monitoring.yml pour les 2 nouvelles règles (2 passages), extraits du
+#    journal Ansible d'OPS01 (~/infraready-logs/ansible.log, lignes « ok/skipping » retirées) ; verif-idempotence.sh : code 0 pour les deux.
+# 2) Scénario normal vérifié sur LINUX01 et dans Prometheus. Scénario d'échec : voir P-84 (nginx arrêté → unité « failed », code 1).
+=== linux_base.yml — 1er passage (journal Ansible d'OPS01, lignes 15513-15626)
+09:22:46 | TASK [Gathering Facts] *********************************************************
+09:22:48 | TASK [Fuseau horaire] **********************************************************
+09:22:48 | TASK [Paquets de base] *********************************************************
+09:22:49 | TASK [Groupes du labo] *********************************************************
+09:22:50 | TASK [Utilisateurs du labo (sans mot de passe, connexion par su/sudo uniquement)] ***
+09:22:51 | TASK [Racine du site - écriture réservée à webadmins (setgid)] *****************
+09:22:51 | TASK [Page d'accueil du site] **************************************************
+09:22:51 | TASK [Virtual host nginx] ******************************************************
+09:22:52 | TASK [Activer le site InfraReady] **********************************************
+09:22:52 | TASK [Désactiver le site par défaut] *******************************************
+09:22:52 | TASK [Services actifs au démarrage] ********************************************
+09:22:53 | TASK [Récupérer l'UUID du système de fichiers DATA] ****************************
+09:22:54 | TASK [Lire l'UUID] *************************************************************
+09:22:54 | TASK [Monter le disque de données via fstab - /data] ***************************
+09:22:54 | TASK [Dossier des rapports - lecture pour auditeurs uniquement] ****************
+09:22:54 | TASK [Dossier des scripts de contrôle InfraReady] ******************************
+09:22:55 | changed: [linux01]
+09:22:55 | TASK [Scripts de contrôle (lecture seule) depuis le dépôt] *********************
+09:22:55 | changed: [linux01] => (item=check-nginx.sh)
+09:22:56 | changed: [linux01] => (item=controle-site-planifie.sh)
+09:22:56 | TASK [Service et timer du contrôle planifié] ***********************************
+09:22:56 | changed: [linux01] => (item=infraready-controle-site.service)
+09:22:56 | changed: [linux01] => (item=infraready-controle-site.timer)
+09:22:56 | TASK [Timer du contrôle planifié actif et activé au démarrage] *****************
+09:22:58 | changed: [linux01]
+09:22:58 | TASK [UFW - SSH depuis le sous-réseau du labo] *********************************
+09:22:58 | TASK [UFW - HTTP depuis le sous-réseau du labo] ********************************
+09:22:59 | TASK [UFW - node_exporter depuis OPS01 uniquement] *****************************
+09:22:59 | TASK [UFW - politique par défaut et activation] ********************************
+09:23:01 | TASK [Appliquer les rechargements en attente avant les vérifications] **********
+09:23:01 | TASK [Le site répond en HTTP 200] **********************************************
+09:23:01 | TASK [Le message attendu est publié] *******************************************
+    changed: false
+    msg: Le contenu attendu est publié.
+09:23:01 | TASK [Les métriques node_exporter sont exposées] *******************************
+09:23:02 | PLAY RECAP *********************************************************************
+09:23:02 | linux01                    : ok=26   changed=4    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+=== linux_base.yml — 2e passage
+    changed: false
+09:23:19 | PLAY RECAP *********************************************************************
+09:23:19 | linux01                    : ok=26   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+=== ops01_monitoring.yml — 1er passage
+09:23:23 | changed: [ops01]
+09:23:36 | RUNNING HANDLER [Redémarrer prometheus] ****************************************
+09:23:37 | changed: [ops01]
+    changed: false
+    msg: '4 cibles up : [''linux01'', ''ops01'', ''ops01'', ''win-dc01'']'
+09:23:54 | PLAY RECAP *********************************************************************
+09:23:54 | ops01                      : ok=28   changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+=== ops01_monitoring.yml — 2e passage
+    changed: false
+    msg: '4 cibles up : [''linux01'', ''ops01'', ''ops01'', ''win-dc01'']'
+09:24:11 | PLAY RECAP *********************************************************************
+09:24:11 | ops01                      : ok=27   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+[linux01, root via sudo — 2026-10-23 09:25:09 CEST]
+$ systemctl list-timers infraready-controle-site.timer --no-pager
+NEXT                         LEFT LAST                         PASSED UNIT                           ACTIVATES
+Fri 2026-10-23 09:26:04 CEST  54s Fri 2026-10-23 09:25:04 CEST 5s ago infraready-controle-site.timer infraready-controle-site.service
+
+1 timers listed.
+Pass --all to see loaded but inactive timers, too.
+$ systemctl cat infraready-controle-site.service | grep -v "^#"
+[Unit]
+Description=InfraReady - contrôle du site web (check-nginx.sh) publié pour Prometheus
+After=nginx.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/infraready/controle-site-planifie.sh
+SyslogIdentifier=infraready-controle-site
+CapabilityBoundingSet=
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/prometheus/node-exporter
+$ systemctl show infraready-controle-site.service -p User -p ExecMainStatus -p Result -p ExecMainStartTimestamp -p ExecMainExitTimestamp
+Result=success
+ExecMainStartTimestamp=Fri 2026-10-23 09:25:04 CEST
+ExecMainExitTimestamp=Fri 2026-10-23 09:25:04 CEST
+ExecMainStatus=0
+User=
+$ ls -l /usr/local/lib/infraready/ /var/lib/prometheus/node-exporter/infraready_controle.prom
+-rw-r--r-- 1 root root  812 Oct 23 09:25 /var/lib/prometheus/node-exporter/infraready_controle.prom
+
+/usr/local/lib/infraready/:
+total 8
+-rwxr-xr-x 1 root root 1727 Oct 23 09:22 check-nginx.sh
+-rwxr-xr-x 1 root root 2082 Oct 23 09:22 controle-site-planifie.sh
+$ cat /var/lib/prometheus/node-exporter/infraready_controle.prom | grep -v "^#"
+infraready_controle_succes{controle="site_web"} 1
+infraready_controle_code_retour{controle="site_web"} 0
+infraready_controle_derniere_execution_secondes{controle="site_web"} 1792740304
+infraready_controle_duree_secondes{controle="site_web"} 0.021
+$ journalctl -u infraready-controle-site --since "-4min" --no-pager -o short-iso | tail -8
+2026-10-23T09:24:02+02:00 linux01 systemd[1]: Starting infraready-controle-site.service - InfraReady - contrôle du site web (check-nginx.sh) publié pour Prometheus...
+2026-10-23T09:24:02+02:00 linux01 infraready-controle-site[16992]: OK : nginx actif, http://127.0.0.1/ répond 200 et contient « InfraReady »
+2026-10-23T09:24:02+02:00 linux01 systemd[1]: infraready-controle-site.service: Deactivated successfully.
+2026-10-23T09:24:02+02:00 linux01 systemd[1]: Finished infraready-controle-site.service - InfraReady - contrôle du site web (check-nginx.sh) publié pour Prometheus.
+2026-10-23T09:25:04+02:00 linux01 systemd[1]: Starting infraready-controle-site.service - InfraReady - contrôle du site web (check-nginx.sh) publié pour Prometheus...
+2026-10-23T09:25:04+02:00 linux01 infraready-controle-site[17023]: OK : nginx actif, http://127.0.0.1/ répond 200 et contient « InfraReady »
+2026-10-23T09:25:04+02:00 linux01 systemd[1]: infraready-controle-site.service: Deactivated successfully.
+2026-10-23T09:25:04+02:00 linux01 systemd[1]: Finished infraready-controle-site.service - InfraReady - contrôle du site web (check-nginx.sh) publié pour Prometheus.
+$ systemd-analyze security infraready-controle-site.service --no-pager | tail -1
+→ Overall exposure level for infraready-controle-site.service: 6.2 MEDIUM 😐
+$ curl -s localhost:9100/metrics | grep -E "^infraready_controle|textfile_scrape_error"
+infraready_controle_code_retour{controle="site_web"} 0
+infraready_controle_derniere_execution_secondes{controle="site_web"} 1.792740304e+09
+infraready_controle_duree_secondes{controle="site_web"} 0.021
+infraready_controle_succes{controle="site_web"} 1
+# HELP node_textfile_scrape_error 1 if there was an error opening or reading a file, 0 otherwise
+# TYPE node_textfile_scrape_error gauge
+node_textfile_scrape_error 0
+[ops01 — 2026-10-23 09:25:17 CEST]
+$ curl -s localhost:9090/api/v1/query --data-urlencode 'query=infraready_controle_succes' ; puis âge du dernier contrôle
+   linux01 site_web = 1
+   âge du dernier contrôle : 14 s
+$ curl -s localhost:9090/api/v1/rules  (noms, santé, état)
+   InstanceDown ok inactive
+   ServiceWindowsCritiqueArrete ok inactive
+   SiteWebIndisponible ok inactive
+   ControlePlanifieEnRetard ok inactive
+   CpuEleve ok inactive
+   MemoireElevee ok inactive
+   DisquePresquePlein ok inactive

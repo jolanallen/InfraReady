@@ -1,0 +1,189 @@
+# Preuve : P-81a-seance6-redeploiement-monitoring-verification-cibles-instable
+# Séance 6, UC-02 — redéploiement de la supervision pour corriger l'écart de P-80 (4 règles chargées au lieu de 5) ;
+#   le 1er passage corrige l'écart (règles copiées, Prometheus redémarré) mais révèle un défaut de la vérification des cibles :
+#   1er passage : « 0 cibles up : [] » → assertion RÉUSSIE sans aucune cible (Prometheus vient de redémarrer, liste vide) ;
+#   2e passage : « Cibles en défaut : ['linux01'] » → cible encore « unknown » (pas encore scrapée, intervalle 15 s).
+#   Les cibles étaient bien up quelques secondes plus tard (voir P-81). Correctif : P-81b.
+# Copie du projet sur OPS01 resynchronisée avec main avant le passage (règles, windows_adds.yml, 2 scripts manquants).
+# 2026-10-23 09:17:01 CEST — ops01 (utilisateur ansible, ~/infraready/ansible)
+$ ../scripts/verif-idempotence.sh playbooks/ops01_monitoring.yml ; echo "code retour : $?"
+== 1er passage : mise à jour de l'état si nécessaire
+PLAY [OPS01 - Prometheus et Grafana] *******************************************
+TASK [Gathering Facts] *********************************************************
+ok: [ops01]
+TASK [Variables du vault présentes avant toute modification] *******************
+ok: [ops01]
+TASK [Paquets Prometheus et node_exporter local] *******************************
+ok: [ops01]
+TASK [Dossier des règles d'alerte] *********************************************
+ok: [ops01]
+TASK [Configuration Prometheus (cibles) depuis le dépôt] ***********************
+ok: [ops01]
+TASK [Règles d'alerte depuis le dépôt] *****************************************
+changed: [ops01]
+TASK [Valider la configuration avant tout redémarrage (promtool)] **************
+ok: [ops01]
+TASK [Prometheus et node_exporter démarrés et activés] *************************
+ok: [ops01] => (item=prometheus)
+ok: [ops01] => (item=prometheus-node-exporter)
+TASK [Clé de signature du dépôt Grafana] ***************************************
+ok: [ops01]
+TASK [Dépôt APT Grafana] *******************************************************
+ok: [ops01]
+TASK [Paquet grafana] **********************************************************
+ok: [ops01]
+TASK [Le mot de passe admin Grafana ne contient aucun caractère ambigu pour un fichier .ini] ***
+ok: [ops01]
+TASK [Mot de passe admin initial] **********************************************
+ok: [ops01]
+TASK [Accès anonyme en lecture seule (rôle Viewer)] ****************************
+ok: [ops01] => (item={'option': 'enabled', 'value': 'true'})
+ok: [ops01] => (item={'option': 'org_role', 'value': 'Viewer'})
+TASK [Dossiers de provisioning et de dashboards] *******************************
+ok: [ops01] => (item={'path': '/etc/grafana/provisioning/datasources', 'owner': 'root'})
+ok: [ops01] => (item={'path': '/etc/grafana/provisioning/dashboards', 'owner': 'root'})
+ok: [ops01] => (item={'path': '/var/lib/grafana/dashboards/infraready', 'owner': 'grafana'})
+TASK [Source de données et fournisseur de dashboards (provisioning)] ***********
+ok: [ops01] => (item=datasources/prometheus.yml)
+ok: [ops01] => (item=dashboards/infraready.yml)
+TASK [Dashboard InfraReady (JSON versionné)] ***********************************
+ok: [ops01]
+TASK [Grafana démarré et activé] ***********************************************
+ok: [ops01]
+TASK [Paquet ufw] **************************************************************
+ok: [ops01]
+TASK [UFW - SSH, Grafana (3000) et Prometheus (9090) depuis le sous-réseau du labo] ***
+ok: [ops01] => (item=22)
+ok: [ops01] => (item=3000)
+ok: [ops01] => (item=9090)
+TASK [UFW - politique par défaut et activation] ********************************
+ok: [ops01]
+TASK [Forcer les handlers maintenant pour tester l'état final] *****************
+RUNNING HANDLER [Redémarrer prometheus] ****************************************
+changed: [ops01]
+TASK [Attendre Prometheus et Grafana] ******************************************
+ok: [ops01] => (item=9090)
+ok: [ops01] => (item=3000)
+TASK [Cibles Prometheus] *******************************************************
+ok: [ops01]
+TASK [Toutes les cibles sont « up »] *******************************************
+ok: [ops01] => 
+    changed: false
+    msg: '0 cibles up : []'
+TASK [Le compte admin Grafana fonctionne avec le mot de passe du vault] ********
+ok: [ops01]
+TASK [La source Prometheus est provisionnée (lecture anonyme)] *****************
+ok: [ops01]
+TASK [Résumé] ******************************************************************
+ok: [ops01] => 
+    msg: Grafana OK — 1 dashboard(s), source 'Prometheus' -> http://localhost:9090
+PLAY RECAP *********************************************************************
+ops01                      : ok=28   changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+Paquets Prometheus et node_exporter local ------------------------------- 6.80s
+UFW - politique par défaut et activation -------------------------------- 1.99s
+UFW - SSH, Grafana (3000) et Prometheus (9090) depuis le sous-réseau du labo --- 1.63s
+Paquet grafana ---------------------------------------------------------- 1.61s
+Gathering Facts --------------------------------------------------------- 1.04s
+Prometheus et node_exporter démarrés et activés ------------------------- 0.89s
+Paquet ufw -------------------------------------------------------------- 0.85s
+Source de données et fournisseur de dashboards (provisioning) ----------- 0.84s
+Dossiers de provisioning et de dashboards ------------------------------- 0.68s
+Configuration Prometheus (cibles) depuis le dépôt ----------------------- 0.55s
+Clé de signature du dépôt Grafana --------------------------------------- 0.55s
+Attendre Prometheus et Grafana ------------------------------------------ 0.52s
+Règles d'alerte depuis le dépôt ----------------------------------------- 0.47s
+Dépôt APT Grafana ------------------------------------------------------- 0.44s
+Valider la configuration avant tout redémarrage (promtool) -------------- 0.43s
+Cibles Prometheus ------------------------------------------------------- 0.42s
+Accès anonyme en lecture seule (rôle Viewer) ---------------------------- 0.41s
+Redémarrer prometheus --------------------------------------------------- 0.41s
+Dashboard InfraReady (JSON versionné) ----------------------------------- 0.40s
+Grafana démarré et activé ----------------------------------------------- 0.38s
+== 2e passage : doit afficher changed=0
+PLAY [OPS01 - Prometheus et Grafana] *******************************************
+TASK [Gathering Facts] *********************************************************
+ok: [ops01]
+TASK [Variables du vault présentes avant toute modification] *******************
+ok: [ops01]
+TASK [Paquets Prometheus et node_exporter local] *******************************
+ok: [ops01]
+TASK [Dossier des règles d'alerte] *********************************************
+ok: [ops01]
+TASK [Configuration Prometheus (cibles) depuis le dépôt] ***********************
+ok: [ops01]
+TASK [Règles d'alerte depuis le dépôt] *****************************************
+ok: [ops01]
+TASK [Valider la configuration avant tout redémarrage (promtool)] **************
+ok: [ops01]
+TASK [Prometheus et node_exporter démarrés et activés] *************************
+ok: [ops01] => (item=prometheus)
+ok: [ops01] => (item=prometheus-node-exporter)
+TASK [Clé de signature du dépôt Grafana] ***************************************
+ok: [ops01]
+TASK [Dépôt APT Grafana] *******************************************************
+ok: [ops01]
+TASK [Paquet grafana] **********************************************************
+ok: [ops01]
+TASK [Le mot de passe admin Grafana ne contient aucun caractère ambigu pour un fichier .ini] ***
+ok: [ops01]
+TASK [Mot de passe admin initial] **********************************************
+ok: [ops01]
+TASK [Accès anonyme en lecture seule (rôle Viewer)] ****************************
+ok: [ops01] => (item={'option': 'enabled', 'value': 'true'})
+ok: [ops01] => (item={'option': 'org_role', 'value': 'Viewer'})
+TASK [Dossiers de provisioning et de dashboards] *******************************
+ok: [ops01] => (item={'path': '/etc/grafana/provisioning/datasources', 'owner': 'root'})
+ok: [ops01] => (item={'path': '/etc/grafana/provisioning/dashboards', 'owner': 'root'})
+ok: [ops01] => (item={'path': '/var/lib/grafana/dashboards/infraready', 'owner': 'grafana'})
+TASK [Source de données et fournisseur de dashboards (provisioning)] ***********
+ok: [ops01] => (item=datasources/prometheus.yml)
+ok: [ops01] => (item=dashboards/infraready.yml)
+TASK [Dashboard InfraReady (JSON versionné)] ***********************************
+ok: [ops01]
+TASK [Grafana démarré et activé] ***********************************************
+ok: [ops01]
+TASK [Paquet ufw] **************************************************************
+ok: [ops01]
+TASK [UFW - SSH, Grafana (3000) et Prometheus (9090) depuis le sous-réseau du labo] ***
+ok: [ops01] => (item=22)
+ok: [ops01] => (item=3000)
+ok: [ops01] => (item=9090)
+TASK [UFW - politique par défaut et activation] ********************************
+ok: [ops01]
+TASK [Forcer les handlers maintenant pour tester l'état final] *****************
+TASK [Attendre Prometheus et Grafana] ******************************************
+ok: [ops01] => (item=9090)
+ok: [ops01] => (item=3000)
+TASK [Cibles Prometheus] *******************************************************
+ok: [ops01]
+TASK [Toutes les cibles sont « up »] *******************************************
+fatal: [ops01]: FAILED! => 
+    assertion: targets.json.data.activeTargets | map(attribute='health') | reject('equalto',
+        'up') | list | length == 0
+    changed: false
+    evaluated_to: false
+    msg: 'Cibles en défaut : [''linux01'']'
+PLAY RECAP *********************************************************************
+ops01                      : ok=23   changed=0    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+UFW - politique par défaut et activation -------------------------------- 1.97s
+Paquet grafana ---------------------------------------------------------- 1.60s
+UFW - SSH, Grafana (3000) et Prometheus (9090) depuis le sous-réseau du labo --- 1.60s
+Gathering Facts --------------------------------------------------------- 1.03s
+Paquets Prometheus et node_exporter local ------------------------------- 0.94s
+Prometheus et node_exporter démarrés et activés ------------------------- 0.89s
+Paquet ufw -------------------------------------------------------------- 0.82s
+Source de données et fournisseur de dashboards (provisioning) ----------- 0.77s
+Dossiers de provisioning et de dashboards ------------------------------- 0.59s
+Clé de signature du dépôt Grafana --------------------------------------- 0.51s
+Attendre Prometheus et Grafana ------------------------------------------ 0.49s
+Configuration Prometheus (cibles) depuis le dépôt ----------------------- 0.47s
+Dépôt APT Grafana ------------------------------------------------------- 0.43s
+Cibles Prometheus ------------------------------------------------------- 0.42s
+Règles d'alerte depuis le dépôt ----------------------------------------- 0.40s
+Accès anonyme en lecture seule (rôle Viewer) ---------------------------- 0.39s
+Dashboard InfraReady (JSON versionné) ----------------------------------- 0.38s
+Grafana démarré et activé ----------------------------------------------- 0.36s
+Valider la configuration avant tout redémarrage (promtool) -------------- 0.32s
+Mot de passe admin initial ---------------------------------------------- 0.30s
+ECHEC : le 2e passage a échoué
+code retour : 2

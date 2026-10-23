@@ -1,0 +1,92 @@
+# Preuve : P-86-incident-arret-non-propre-win-dc01-diagnostic
+# Séance 6, UC-05 — incident INC-2026-10-23-01 : WIN-DC01 s'arrête brutalement à chaque arrêt de l'hôte Proxmox
+#   Symptôme : au démarrage du 23/10 09:01, événements System 41 (Kernel-Power) et 6008 (EventLog) « arrêt précédent inattendu »,
+#   remontés par le contrôle d'état initial (P-80) et le contrôle de santé (P-82, ATTENTION). Machine : WIN-DC01 (AD DS, DNS).
+#   Impact supposé : risque d'incohérence de la base AD (NTDS, moteur ESE) et du DNS ; arrêt de l'hôte rallongé de 3 min.
+# Démarche : (1) journaux Windows ; (2) journal des tâches de l'hyperviseur ; (3) comparaison avec les VM Linux et les métriques ;
+#   (4) hypothèse et observation discriminante ; (5) reproduction contrôlée SANS arrêt forcé. Lecture seule sauf (5).
+#
+# 1) Windows — journal System (événements 41 / 6008 / 1074 / 6006 des 7 derniers jours), via WinRM depuis OPS01
+$ ansible win-dc01 -m win_shell -a "Get-WinEvent System Id 41,6008,1074 (7 derniers jours)"
+win-dc01 | CHANGED | rc=0 >>
+2026-10-23 09:01:29    41 Microsoft-Windows-Kernel-Power : The system has rebooted without cleanly shutting down first. This error could be caused if the system stopped responding, crashed, or lost power unexpectedly.
+2026-10-23 09:01:33  6008 EventLog : The previous system shutdown at 7:32:34 PM on ‎10/‎20/‎2026 was unexpected.
+2026-10-20 10:40:22    41 Microsoft-Windows-Kernel-Power : The system has rebooted without cleanly shutting down first. This error could be caused if the system stopped responding, crashed, or lost power unexpectedly.
+2026-10-20 10:40:26  6008 EventLog : The previous system shutdown at 8:50:25 PM on ‎10/‎19/‎2026 was unexpected.
+2026-10-19 18:04:01  1074 User32 : The process C:\WINDOWS\servicing\TrustedInstaller.exe (WIN-DC01) has initiated the restart of computer WIN-DC01 on behalf of user NT AUTHORITY\SYSTEM for the following reason: Operating System: Upgrade (Planned)
+2026-10-19 18:04:01  6006 EventLog : The Event log service was stopped.
+
+
+# 2) Hyperviseur — journal des tâches Proxmox (API /nodes/corsair1/tasks, lecture seule) — 2026-10-23 09:52:37
+$ GET /nodes/corsair1/tasks  (arrêts et démarrages des VM 100-102, 19/10 → 23/10)
+   19/10 10:52:31 → 10:52:31  startall   VM     durée    0s  OK
+   19/10 14:45:44 → 14:45:45  qmstart    VM 101 durée    1s  OK
+   19/10 14:45:45 → 14:45:46  qmstart    VM 102 durée    1s  OK
+   19/10 14:47:35 → 14:47:36  qmstart    VM 100 durée    1s  OK
+   19/10 14:58:12 → 14:58:13  qmstart    VM 101 durée    1s  OK
+   19/10 14:58:15 → 14:58:15  qmstart    VM 102 durée    0s  OK
+   19/10 20:48:08 → 20:51:11  stopall    VM     durée  183s  OK
+   19/10 20:48:08 → 20:51:10  qmshutdown VM 100 durée  182s  OK
+   19/10 20:48:08 → 20:48:20  qmshutdown VM 102 durée   12s  OK
+   19/10 20:48:08 → 20:48:10  qmshutdown VM 101 durée    2s  OK
+   19/10 20:49:37 → 20:49:47  qmshutdown VM 100 durée   10s  can't lock file '/var/lock/qemu-server/lock-100.conf' - got timeout
+   19/10 20:49:51 → 20:50:01  qmshutdown VM 100 durée   10s  can't lock file '/var/lock/qemu-server/lock-100.conf' - got timeout
+   20/10 08:54:19 → 08:54:19  startall   VM     durée    0s  OK
+   20/10 10:40:14 → 10:40:14  qmstart    VM 100 durée    0s  OK
+   20/10 10:40:16 → 10:40:17  qmstart    VM 101 durée    1s  OK
+   20/10 10:40:19 → 10:40:20  qmstart    VM 102 durée    1s  OK
+   20/10 19:29:50 → 19:32:53  qmshutdown VM 100 durée  183s  OK
+   20/10 19:29:50 → 19:32:53  stopall    VM     durée  183s  OK
+   20/10 19:29:50 → 19:29:59  qmshutdown VM 101 durée    9s  OK
+   20/10 19:29:50 → 19:29:59  qmshutdown VM 102 durée    9s  OK
+   23/10 08:27:27 → 08:27:27  startall   VM     durée    0s  OK
+   23/10 09:01:20 → 09:01:21  qmstart    VM 100 durée    1s  OK
+   23/10 09:01:24 → 09:01:24  qmstart    VM 101 durée    0s  OK
+   23/10 09:01:29 → 09:01:30  qmstart    VM 102 durée    1s  OK
+   23/10 09:38:45 → 09:40:15  qmshutdown VM 100 durée   90s  VM quit/powerdown failed - got timeout
+$ GET /nodes/corsair1/tasks/UPID:corsair1:000051DB:00068EDE:6ADB0F05:qmshutdown:100…/log
+    TASK ERROR: VM quit/powerdown failed - got timeout
+$ GET /nodes/corsair1/tasks/UPID:corsair1:00027D7C:003A3746:6AD7A50E:qmshutdown:100…/log
+    VM still running - terminating now with SIGTERM
+    org.freedesktop.DBus.Error.NoReply: Did not receive a reply. Possible causes include: the remote application did not send a reply, the message bus security policy blocked the reply, the reply timeout expired, or the network connection was broken.
+    TASK OK
+$ GET /nodes/corsair1/tasks/UPID:corsair1:00027D7B:003A3745:6AD7A50E:qmshutdown:101…/log
+    org.freedesktop.DBus.Error.NoReply: Did not receive a reply. Possible causes include: the remote application did not send a reply, the message bus security policy blocked the reply, the reply timeout expired, or the network connection was broken.
+    TASK OK
+$ GET /nodes/corsair1/qemu/100/config  (agent, onboot)
+    agent: non défini (pas d agent invité) | onboot: non défini (0) | ostype: win11
+
+# 3) Comparaison : les VM Linux s'arrêtent proprement en 2 à 12 s (fin de journal « systemd-shutdown … Journal stopped »)
+$ journalctl -b -1 -n 4 --no-pager -o short-iso
+2026-10-20T19:29:50+02:00 linux01 systemd-shutdown[1]: Syncing filesystems and block devices.
+2026-10-20T19:29:50+02:00 linux01 systemd-shutdown[1]: Sending SIGTERM to remaining processes...
+2026-10-20T19:29:50+02:00 linux01 systemd-journald[345]: Received SIGTERM from PID 1 (systemd-shutdow).
+2026-10-20T19:29:50+02:00 linux01 systemd-journald[345]: Journal stopped
+$ journalctl -b -1 -n 4 --no-pager -o short-iso
+# Métriques : Prometheus est sur OPS01, arrêté à 19:29:50 en même temps que les autres VM → aucune donnée sur les 3 dernières
+#   minutes de WIN-DC01 (limite : la supervision tourne sur le même hôte que les serveurs supervisés).
+$ query=max_over_time(timestamp(up)[15m:5s]) @ 2026-10-20 19:40 (API Prometheus, dernier échantillon de chaque cible)
+   linux01 19:29:43 | ops01 (prometheus) 19:29:39 | ops01 19:29:44 | win-dc01 19:29:45
+
+# 4) Hypothèse : WIN-DC01 ignore la demande d'arrêt ACPI de Proxmox (bouton d'alimentation virtuel) car personne n'a ouvert
+#    de session et la stratégie « Arrêt : permet au système d'être arrêté sans avoir à se connecter » est désactivée
+#    (valeur par défaut de Windows Server) ; pas d'agent invité QEMU pour un arrêt par l'agent. Proxmox attend 180 s puis tue la VM.
+#    Observation qui confirmerait : valeur ShutdownWithoutLogon = 0 et demande ACPI sans effet ; qui infirmerait : arrêt propre.
+# Vérification de l'hypothèse (lecture seule) — 2026-10-23 09:38:25 CEST
+$ ansible win-dc01 -m win_shell -a "<lecture de la stratégie, du bouton d alimentation, des sessions>"
+win-dc01 | CHANGED | rc=0 >>
+ShutdownWithoutLogon (HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System) = 0
+Sessions utilisateur (quser) :
+No User exists for *
+Service agent QEMU présent : False
+
+
+# 5) Reproduction contrôlée (hypothèse confirmée) : la VM reste allumée, aucun arrêt forcé n'a été déclenché
+# Reproduction contrôlée — 2026-10-23 09:38:45 CEST — arrêt ACPI demandé par l'API Proxmox, délai 90 s, SANS arrêt forcé (forceStop=0)
+$ POST /nodes/corsair1/qemu/100/status/shutdown  timeout=90 forceStop=0
+tâche : UPID:corsair1:000051DB:00068EDE:6ADB0F05:qmshutdown:100…
+09:40:17 fin de la tâche : stopped VM quit/powerdown failed - got timeout
+$ GET tasks/<UPID>/log
+   TASK ERROR: VM quit/powerdown failed - got timeout
+$ GET /nodes/corsair1/qemu/100/status/current
+   status: running | uptime: 2336 s
