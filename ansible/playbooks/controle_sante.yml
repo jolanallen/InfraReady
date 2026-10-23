@@ -1,0 +1,298 @@
+---
+# Séance 6 (UC-01, UC-C2) — contrôle de santé en LECTURE SEULE des trois serveurs du labo.
+# Aucune tâche ne modifie un serveur : un passage normal comme un passage --check affichent changed=0.
+# Résultat : un tableau par hôte et par contrôle (OK, ATTENTION, ECHEC, NON APPLICABLE, INACCESSIBLE),
+# puis échec du dernier play si un contrôle est en ECHEC ou un hôte INACCESSIBLE (code de retour exploitable).
+#
+# usage (OPS01, utilisateur ansible, dossier ansible/) :
+#   ansible-playbook playbooks/controle_sante.yml
+#   ansible-playbook playbooks/controle_sante.yml -e sante_rapport=true   # + rapport daté dans ~/infraready-logs/
+
+- name: Contrôle de santé - serveurs Linux
+  hosts: linux
+  gather_facts: true
+
+  vars:
+    sante_disque_max: 85          # même seuil que l'alerte DisquePresquePlein
+    sante_services:
+      linux01: [ssh, nginx, prometheus-node-exporter]
+      ops01: [prometheus, grafana-server, prometheus-node-exporter]   # OPS01 : connexion locale, ssh non sollicité
+
+  tasks:
+    - name: Pourcentage utilisé par système de fichiers
+      ansible.builtin.set_fact:
+        sante_disques: >-
+          {{ sante_disques | default([])
+             + [{'mount': item.mount, 'pct': (100 - item.size_available * 100 / item.size_total) | round(1)}] }}
+      loop: "{{ ansible_mounts | selectattr('fstype', 'in', ['ext4', 'xfs']) | list }}"
+      loop_control:
+        label: "{{ item.mount }}"
+
+    - name: Synchronisation de l'heure (NTP)
+      ansible.builtin.command: timedatectl show -p NTPSynchronized --value
+      register: sante_ntp
+      changed_when: false
+      failed_when: false
+      check_mode: false   # lecture seule : exécutée aussi en --check
+
+    - name: État des services
+      ansible.builtin.service_facts:
+
+    - name: Unités systemd en échec
+      # le module systemd ne sait pas lister les unités en échec : lecture seule par systemctl
+      ansible.builtin.command: systemctl list-units --state=failed --no-legend --plain  # noqa: command-instead-of-module
+      register: sante_unites
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Erreurs du journal système sur 24 h
+      ansible.builtin.command: journalctl -p err --since -24h -q --no-pager -o short-iso
+      register: sante_journal
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Résolution DNS du contrôleur de domaine
+      ansible.builtin.command: getent ahostsv4 win-dc01.{{ ad_domain }}
+      register: sante_dns
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Site web de LINUX01 - HTTP et contenu (depuis OPS01, par le nom DNS)
+      ansible.builtin.uri:
+        url: "http://linux01.{{ ad_domain }}/"
+        return_content: true
+        timeout: 5
+      register: sante_web
+      failed_when: false
+      delegate_to: localhost
+      become: false
+      check_mode: false
+      when: inventory_hostname == 'linux01'
+
+    - name: Prometheus - état des cibles collectées
+      ansible.builtin.uri:
+        url: http://localhost:9090/api/v1/targets
+        timeout: 5
+      register: sante_cibles
+      failed_when: false
+      become: false
+      check_mode: false
+      when: inventory_hostname == 'ops01'
+
+    - name: Grafana - santé de l'API
+      ansible.builtin.uri:
+        url: http://localhost:3000/api/health
+        timeout: 5
+      register: sante_grafana
+      failed_when: false
+      become: false
+      check_mode: false
+      when: inventory_hostname == 'ops01'
+
+    - name: Synthèse des contrôles Linux
+      vars:
+        disque_max: "{{ sante_disques | map(attribute='pct') | max }}"
+        services_arretes: >-
+          {{ sante_services[inventory_hostname]
+             | reject('in', ansible_facts.services | dict2items | selectattr('value.state', 'eq', 'running')
+                            | map(attribute='value.name') | map('regex_replace', '\.service$', '') | list)
+             | list }}
+        cibles: "{{ sante_cibles.json.data.activeTargets | default([]) }}"
+        cibles_hs: "{{ cibles | rejectattr('health', 'eq', 'up') | map(attribute='labels.host') | list }}"
+        controles:
+          - controle: Identité
+            statut: OK
+            detail: >-
+              {{ ansible_hostname }} {{ ansible_default_ipv4.address | default('?') }}, Ubuntu {{ ansible_distribution_version }},
+              noyau {{ ansible_kernel }}, démarré depuis {{ (ansible_uptime_seconds / 3600) | round(1) }} h
+          - controle: Heure
+            statut: "{{ 'OK' if sante_ntp.stdout == 'yes' else 'ECHEC' }}"
+            detail: >-
+              {{ ansible_date_time.date }} {{ ansible_date_time.time }} {{ ansible_date_time.tz }},
+              NTP synchronisé : {{ sante_ntp.stdout | default('?') }}
+          - controle: Espace disque
+            statut: "{{ 'OK' if disque_max | float < sante_disque_max else 'ECHEC' }}"
+            detail: "{% for d in sante_disques %}{{ d.mount }} {{ d.pct }} %  {% endfor %}(seuil {{ sante_disque_max }} %)"
+          - controle: Disque de données /data
+            statut: >-
+              {{ 'NON APPLICABLE' if inventory_hostname != 'linux01'
+                 else ('OK' if '/data' in sante_disques | map(attribute='mount') else 'ECHEC') }}
+            detail: >-
+              {{ 'pas de disque de données sur cet hôte' if inventory_hostname != 'linux01'
+                 else ('/data monté' if '/data' in sante_disques | map(attribute='mount') else '/data non monté') }}
+          - controle: Services attendus
+            statut: "{{ 'OK' if services_arretes | length == 0 else 'ECHEC' }}"
+            detail: >-
+              {{ sante_services[inventory_hostname] | join(', ')
+                 ~ (' — arrêtés : ' ~ services_arretes | join(', ') if services_arretes else ' actifs') }}
+          - controle: Unités systemd en échec
+            statut: "{{ 'OK' if sante_unites.stdout_lines | length == 0 else 'ECHEC' }}"
+            detail: "{{ sante_unites.stdout_lines | map('split') | map('first') | join(', ') if sante_unites.stdout_lines else 'aucune' }}"
+          - controle: Journal (erreurs 24 h)
+            statut: "{{ 'OK' if sante_journal.stdout_lines | length == 0 else 'ATTENTION' }}"
+            detail: >-
+              {{ sante_journal.stdout_lines | length ~ ' ligne(s)'
+                 ~ (' ; dernière : ' ~ sante_journal.stdout_lines[-1] if sante_journal.stdout_lines else '') }}
+          - controle: DNS du domaine
+            statut: "{{ 'OK' if sante_dns.rc == 0 else 'ECHEC' }}"
+            detail: "win-dc01.{{ ad_domain }} -> {{ sante_dns.stdout_lines[0].split()[0] if sante_dns.rc == 0 else 'non résolu' }}"
+        fonctionnels_linux01:
+          - controle: Site web (HTTP + contenu)
+            statut: "{{ 'OK' if sante_web.status | default(0) == 200 and 'InfraReady' in sante_web.content | default('') else 'ECHEC' }}"
+            detail: "http://linux01.{{ ad_domain }}/ -> HTTP {{ sante_web.status | default('injoignable') }}"
+        fonctionnels_ops01:
+          - controle: Prometheus - cibles
+            statut: "{{ 'OK' if cibles | length > 0 and cibles_hs | length == 0 else 'ECHEC' }}"
+            detail: >-
+              {{ (cibles | length - cibles_hs | length) ~ '/' ~ cibles | length ~ ' cibles up'
+                 ~ (' — hors service : ' ~ cibles_hs | join(', ') if cibles_hs else '') }}
+          - controle: Grafana - API
+            statut: "{{ 'OK' if sante_grafana.json.database | default('') == 'ok' else 'ECHEC' }}"
+            detail: "base {{ sante_grafana.json.database | default('injoignable') }}, version {{ sante_grafana.json.version | default('?') }}"
+      ansible.builtin.set_fact:
+        sante: "{{ controles + (fonctionnels_linux01 if inventory_hostname == 'linux01' else fonctionnels_ops01) }}"
+
+- name: Contrôle de santé - WIN-DC01
+  hosts: windows
+  gather_facts: false
+
+  # Un hôte injoignable ou un relevé en erreur produit une ligne INACCESSIBLE / ECHEC au lieu
+  # d'interrompre le playbook (sinon la synthèse ne serait jamais affichée).
+  ignore_unreachable: true
+
+  tasks:
+    - name: Relevé et synthèse Windows
+      block:
+        - name: Relevé en lecture seule (PowerShell)
+          ansible.windows.win_powershell:
+            depth: 4   # objets imbriqués (liste des disques) restitués en données, pas en texte
+            parameters:
+              Domaine: "{{ ad_domain }}"
+            script: |
+              param([string]$Domaine)
+              $Ansible.Changed = $false   # contrôle en lecture seule
+              $os = Get-CimInstance Win32_OperatingSystem
+              $attendus = 'NTDS', 'DNS', 'Netlogon', 'Kdc', 'W32Time', 'WinRM', 'windows_exporter'
+              $ntp = (w32tm /query /status) -join "`n"
+              [PSCustomObject]@{
+                nom      = $env:COMPUTERNAME
+                os       = '{0} (build {1})' -f $os.Caption, $os.BuildNumber
+                heures   = [math]::Round(((Get-Date) - $os.LastBootUpTime).TotalHours, 1)
+                date     = Get-Date -Format 'yyyy-MM-ddTHH:mm:ssK'
+                ntp_ok   = ($ntp -match 'Last Successful Sync Time') -and ($ntp -notmatch 'Local CMOS Clock|Free-running')
+                ntp_src  = ([regex]::Match($ntp, 'Source: (\S+)')).Groups[1].Value
+                disques  = @(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' | ForEach-Object {
+                             [PSCustomObject]@{ volume = $_.DeviceID; pct = [math]::Round(100 - 100 * $_.FreeSpace / $_.Size, 1) } })
+                arretes  = @($attendus | Where-Object { (Get-Service -Name $_ -ErrorAction SilentlyContinue).Status -ne 'Running' })
+                erreurs  = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; Level = 1, 2; StartTime = (Get-Date).AddHours(-24) } `
+                             -ErrorAction SilentlyContinue | ForEach-Object { '{0:yyyy-MM-dd HH:mm} {1} {2}' -f $_.TimeCreated, $_.Id, $_.ProviderName })
+                dns      = $(try { @(Resolve-DnsName -Name "linux01.$Domaine" -Server 127.0.0.1 -Type A -ErrorAction Stop)[0].IPAddress } catch { '' })
+                ad       = $(try { (Get-ADDomain -ErrorAction Stop).DNSRoot } catch { '' })
+                exporter = $(try { (Invoke-WebRequest -UseBasicParsing -TimeoutSec 5 http://localhost:9182/metrics).StatusCode } catch { 0 })
+              }
+          register: sante_win
+          check_mode: false   # lecture seule : le relevé reste exécuté en --check
+
+        - name: Synthèse des contrôles Windows
+          vars:
+            releve: "{{ sante_win.output[0] }}"
+          ansible.builtin.set_fact:
+            sante:
+              - controle: Identité
+                statut: OK
+                detail: "{{ releve.nom }} {{ ansible_host }}, {{ releve.os }}, démarré depuis {{ releve.heures }} h"
+              - controle: Heure
+                statut: "{{ 'OK' if releve.ntp_ok else 'ECHEC' }}"
+                detail: "{{ releve.date }}, source NTP : {{ releve.ntp_src or 'aucune' }}"
+              - controle: Espace disque
+                statut: "{{ 'OK' if releve.disques | map(attribute='pct') | max < 85 else 'ECHEC' }}"
+                detail: "{% for d in releve.disques %}{{ d.volume }} {{ d.pct }} %  {% endfor %}(seuil 85 %)"
+              - controle: Services attendus
+                statut: "{{ 'OK' if releve.arretes | length == 0 else 'ECHEC' }}"
+                detail: >-
+                  NTDS, DNS, Netlogon, Kdc, W32Time, WinRM,
+                  windows_exporter{{ ' — arrêtés : ' ~ releve.arretes | join(', ') if releve.arretes else ' actifs' }}
+              - controle: Journal (erreurs 24 h)
+                statut: "{{ 'OK' if releve.erreurs | length == 0 else 'ATTENTION' }}"
+                detail: "{{ releve.erreurs | length }} événement(s) System{{ ' ; ' ~ releve.erreurs[:3] | join(' | ') if releve.erreurs else '' }}"
+              - controle: DNS du domaine
+                statut: "{{ 'OK' if releve.dns == '192.168.50.20' else 'ECHEC' }}"
+                detail: "linux01.{{ ad_domain }} -> {{ releve.dns or 'non résolu' }} (serveur DNS local)"
+              - controle: Active Directory
+                statut: "{{ 'OK' if releve.ad == ad_domain else 'ECHEC' }}"
+                detail: "domaine {{ releve.ad or 'injoignable' }}"
+              - controle: windows_exporter
+                statut: "{{ 'OK' if releve.exporter == 200 else 'ECHEC' }}"
+                detail: "http://localhost:9182/metrics -> HTTP {{ releve.exporter }}"
+      rescue:
+        - name: Relevé Windows impossible
+          ansible.builtin.set_fact:
+            sante:
+              - controle: Relevé WinRM
+                statut: "{{ 'INACCESSIBLE' if sante_win.unreachable | default(false) else 'ECHEC' }}"
+                # accolades retirées : le message ne doit pas être réinterprété comme un modèle Jinja dans la synthèse
+                detail: "{{ (sante_win.msg | default(ansible_failed_result.msg | default('erreur inconnue'))) | regex_replace('[{}]', '') | truncate(150) }}"
+
+- name: Contrôle de santé - synthèse
+  hosts: localhost
+  gather_facts: false
+  become: false
+
+  vars:
+    sante_rapport: false
+    rapport_dir: "{{ lookup('ansible.builtin.env', 'HOME') }}/infraready-logs"
+
+  tasks:
+    # Hôtes visés = inventaire restreint par --limit : un hôte exclu volontairement n'est pas « INACCESSIBLE »
+    - name: Construire le tableau (un hôte visé sans résultat est INACCESSIBLE)
+      ansible.builtin.set_fact:
+        sante_lignes: >-
+          {%- set lignes = [] -%}
+          {%- for h in groups['all'] | select('in', query('inventory_hostnames', ansible_limit | default('all'))) | sort -%}
+          {%- for c in hostvars[h].sante | default([{'controle': 'Connexion', 'statut': 'INACCESSIBLE',
+                'detail': 'aucun résultat (hôte injoignable ou erreur de privilèges : voir PLAY RECAP)'}]) -%}
+          {%- set _ = lignes.append({'hote': h, 'controle': c.controle, 'statut': c.statut, 'detail': c.detail | trim}) -%}
+          {%- endfor -%}
+          {%- endfor -%}
+          {{ lignes }}
+
+    - name: Résultat du contrôle de santé
+      ansible.builtin.debug:
+        msg: |-
+          {% for l in sante_lignes %}
+          {{ '%-9s %-26s %-15s %s' | format(l.hote, l.controle, l.statut, l.detail) }}
+          {% endfor %}
+
+    - name: Rapport daté sur OPS01 (uniquement avec -e sante_rapport=true)
+      when: sante_rapport | bool
+      block:
+        - name: Dossier des rapports
+          ansible.builtin.file:
+            path: "{{ rapport_dir }}"
+            state: directory
+            mode: "0750"
+
+        - name: Rapport de contrôle de santé
+          ansible.builtin.copy:
+            dest: "{{ rapport_dir }}/controle-sante-{{ now(fmt='%Y%m%d-%H%M%S') }}.txt"
+            mode: "0640"
+            content: |
+              Contrôle de santé InfraReady — {{ now(fmt='%Y-%m-%d %H:%M:%S') }}
+              {% for l in sante_lignes %}
+              {{ '%-9s %-26s %-15s %s' | format(l.hote, l.controle, l.statut, l.detail) }}
+              {% endfor %}
+
+    - name: Aucun contrôle en échec et aucun hôte inaccessible
+      ansible.builtin.assert:
+        that: sante_lignes | selectattr('statut', 'in', ['ECHEC', 'INACCESSIBLE']) | list | length == 0
+        fail_msg: >-
+          {{ sante_lignes | selectattr('statut', 'in', ['ECHEC', 'INACCESSIBLE']) | map(attribute='hote') | zip(
+             sante_lignes | selectattr('statut', 'in', ['ECHEC', 'INACCESSIBLE']) | map(attribute='controle')) | map('join', ' : ') | join(' ; ') }}
+        success_msg: >-
+          {{ sante_lignes | selectattr('statut', 'eq', 'OK') | list | length }} OK,
+          {{ sante_lignes | selectattr('statut', 'eq', 'ATTENTION') | list | length }} ATTENTION,
+          {{ sante_lignes | selectattr('statut', 'eq', 'NON APPLICABLE') | list | length }} NON APPLICABLE,
+          0 ECHEC, 0 INACCESSIBLE
