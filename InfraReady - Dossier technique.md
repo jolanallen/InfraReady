@@ -1628,7 +1628,7 @@ InfraReady/
 - [x] Rapport final en PDF à la racine du dépôt (`InfraReady-Rapport-final.pdf`, sources LaTeX dans `rapport/`) + lien du dépôt
 - [x] Captures et sorties de commandes classées (`docs/preuves/`, numérotation par phase)
 - [x] Rapport d'incident distinct rédigé (`docs/rapport-incident.md`)
-- [ ] PowerPoint final préparé selon modalités du formateur
+- [x] PowerPoint final préparé (`InfraReady-Soutenance.pptx`, 23 diapositives avec notes d'orateur) — à adapter aux modalités du formateur (durée, format)
 - [x] TP de la séance 4 réalisé et documenté (section 11, preuves P-14, P-25, P-26, P-38 à P-39, P-74 à P-79)
 - [ ] Bilans individuels et revue croisée de la séance 4 (chaque membre)
 - [x] TP de la séance 6 réalisé et documenté (section 12, preuves P-80 à P-89, P-64)
