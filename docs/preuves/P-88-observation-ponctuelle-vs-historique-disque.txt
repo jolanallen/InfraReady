@@ -1,0 +1,46 @@
+# Preuve : P-88-observation-ponctuelle-vs-historique-disque
+# Séance 6, UC-C3 — ressource choisie : espace disque de / sur LINUX01 et OPS01 (OPS01 héberge la base Prometheus).
+#   Comparaison d'une mesure instantanée avec l'historique conservé par Prometheus (rétention par défaut 15 j, scrape 15 s),
+#   puis pente (deriv) et projection (predict_linear) calculées par Prometheus — interprétation dans le dossier, section séance 6.
+# Requêtes envoyées à l'API de Prometheus d'OPS01 depuis le poste (tunnel SSH), lecture seule. Panneau associé : P-85, « Stockage utilisé (%) — évolution ».
+# Relevé du 2026-10-23 09:46:27 CEST — API Prometheus (OPS01), lecture seule
+# 1) Observation ponctuelle (instantanée)
+$ query= (1 - node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100
+   linux01  % utilisé / = 29.23
+   ops01    % utilisé / = 26.29
+$ query= node_filesystem_size_bytes{mountpoint="/"} - node_filesystem_avail_bytes{mountpoint="/"}
+   linux01  octets utilisés / = 8.01 Gio
+   ops01    octets utilisés / = 12.34 Gio
+$ query= prometheus_tsdb_storage_blocks_bytes + prometheus_tsdb_head_chunks_storage_size_bytes + WAL (taille de la base Prometheus)
+   base Prometheus = 42.4 Mio
+
+
+# 2) Historique disponible : 19/10 14:00 → maintenant, pas de 1 h, espace occupé sur / (taille - disponible, réserve root comprise)
+#    (séries filtrées sur host=~".+" : quelques séries sans label host datent du 1er démarrage de Prometheus le 19/10, voir phase F)
+$ query_range= avg_over_time((node_filesystem_size_bytes{mountpoint="/", host=~".+"} - node_filesystem_avail_bytes{mountpoint="/", host=~".+"})[1h:1m]) step=1h
+   heure (moy. 1 h)          linux01 Gio    ops01 Gio
+   19/10 17:00                     7.963       12.241
+   19/10 18:00                     7.963       12.259
+   19/10 19:00                     7.963       12.267
+   19/10 20:00                     7.963       12.286
+   19/10 21:00                     7.963       12.298
+   … pas de données (13 h) 
+   20/10 11:00                     7.970       12.282
+   20/10 12:00                     7.970       12.288
+   20/10 13:00                     7.972       12.307
+   20/10 14:00                     7.984       12.321
+   20/10 15:00                     7.984       12.328
+   20/10 16:00                     7.984       12.339
+   20/10 17:00                     7.984       12.354
+   20/10 18:00                     7.984       12.344
+   20/10 19:00                     7.984       12.354
+   20/10 20:00                     7.984       12.363
+   heures avec données : 15 sur 91 heures écoulées depuis le 19/10 14:00
+
+# 3) Tendance calculée par Prometheus (Mio/jour consommés, sur les 6 dernières heures ; projection à 30 jours)
+$ query= deriv(node_filesystem_avail_bytes{mountpoint="/", host=~".+"}[6h]) * -86400 / 2^20
+   linux01  -234.5
+   ops01    81.8
+$ query= (1 - predict_linear(node_filesystem_avail_bytes{mountpoint="/", host=~".+"}[6h], 30*86400) / node_filesystem_size_bytes{mountpoint="/", host=~".+"}) * 100
+   linux01  4.7
+   ops01    31.4

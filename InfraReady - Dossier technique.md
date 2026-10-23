@@ -2,8 +2,8 @@
 title: InfraReady — Dossier technique
 type: livrable
 status: en cours
-version: v0.4
-updated: 2026-10-20
+version: v0.5
+updated: 2026-10-23
 tags:
   - infraready
   - projet-fil-rouge
@@ -20,8 +20,8 @@ tags:
 | **Équipe** | MIR Mahan / Jolan Allen (chef de projet) / Kenzi Bendjelloul |
 | **Classe** | B3 Cybersécurité |
 | **Lien GitHub** | https://github.com/jolanallen/InfraReady |
-| **Date / version** | 20/10/2026 — v0.4 |
-| **Statut du projet** | Phases A à H et TP de la séance 4 réalisés — finalisation avant remise (bilans, PDF, oral) |
+| **Date / version** | 23/10/2026 — v0.5 |
+| **Statut du projet** | Phases A à H, TP des séances 4 et 6 réalisés (correction de l'incident INC-2026-10-23-01 en attente de validation) — finalisation avant remise (bilans, PDF, oral) |
 
 ---
 
@@ -33,7 +33,7 @@ tags:
 	- Administration reproductible (Ansible), supervision (Prometheus/Grafana), dépôt versionné et validé par CI.
 	- Aucune donnée réelle : comptes, groupes et données sont fictifs.
 - **Répartition de l'équipe :** Jolan Allen, chef de projet (planification, coordination, suivi et dépôt de remise) ; Kenzi Bendjelloul, partie Ansible (phase D) ; les autres phases ont été réalisées conjointement par MIR Mahan et Jolan Allen.
-- **Conventions de preuves :** numérotation par phase — A = P-0x, B = P-1x, C = P-2x, D = P-3x, E = P-4x, F = P-5x, G = P-6x, H = P-7x. Les sorties sont capturées automatiquement avec l'heure et la commande exécutée.
+- **Conventions de preuves :** numérotation par phase — A = P-0x, B = P-1x, C = P-2x, D = P-3x, E = P-4x, F = P-5x, G = P-6x, H = P-7x ; séance 6 = P-8x. Les sorties sont capturées automatiquement avec l'heure et la commande exécutée.
 
 ---
 
@@ -342,8 +342,10 @@ Retour arrière disponible : snapshot `s02_avant_maj_c` (inclut le disque de tes
 | Playbook | Cible | Actions automatisées | Vérifications intégrées |
 | --- | --- | --- | --- |
 | `windows_adds.yml` | WIN-DC01 | Rôle AD DS, forêt, NTP, redirecteurs et client DNS | Attente des services AD, état du domaine |
-| `linux_base.yml` | LINUX01 | Fuseau, paquets, groupes/comptes, droits du site, template nginx + handler de rechargement, montage `/data` par UUID, droits `/data/rapports`, **pare-feu UFW** (22 et 80 depuis le labo, 9100 depuis OPS01, refus par défaut), node_exporter | HTTP 200 sur le site, `/metrics` de node_exporter |
+| `linux_base.yml` | LINUX01 | Fuseau, paquets, groupes/comptes, droits du site, template nginx + handler de rechargement, montage `/data` par UUID (options `usrquota,grpquota` depuis la séance 6), droits `/data/rapports`, **pare-feu UFW** (22 et 80 depuis le labo, 9100 depuis OPS01, refus par défaut), node_exporter, `openipmi` désactivé, **contrôle planifié du site** (timer systemd, séance 6) | HTTP 200 sur le site, `/metrics` de node_exporter |
 | `windows_base.yml` | WIN-DC01 | OU, groupes, comptes (`no_log`), dossier + ACL NTFS + partage SMB, zone inverse, enregistrements A/PTR, windows_exporter **0.31.8** (MSI), règle de pare-feu 9182 réservée à OPS01 | Services NTDS, DNS, Netlogon, kdc, windows_exporter démarrés (`assert`), `/metrics` joignable depuis OPS01 |
+| `controle_sante.yml` (séance 6) | les 3 serveurs | **Aucune** : contrôle de santé en lecture seule (identité, heure, disques, services, unités en échec, journaux, DNS, tests fonctionnels) | Tableau OK / ATTENTION / ECHEC / NON APPLICABLE / INACCESSIBLE, échec du play s'il reste un ECHEC (section 12, UC-C2) |
+| `linux_quotas.yml` (séance 6, défi) | LINUX01 | Quotas alice / bruno sur le disque de test `/data` | Numéro de série du disque et options de montage vérifiés avant toute modification (section 12, UC-A3) |
 
 **Commandes réellement utilisées** : `ansible --version`, `ansible-inventory --graph`, `ansible linux -m ping`, `ansible windows -m win_ping`, `ansible-playbook playbooks/<nom>.yml [--diff]`, lancées deux fois de suite.
 
@@ -489,13 +491,15 @@ Chaque cible porte un label `host` (linux01, ops01, win-dc01) et `os`, utilisés
 | `CpuEleve` | CPU > 80 % | 2 min | warning |
 | `MemoireElevee` | mémoire > 90 % | 5 min | warning |
 | `DisquePresquePlein` | volume > 85 % | 5 min | warning |
+| `SiteWebIndisponible` (séance 6) | contrôle planifié du site LINUX01 en échec (`infraready_controle_succes == 0`) | 2 min | critical |
+| `ControlePlanifieEnRetard` (séance 6) | dernier contrôle planifié plus vieux que 5 min, ou métrique absente | 5 min | warning |
 
 **Démonstration d'alerte** (contrôlée et réversible, rejouée 3 fois avec le même résultat) : arrêt de `prometheus-node-exporter` sur LINUX01 → `InstanceDown[linux01]` passe en `pending` après 10 s, puis **`firing` après 60 s** (durée `for: 1m`) ; dashboard : LINUX01 « HORS LIGNE » et alerte dans la table ; redémarrage du service → alerte disparue 16 s plus tard.
 
 **Points de contrôle réellement utilisés** : `/api/v1/targets`, `/api/v1/rules`, `/api/v1/alerts`, `/api/v1/query`, page `/classic/targets` et `/classic/alerts`, `/metrics` de chaque exporter, API Grafana (`/api/health`, `/api/admin/stats`, `/api/datasources`), `ss -tlnp`, `promtool check config`.
 
 > [!warning] Captures à rafraîchir
-> P-53 et P-55 montrent la version 1 du dashboard (5 panneaux, sans filtre Hôte). La version 2 est vérifiée par l'API dans P-56 ; nouvelles captures à prendre.
+> P-53 et P-55 montrent la version 1 du dashboard (5 panneaux, sans filtre Hôte). La version 2 est vérifiée par l'API dans P-56. Depuis la séance 6, le dashboard est en **version 3** (9 panneaux, unités, descriptions, données absentes distinguées de zéro), vérifiée par l'API et capturée dans P-85 (section 12, UC-03). P-53 et P-55 restent des traces de la version 1.
 
 ![[P-53-grafana-dashboard-infraready.png|700]]
 
@@ -525,6 +529,9 @@ Chaque cible porte un label `host` (linux01, ops01, win-dc01) et `os`, utilisés
 | Captures Grafana parfois vides avec Chrome headless | Deux lancements consécutifs partageaient le même profil (verrou) | Profil temporaire unique par capture | Captures fiables |
 
 Retour arrière disponible : snapshot `s02_avant_monitoring` (OPS01).
+
+> [!note] Séance 6
+> La vérification des cibles de `ops01_monitoring.yml` pouvait réussir sans aucune cible juste après un redémarrage de Prometheus. Elle attend désormais le premier scrape (P-81a → P-81b). Le playbook désactive aussi `openipmi` (P-80b). Détails en section 12.
 
 ---
 
@@ -626,7 +633,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | 1ᵉʳ essai de correction : le playbook restaure le fichier (`changed=1`) mais le site reste en 404, et le 2ᵉ passage (`changed=0`) ne change rien | La vérification « HTTP 200 » échoue avant la fin du play ; Ansible n'exécute les handlers qu'en fin de play, donc le rechargement nginx notifié est perdu | `ansible.builtin.meta: flush_handlers` placé avant les vérifications dans `linux_base.yml` | Un seul passage suffit : fichier + rechargement + tests ([P-72a](docs/preuves/P-72a-incident-nginx-correction-1er-essai-handler-non-execute.txt) → [P-72](docs/preuves/P-72-incident-nginx-correction-playbook-corrige.txt)) |
 | Journal d'erreur nginx vide malgré l'incident | `try_files … =404` renvoie 404 sans écrire dans `error.log` | Lire la configuration chargée (`nginx -T`) et le journal systemd | Cause trouvée en moins d'une minute |
-| Le site n'est pas supervisé en HTTP (seul `up` du node_exporter l'est) : l'incident n'a déclenché aucune alerte | Pas de sonde HTTP dans Prometheus | Piste d'amélioration : `blackbox_exporter` + alerte `SiteWebHS` | Noté en section 14 |
+| Le site n'est pas supervisé en HTTP (seul `up` du node_exporter l'est) : l'incident n'a déclenché aucune alerte | Pas de sonde HTTP dans Prometheus | Contrôle planifié du site (timer systemd) + alerte `SiteWebIndisponible` | **Réalisé en séance 6** (section 12, P-83, P-84) |
 
 Retour arrière disponible : `/root/infraready.nginx.bak-incident-h` sur LINUX01, et la configuration de référence du dépôt (`templates/nginx-infraready.conf.j2`).
 
@@ -674,7 +681,6 @@ Retour arrière disponible : `/root/infraready.nginx.bak-incident-h` sur LINUX01
 | LINUX01 | `prometheus-node-exporter`, `ssh` | `active` | Supervision et administration depuis OPS01 | P-26 |
 | LINUX01 | Processus en tête du tri CPU | `systemd-hostnamed` à 50 % | Démarré par notre propre `hostnamectl` quelques instants avant : un pic de CPU ne prouve pas un défaut | P-26 |
 | WIN-DC01 | `NTDS`, `DNS`, `Netlogon`, `W32Time` | `Running`, `Automatic` | Services critiques du domaine : exclus de toute panne volontaire | P-14 |
-| P-15 | 20/10/2026 | `windows_adds.yml` idempotent après correction du DNS du DC (`changed=0` ×2) | [P-15](docs/preuves/P-15-windows-adds-dns-idempotence.txt) |
 | WIN-DC01 | `Dnscache` (client DNS), `WinRM` | `Running`, `Automatic` | `Dnscache` contrôlé par `Check-DnsClient.ps1` ; son état ne prouve pas qu'un nom se résout | P-14 |
 | WIN-DC01 | Processus en tête du tri CPU | `MsMpEng` (Defender, 109 s), `System`, `windows_exporter` | Temps CPU cumulé depuis le démarrage : normal | P-14 |
 | WIN-DC01 | Journal System (20 derniers événements) | 7036 (Service Control Manager), 6038 (LsaSrv, avertissement) | 6038 : NTLM utilisé par un client, ici les connexions WinRM d'Ansible ; aucun événement d'erreur | P-14 |
@@ -726,23 +732,321 @@ Retour arrière : snapshot Proxmox `s07_avant_seance4` des 3 VM pris avant la s�
 
 ---
 
-## 12. Sécurité et limites d'intervention
+## 12. Séance 6 — Maintenance opérationnelle et supervision
+
+> [!abstract] Objectif
+> Appliquer au laboratoire le TP de la séance 6 (support pédagogique n° 6 « Maintenance opérationnelle et supervision ») : en tant que technicien d'exploitation, contrôler l'état de la plateforme, fiabiliser la maintenance, rendre les anomalies observables et conserver des preuves vérifiables. Socle obligatoire UC-01 à UC-06, compléments UC-C1 à UC-C4, un défi avancé (UC-A3).
+
+**Responsable :** MIR Mahan / Jolan Allen / Kenzi Bendjelloul · **Dates :** 23/10/2026 · **Statut :** Fait (socle, 4 compléments, défi UC-A3). La correction de l'incident UC-05 est **préparée mais pas encore appliquée** : elle modifie le contrôleur de domaine et attend une validation explicite (voir UC-05).
+
+Retour arrière : snapshot Proxmox `s09_avant_seance6` des 3 VM, pris le 23/10/2026 à 09:05:43, avant toute modification.
+
+### Démarrage — état initial commun
+
+| Étape du support | Constat réel | Preuve |
+| --- | --- | --- |
+| 1. Noms, adresses, rôles | Conformes à l'inventaire : WIN-DC01 `.10` (AD DS, DNS), LINUX01 `.20` (nginx, `/data`), OPS01 `.30` (Ansible, Prometheus, Grafana) | P-80 |
+| 2. Accès autorisés | SSH par clé (rebond par l'hôte) vers LINUX01 et OPS01 ; WinRM depuis OPS01 vers WIN-DC01 ; API Proxmox par jeton | P-80 |
+| 3. Services attendus et tests qui les prouvent | Voir la fiche d'état initial (UC-01) : un test fonctionnel par service (DNS, HTTP + contenu, API Prometheus et Grafana, domaine AD) | P-80, P-82 |
+| 4. Prometheus, Grafana, Node Exporter, Windows Exporter | Vérifiés **sur les machines** (services actifs, ports, `/metrics`), pas d'après la documentation | P-80, P-81 |
+| 5. Blocages initiaux | Voir tableau suivant | P-80 |
+
+| # | Blocage initial | Cause | Action | Statut |
+| --- | --- | --- | --- | --- |
+| 1 | Laboratoire injoignable (`No route to host`) | L'hôte Proxmox a été redémarré à 08:27 ; les VM n'ont pas l'option « démarrage automatique » (`onboot`) | VM démarrées à la main à 09:01 | Levé (option `onboot` non activée : à décider) |
+| 2 | Jeton API Proxmox sans aucun droit (`Permission check failed (/vms/100, VM.PowerMgmt)`) | Jeton créé avec « Privilege Separation » | Séparation retirée par l'étudiant ; snapshot pris ensuite | Levé — jeton à révoquer après la remise |
+| 3 | Prometheus charge **4 règles** alors que le dépôt en définit **5** (`ServiceWindowsCritiqueArrete` absente) | La copie du projet sur OPS01 n'avait pas été resynchronisée après une modification des règles | UC-02 : copie resynchronisée avec `main`, `ops01_monitoring.yml` rejoué | Corrigé (P-81a, P-81) |
+| 4 | `openipmi.service` en échec à chaque démarrage (LINUX01, OPS01) | Paquet recommandé `ipmitool`, tiré par `prometheus-node-exporter` installé par nos playbooks ; aucun matériel IPMI dans une VM | Service désactivé **par Ansible** dans `linux_base.yml` et `ops01_monitoring.yml` | Corrigé (P-80b) |
+| 5 | WIN-DC01 : événements 41 et 6008 « arrêt précédent inattendu » | Incident traité en UC-05 | Diagnostic et reproduction faits, correction en attente de validation | Diagnostiqué (P-86) |
+
+### Travaux réalisés / checklist
+
+- [x] **UC-01** — État de santé initial daté des 3 serveurs, avant toute modification, avec un test fonctionnel par service (P-80).
+- [x] **UC-02** — Cibles Linux et Windows vérifiées de bout en bout ; écart de configuration corrigé ; défaut du playbook de supervision corrigé (P-81, P-81a, P-81b).
+- [x] **UC-03** — Dashboard d'exploitation v3 : unités, descriptions, données absentes distinguées de zéro, 3 nouveaux panneaux (P-85).
+- [x] **UC-04** — Nouvelle alerte `SiteWebIndisponible`, testée de façon contrôlée : déclenchement puis retour à la normale (P-84).
+- [ ] **UC-05** — Incident réel (arrêt brutal du DC) diagnostiqué et reproduit (P-86) ; **correction préparée, pas encore appliquée**.
+- [x] **UC-06** — Fichiers versionnés, contrôles CI, README et dossier à jour, liste validé / partiel / bloqué (ci-dessous).
+- [x] **UC-C1** — Maintenance de LINUX01 encadrée par un contrôle avant / après (P-87).
+- [x] **UC-C2** — Playbook de contrôle de santé en lecture seule : `controle_sante.yml` (P-82, P-80b).
+- [x] **UC-C3** — Observation ponctuelle comparée à l'historique Prometheus (P-88).
+- [x] **UC-C4** — Tâche planifiée tracée : timer systemd `infraready-controle-site` (P-83, P-84).
+- [x] **UC-A3** (défi) — Quotas utilisateurs sur le disque de test `/data` (P-89a, P-89).
+
+### Correspondance avec le support
+
+| Use case | Réalisation dans InfraReady | Fichiers | Preuves |
+| --- | --- | --- | --- |
+| UC-01 État de santé vérifiable | Fiche d'état initial datée (commandes Linux en lecture seule, PowerShell par WinRM) ; contrôles automatisés ensuite par `controle_sante.yml` | `ansible/playbooks/controle_sante.yml` | P-80, P-82 |
+| UC-02 Métriques Linux et Windows | Configuration réelle, cibles attendues / observées, endpoints, métriques stockées ; correction de l'écart de règles | `monitoring/prometheus/`, `ops01_monitoring.yml` | P-81a, P-81b, P-81 |
+| UC-03 Tableau de bord | Dashboard « InfraReady — Serveurs » v3 provisionné depuis le dépôt | `monitoring/grafana/dashboards/infraready.json` | P-85 |
+| UC-04 Alerte exploitable | `SiteWebIndisponible` (+ `ControlePlanifieEnRetard`) | `monitoring/prometheus/rules/infraready.rules.yml` | P-84 |
+| UC-05 Incident | INC-2026-10-23-01 : arrêt non propre de WIN-DC01 | `docs/rapport-incident.md` | P-86 |
+| UC-06 Livrables | Dépôt, CI, README, dossier, liste des éléments validés / partiels / bloqués | `.github/workflows/validation.yml`, `README.md` | P-64 |
+| UC-C1 Maintenance avant / après | `linux_maintenance.yml` sur LINUX01 entre deux `controle_sante.yml` | `docs/procedure-maintenance.md` | P-87 |
+| UC-C2 Contrôle de santé Ansible | `controle_sante.yml` (Linux + Windows, lecture seule) | `ansible/playbooks/controle_sante.yml` | P-82, P-80b |
+| UC-C3 Ponctuel / historique | Espace disque de `/` : mesure instantanée, historique 19→23/10, pente et projection | — | P-88 |
+| UC-C4 Tâche planifiée | Timer systemd + `check-nginx.sh` + métriques textfile + journal | `scripts/controle-site-planifie.sh`, `linux_base.yml` | P-83, P-84 |
+| UC-A3 Quotas | Quotas alice / bruno sur `/data` (disque de test) | `ansible/playbooks/linux_quotas.yml` | P-89a, P-89 |
+
+### UC-01 — Fiche d'état initial (23/10/2026, 09:06)
+
+Relevé fait **avant toute modification**, cinq minutes après le démarrage des VM. Outils : sous Linux, `hostnamectl`, `timedatectl`, `df`, `free`, `systemctl`, `journalctl -p err`, `getent`, `curl` (root via sudo, rebond SSH par l'hôte) ; sous Windows, un script PowerShell en lecture seule lancé depuis OPS01 par `ansible win-dc01 -m ansible.windows.win_shell` (`Get-CimInstance`, `w32tm /query /status`, `Get-Service`, `Get-WinEvent`, `Resolve-DnsName`, `Get-ADDomain`).
+
+| Contrôle | WIN-DC01 | LINUX01 | OPS01 | Attendu | Écart |
+| --- | --- | --- | --- | --- | --- |
+| Identité | Windows Server 2025 build 26100 | Ubuntu 24.04.5, noyau 6.8.0-147 | Ubuntu 24.04.5, noyau 6.8.0-147 | Conforme à l'inventaire | — |
+| Heure | Synchronisée NTP (`fr.pool.ntp.org`, strate 3) | NTP synchronisé, Europe/Paris | NTP synchronisé, Europe/Paris | Heure commune (Kerberos) | — |
+| Espace disque | `C:` 37,3 % | `/` 26 %, `/data` 1 %, `/boot` 6 % | `/` 23 %, `/boot` 6 % | < 85 % | — |
+| Services | NTDS, DNS, Netlogon, Kdc, W32Time, WinRM, windows_exporter : `Running` | nginx, node_exporter : actifs | prometheus, grafana-server, node_exporter : actifs | Tous actifs | — |
+| Unités en échec | — | `openipmi.service` | `openipmi.service` | Aucune | **Écart n° 4** |
+| Erreurs récentes | 41 (Kernel-Power) et 6008 (EventLog) à 09:01 | 1 (openipmi) | 2 (openipmi, sudo refusé à notre compte d'administration) | Aucune | **Écart n° 5** (incident UC-05) |
+| Test fonctionnel | DNS local : `linux01.infraready.test` → `.20` ; domaine AD `infraready.test` ; exporter HTTP 200 | Site HTTP 200 en 0,9 ms ; `/data` monté | Site LINUX01 par le nom DNS : HTTP 200 ; Prometheus « Ready » ; Grafana `database: ok` | Service rendu, pas seulement processus présent | — |
+| Supervision | — | — | 4/4 cibles `up` ; **4 règles chargées** | 5 règles (dépôt) | **Écart n° 3** |
+
+> [!note] Un processus actif ne prouve pas un service rendu
+> Écart de mesure à connaître : `df` affiche 26 % sur `/` de LINUX01, Prometheus et le contrôle de santé 29,2 %, car l'espace réservé à root est compté comme occupé (`size - avail`).
+>
+> Chaque service a un test fonctionnel : résolution DNS par le DC et depuis les clients Linux, page HTTP avec contrôle du contenu (par le nom DNS, depuis OPS01), API Prometheus et Grafana, requête Active Directory. Les captures et sorties ne contiennent aucun secret : le vault reste chiffré et les mots de passe ne passent que par l'entrée standard.
+
+### UC-02 — Métriques Linux et Windows collectables
+
+| Cible attendue (dépôt) | Job | Observée par Prometheus | Durée du scrape | Séries | Preuve de collecte |
+| --- | --- | --- | --- | --- | --- |
+| LINUX01 `192.168.50.20:9100` | `linux` | `up` | 55 ms | 1 692 | CPU 0,2 %, mémoire 10,4 %, `/` 29,2 %, `/data` 5,3 % |
+| OPS01 `localhost:9100` | `linux` | `up` | 50 ms | 1 764 | CPU 6,5 %, mémoire 12,3 % |
+| OPS01 `localhost:9090` | `prometheus` | `up` | 3 ms | — | Auto-supervision |
+| WIN-DC01 `192.168.50.10:9182` | `windows` | `up` | 25 ms | 3 285 | CPU 0,8 %, mémoire 23,8 %, `C:` 37,3 % ; services DNS, NTDS, Netlogon, Kdc `running = 1` |
+
+- **Chemin vérifié de bout en bout** : configuration chargée (`/etc/prometheus/prometheus.yml`), connexions TCP établies vers `:9100` et `:9182` (`ss`), endpoints `/metrics` en HTTP 200 (164 Ko côté Linux, 263 Ko côté Windows), puis valeurs **lues dans la base Prometheus** (`/api/v1/query`) : la collecte aboutit réellement et n'est pas simulée.
+- **Écart corrigé** : `ops01_monitoring.yml` a été rejoué depuis une copie resynchronisée avec `main`. Prometheus charge désormais 5 règles, puis 7 avec celles de la séance (P-81, P-83).
+- **Défaut révélé par ce redéploiement** (P-81a) : juste après le redémarrage de Prometheus, la liste des cibles est vide et la vérification du playbook réussissait **sans rien vérifier** (« 0 cibles up »). Au passage suivant, une cible encore « unknown » la faisait échouer. Correction (P-81b) : la tâche attend le premier scrape (`until`, 8 × 5 s) et l'assertion exige une liste non vide. Le cas qui échouait a été rejoué, puis l'idempotence revérifiée.
+- **Piège noté** : les noms de service de `windows_exporter` sont sensibles à la casse (`NTDS`, pas `ntds`). Une requête en minuscules renvoie un résultat vide, pas une erreur.
+
+### UC-03 — Tableau de bord d'exploitation (dashboard v3)
+
+**Titre :** « InfraReady — Serveurs » · **Période par défaut :** 6 dernières heures, rafraîchissement 30 s · **Source :** Prometheus (`prometheus-infraready`), provisionnée · **Usage (description du dashboard) :** à la prise de poste, tout ce qui n'est pas vert, toute alerte active ou toute case « NON COLLECTÉ » justifie une investigation, en commençant par `controle_sante.yml`.
+
+| Panneau | Métrique / requête | Unité | Ce que le panneau permet de décider |
+| --- | --- | --- | --- |
+| Disponibilité des serveurs | `max by (host) (up{job=~"linux\|windows"})` | état | HORS LIGNE ou NON COLLECTÉ → vérifier la VM, l'exporter et le pare-feu |
+| Uptime | `time() - node_boot_time_seconds` / `windows_system_boot_time_timestamp` | durée | Une valeur courte inattendue signale un redémarrage non planifié |
+| CPU (%) | `100 - avg by (host) (rate(..._idle[2m])) * 100` | % | > 80 % pendant 2 min → alerte `CpuEleve` |
+| Mémoire utilisée (%) | `(1 - MemAvailable / MemTotal) * 100` | % | > 90 % pendant 5 min → alerte `MemoireElevee` |
+| Stockage utilisé (%) par volume | `(1 - avail / size) * 100` | % | > 85 % → identifier ce qui grossit avant toute maintenance |
+| Alertes Prometheus actives | `ALERTS{alertstate="firing"}` | liste | Liste vide = aucune alerte active |
+| **Contrôle planifié du site web** (nouveau) | `infraready_controle_succes`, âge de `infraready_controle_derniere_execution_secondes` | état, s | ÉCHEC = site indisponible même si le serveur est EN LIGNE ; âge > 300 s = la tâche ne tourne plus |
+| **Maintenance Linux** (nouveau) | `apt_upgrades_pending`, `apt_upgrades_held`, `node_reboot_required` | paquets | Préparer une fenêtre de maintenance (limite constatée en UC-C1) |
+| **Stockage utilisé (%) — évolution** (nouveau) | même requête que le stockage, en série temporelle | % | Distinguer une mesure ponctuelle d'une tendance (UC-C3) |
+
+- **Données absentes ≠ zéro** : chaque panneau affiche « NON COLLECTÉ » ou « Aucune donnée » quand aucune série n'existe (`noValue`), et les courbes ne relient pas les trous (`spanNulls: false`). Sur la capture, le labo était éteint avant 09:01 : la zone est vide, elle ne descend pas à 0 %. Pour le panneau « Maintenance Linux », le 0 n'est affiché que si le collecteur `apt` a bien tourné (`... or apt_upgrades_held * 0`). Sans fichier `apt.prom`, le panneau affiche « NON COLLECTÉ ».
+- **Déploiement** : `ops01_monitoring.yml` (2ᵉ passage `changed=0`), version 3 vérifiée par l'API Grafana (9 panneaux, tous décrits) (P-85).
+
+![[P-85-grafana-dashboard-v3-exploitation.png|700]]
+
+### UC-04 — Alerte exploitable et testée
+
+Le support demande une alerte liée à une exigence du projet. L'incident de la phase H avait montré un manque : **le site pouvait être indisponible sans aucune alerte**, car seul `up` (l'exporter) était surveillé. La nouvelle alerte s'appuie sur le contrôle planifié de UC-C4.
+
+| Élément | `SiteWebIndisponible` | `ControlePlanifieEnRetard` |
+| --- | --- | --- |
+| Cible | Site web de LINUX01 (résultat de `check-nginx.sh` publié chaque minute) | Le contrôle planifié lui-même |
+| Condition | `infraready_controle_succes{controle="site_web"} == 0` | Dernier contrôle plus vieux que 300 s, ou métrique absente (`absent()`) |
+| Durée | 2 min | 5 min |
+| Gravité | critical | warning |
+| Justification du seuil | Deux contrôles consécutifs en échec (un par minute) : un redémarrage de nginx pendant une maintenance ne déclenche rien | Cinq contrôles manqués : le timer ou le script ne tourne plus ; la surveillance du site est alors aveugle |
+| Première action | `journalctl -u infraready-controle-site -n 5` sur LINUX01, puis `systemctl status nginx` | `systemctl list-timers infraready-controle-site.timer`, `journalctl -u infraready-controle-site` |
+| Syntaxe | `promtool check config` (local + CI) : 7 règles valides | idem |
+
+**Méthode de test contrôlée :** arrêt de nginx sur LINUX01, un service de test sans dépendance pour AD, le DNS ou la supervision, avec le snapshot `s09_avant_seance6` disponible. **Pas de notification externe** (pas d'Alertmanager) : le test porte sur l'**état de l'alerte** dans Prometheus, pas sur la réception d'un message.
+
+| Heure | Événement | Observé |
+| --- | --- | --- |
+| 09:26:14 | `systemctl stop nginx` | `inactive` |
+| 09:27:12 | 1ᵉʳ contrôle planifié en échec | journal : « ECHEC : le service nginx n'est pas actif » ; unité `failed`, code 1 |
+| 09:27:23 | Alerte `pending` | `infraready_controle_succes = 0` ; **`up(linux01)` reste à 1, `InstanceDown` reste inactive** |
+| 09:29:22 | Alerte **`firing`** (+3 min 08 s) | Capture P-84 |
+| 09:30:05 | `systemctl start nginx` | `active` |
+| 09:30:32 | Alerte résolue (27 s après le retour du service) | contrôle OK, `check-nginx.sh` → 0 |
+
+![[P-84-prometheus-alerte-sitewebindisponible-firing.png|600]]
+
+**Second test, `ControlePlanifieEnRetard` :** arrêt du timer à 09:54:02, alors que nginx reste actif et que le site reste servi. Dernier contrôle de plus de 300 s → `pending` à 09:59:02, **`firing` à 10:04:01** (durée `for` de 5 min respectée), sans que `SiteWebIndisponible` ne se déclenche. Timer redémarré à 10:04:06 : contrôle exécuté aussitôt, alerte résolue à 10:04:17 (P-84).
+
+### UC-05 — Incident INC-2026-10-23-01 : arrêt non propre de WIN-DC01
+
+> [!warning] Incident réel, découvert par l'état initial (pas un scénario préparé)
+> **Symptôme :** au démarrage du 23/10 à 09:01, WIN-DC01 journalise les événements 41 (Kernel-Power) et 6008 (« l'arrêt précédent du système le 20/10 à 19:32:34 était inattendu »). **Machine :** WIN-DC01 (AD DS, DNS). **Impact supposé :** risque d'incohérence de la base Active Directory (NTDS) et des zones DNS à chaque arrêt de l'hôte, et arrêt de l'hôte rallongé de 3 minutes. Aucun impact utilisateur constaté à ce jour : `dcdiag` n'a pas été relancé dans la séance, le contrôle de santé est OK.
+
+| Étape | Éléments de preuve | Conclusion |
+| --- | --- | --- |
+| Journaux Windows | 41 + 6008 le 20/10 à 10:40 (arrêt du 19/10 20:50) et le 23/10 à 09:01 (arrêt du 20/10 19:32) ; aucun 1074 / 6006 (arrêt propre) sauf pour les redémarrages de Windows Update | Récurrent : **chaque** arrêt de l'hôte |
+| Journal des tâches Proxmox | `stopall` des 19/10 et 20/10 : LINUX01 et OPS01 arrêtées en 2 à 12 s ; **VM 100 : 182-183 s**, puis « VM still running - terminating now with SIGTERM » | Proxmox attend 180 s puis tue le DC |
+| Comparaison | VM Linux : fin de journal propre (`systemd-shutdown … Journal stopped`) ; VM 100 sans agent invité (`agent` non défini) | Le problème est propre à Windows |
+| Métriques | Derniers échantillons de toutes les cibles à 19:29:4x : Prometheus (OPS01) s'arrête en même temps que les autres VM | **Limite** : la supervision tourne sur le même hôte et ne voit pas la fin de vie du DC |
+| Hypothèse | Windows Server ignore le bouton d'alimentation ACPI à l'écran d'ouverture de session quand la stratégie « Arrêt : permet au système d'être arrêté sans avoir à se connecter » est désactivée (valeur par défaut sur Server) | — |
+| Observation discriminante | `ShutdownWithoutLogon = 0`, aucune session ouverte (`quser` : « No User exists »), pas de service QEMU-GA | Hypothèse **confortée** |
+| Reproduction contrôlée (09:38:45) | Arrêt ACPI demandé par l'API Proxmox, délai 90 s, **sans arrêt forcé** (`forceStop=0`) : « VM quit/powerdown failed - got timeout », VM toujours `running` | Hypothèse **confirmée**, sans arrêt brutal du DC |
+
+**Correction proposée (autorisée, réversible, rejouée en Ansible) :** tâche `win_regedit` dans `windows_base.yml`, `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\shutdownwithoutlogon = 1` ; retour arrière = valeur 0. **Validation prévue :** nouvel arrêt ACPI par l'API (doit aboutir proprement en moins de 90 s), redémarrage, événements 1074 / 6006 et **absence** de 41 / 6008, contrôle de santé complet, puis `windows_base.yml` rejoué deux fois (`changed=0`). Piste complémentaire : agent invité QEMU (ISO virtio-win) avec `agent: 1` pour un arrêt par l'agent.
+
+> [!todo] Correction non appliquée à ce stade
+> La modification touche le contrôleur de domaine partagé : elle a été bloquée par le garde-fou de l'agent et attend une validation explicite de l'équipe avant application. Rapport complet : `docs/rapport-incident.md` (INC-2026-10-23-01).
+
+### UC-06 — Intégration aux livrables
+
+| Élément | État | Où |
+| --- | --- | --- |
+| Configurations, scripts, playbooks, supervision versionnés | ✅ `controle_sante.yml`, `linux_quotas.yml`, `controle-site-planifie.sh`, règles, dashboard v3, correctifs | une branche et une PR par sujet (journal de changements) |
+| GitHub Actions | ✅ Contrôles exécutés sur chaque PR : arborescence, `yamllint`, `--syntax-check` (dont les 2 nouveaux playbooks), `ansible-lint` (profil *production*), `promtool` (7 règles), JSON du dashboard, gitleaks, vault chiffré | P-64 |
+| Validation ≠ déploiement | ⚠️ La CI **valide les fichiers** ; elle ne déploie rien. Le déploiement est fait depuis OPS01 (copie du dépôt), car un runner hébergé par GitHub ne peut pas joindre le réseau privé du labo | README, section 9 |
+| Prérequis, étapes, tests, résultats | ✅ README (commandes de la séance 6) et cette section | `README.md` |
+| Aucun secret commité, captures expurgées | ✅ Recherche des vrais secrets avant chaque commit, gitleaks en CI ; les captures ne montrent ni mot de passe ni jeton | — |
+
+| Fonctionnalité | Statut | Cause / action nécessaire |
+| --- | --- | --- |
+| UC-01 à UC-04, UC-06, UC-C1 à UC-C4, UC-A3 | Validé | — |
+| UC-05 : correction de l'arrêt non propre du DC | **Partiel** (diagnostic et reproduction faits) | Validation de l'équipe, puis application de `windows_base.yml` et test d'arrêt ACPI |
+| UC-C1 côté Windows | **Non exécuté** (procédure seulement) | Pas de fenêtre de maintenance du DC dans la séance (redémarrage du contrôleur de domaine, boucle KB5007651 connue) ; procédure : `windows_maintenance.yml` (recherche puis `-e maintenance_apply=true`) |
+| Notification externe des alertes | **Non configurée** | Pas d'Alertmanager : alertes visibles dans Prometheus et Grafana uniquement |
+| Démarrage automatique des VM (`onboot`) | **Non fait** | Choix de l'équipe : les VM restent éteintes au redémarrage de l'hôte (blocage n° 1) |
+
+### UC-C1 — Maintenance planifiée avec contrôle avant / après
+
+| Élément | Contenu |
+| --- | --- |
+| Périmètre | LINUX01 (VM de test), paquets Ubuntu ; WIN-DC01 hors périmètre de la séance (voir UC-06) |
+| Prérequis | Snapshot `s09_avant_seance6` ; contrôle de santé sans ECHEC ; `apt list --upgradable` (8 paquets) |
+| Risques | Redémarrage de nginx pendant la mise à jour, paquet cassé, redémarrage noyau requis |
+| Moment | 23/10/2026 09:45, hors usage (labo) |
+| Mécanisme réel | `apt` via `linux_maintenance.yml` (+ `unattended-upgrades` quotidien pour la sécurité) ; aucune distribution centralisée (pas de WSUS ni de miroir) |
+| Conditions d'arrêt | Disque > 85 % ou service attendu inactif avant la maintenance (assertions du playbook) ; service inactif ou site KO après |
+| Retour arrière | Restauration du snapshot `s09_avant_seance6` (VM 101) ; redémarrage interdit sans `-e allow_reboot=true` |
+| Tests de réception | Services, site HTTP + contenu, DNS, espace disque, journaux, unités en échec : `controle_sante.yml` avant et après |
+
+| Contrôle (LINUX01) | Avant (09:45:02) | Après (09:45:29) |
+| --- | --- | --- |
+| Paquets | 8 en attente | 3 mis à jour (`tmux`, `ubuntu-pro-client`, `ubuntu-pro-client-l10n`), 5 reportés par le phasage d'Ubuntu |
+| Services ssh, nginx, node_exporter | actifs | actifs |
+| Site web (HTTP + contenu) | 200 | 200 |
+| Disque | `/` 29,2 % | `/` 29,2 % |
+| Redémarrage requis | non | non |
+| Statuts du contrôle de santé | 19 lignes (LINUX01 + OPS01) | **aucun écart de statut** (`diff` des deux rapports) |
+
+**Limite constatée :** avant la maintenance, le collecteur `apt` de node_exporter comptait les 8 paquets comme « retenus » et 0 « à installer », alors que 3 étaient installables. Après la maintenance, il compte 5 retenus, ce qui correspond aux paquets reportés par le phasage. Le panneau « Maintenance Linux » est donc un indicateur : la liste de référence reste `apt list --upgradable` en pré-contrôle (P-87).
+
+### UC-C2 — Contrôle de santé automatisé avec Ansible
+
+`ansible/playbooks/controle_sante.yml` réutilise l'inventaire du projet (`linux`, `windows`) et le vault pour WinRM.
+
+| Contrôle | Linux | Windows | Statuts possibles |
+| --- | --- | --- | --- |
+| Identité, durée depuis le démarrage | faits Ansible | `Win32_OperatingSystem` | OK |
+| Heure | `timedatectl` (NTP) | `w32tm /query /status` | OK / ECHEC |
+| Espace disque (seuil 85 %) | `ansible_mounts` | `Win32_LogicalDisk` | OK / ECHEC |
+| Disque de données `/data` | LINUX01 | — | OK / ECHEC / NON APPLICABLE (OPS01) |
+| Services attendus | `service_facts` | `Get-Service` | OK / ECHEC |
+| Unités systemd en échec | `systemctl list-units --state=failed` | — | OK / ECHEC |
+| Erreurs du journal sur 24 h | `journalctl -p err` | `Get-WinEvent` niveaux 1-2 | OK / ATTENTION |
+| DNS du domaine | `getent` | `Resolve-DnsName` (DNS local) | OK / ECHEC |
+| Tests fonctionnels | site HTTP + contenu par le nom ; cibles Prometheus ; API Grafana | domaine AD ; `windows_exporter` | OK / ECHEC |
+| Connexion | — | — | INACCESSIBLE (hôte injoignable ou erreur de privilèges) |
+
+- **Lecture seule vérifiée** : `changed=0` sur les trois serveurs en exécution normale et en `--check`. Seule l'option `-e sante_rapport=true` écrit un rapport daté dans `~/infraready-logs/` sur OPS01, et cette écriture est annoncée comme `changed`.
+- **Résultat exploitable** : un tableau hôte / contrôle / statut / détail, puis un dernier play en échec (code 2) s'il reste un ECHEC ou un INACCESSIBLE. Le playbook peut donc servir de critère d'arrêt (UC-C1) ou être lancé par une tâche planifiée.
+- **Premier passage (P-82)** : il a détecté 2 ECHEC réels (`openipmi`), corrigés en Ansible (P-80b) ; ensuite 23 OK, 3 ATTENTION (événements réels des dernières 24 h), 1 NON APPLICABLE, 0 ECHEC.
+- **Erreurs de connexion** : un WinRM injoignable, simulé en interrogeant un port fermé (`-e ansible_port=5986`) sans toucher au serveur, produit une ligne INACCESSIBLE avec le message de connexion, au lieu d'interrompre le playbook. Ce test a révélé un défaut, corrigé : avec `--limit`, les hôtes volontairement exclus apparaissaient comme INACCESSIBLE.
+
+### UC-C3 — Observation ponctuelle et suivi dans le temps
+
+**Ressource choisie :** espace occupé sur `/` de LINUX01 et OPS01. OPS01 héberge la base Prometheus, qui grossit avec le temps.
+
+| Élément | Observation |
+| --- | --- |
+| Mesure ponctuelle (23/10 09:46) | LINUX01 `/` 29,2 % (8,01 Gio occupés, réserve root comprise) ; OPS01 `/` 26,3 % (12,34 Gio) ; base Prometheus 42,4 Mio |
+| Historique disponible | Du 19/10 17:00 au 20/10 20:00 puis depuis le 23/10 09:01 : **15 h de données sur 91 h**, le labo étant éteint le reste du temps. Scrape toutes les 15 s, rétention par défaut de 15 jours |
+| Unité, période, limites | Octets (Gio), moyenne horaire ; trous = labo éteint (aucune donnée, pas une occupation nulle) ; les séries sans label `host` du 1ᵉʳ démarrage de Prometheus (19/10) sont exclues |
+| Tendance décrite | OPS01 : + 0,12 Gio sur ~ 15 h de fonctionnement (12,24 → 12,36 Gio), croissance régulière quand le labo tourne ; LINUX01 : stable (7,96 → 7,98 Gio) |
+| Ce qu'il ne faut pas conclure | `deriv()` sur 6 h annonce LINUX01 « − 234 Mio/jour » et `predict_linear()` une occupation de 4,7 % dans 30 jours : la fenêtre ne contient que 45 min de données, dont la maintenance qui a vidé le cache apt. **Une pente calculée sur si peu de données n'est pas une tendance.** On n'attribue pas non plus la croissance d'OPS01 à Prometheus seul (journaux, apt) sans mesure dédiée |
+| Proposition de suivi | Panneau « Stockage utilisé (%) — évolution » consulté sur 7 jours. Alerte prédictive à valider **après une semaine de fonctionnement continu** : `predict_linear(node_filesystem_avail_bytes{mountpoint="/"}[3d], 14*86400) < 0`, avec un `for` de 1 h. Taille de la base suivie par `prometheus_tsdb_storage_blocks_bytes` |
+
+### UC-C4 — Tâche planifiée et traçabilité
+
+| Élément de la fiche | Valeur |
+| --- | --- |
+| Tâche | Contrôle du site web de LINUX01, sans effet destructif (`check-nginx.sh` : lecture seule) |
+| Mécanisme | Timer systemd `infraready-controle-site.timer` (1 min après le démarrage, puis chaque minute) → service `oneshot` `infraready-controle-site.service` |
+| Déploiement | `linux_base.yml` (scripts copiés depuis `scripts/` vers `/usr/local/lib/infraready/`, unités dans `/etc/systemd/system/`) |
+| Compte d'exécution et droits | root **sans aucune capacité** (`CapabilityBoundingSet=` vide), `NoNewPrivileges`, système de fichiers en lecture seule (`ProtectSystem=strict`) sauf `/var/lib/prometheus/node-exporter` ; exposition systemd 6,2 « MEDIUM » |
+| Codes de retour | 0 = OK, 1 = contrôle négatif, 2 = erreur d'exécution (ceux de `check-nginx.sh`), 3 = métriques non publiées |
+| Traces | Journal : `journalctl -u infraready-controle-site` (sortie du contrôle, `Result=exit-code`) ; métriques : `/var/lib/prometheus/node-exporter/infraready_controle.prom` (écriture atomique), lues par node_exporter puis Prometheus ; Grafana : panneau « Contrôle planifié du site web » |
+| Scénario normal testé | Exécution chaque minute, `Result=success`, `ExecMainStatus=0`, métrique `succes=1`, âge < 60 s dans Prometheus (P-83) |
+| Diagnostic d'un échec | 1) `systemctl list-timers infraready-controle-site.timer` : le timer tourne-t-il ? 2) `systemctl status infraready-controle-site` / `journalctl -u … -n 20` : dernier code et message ; 3) code 1 → le site (nginx, HTTP, contenu), code 2 → prérequis (curl, unité nginx), code 3 → droits ou espace sur le dossier textfile ; 4) `node_textfile_scrape_error` et âge de la métrique côté Prometheus. Cas réel observé pendant UC-04 : unité `failed`, « ECHEC : le service nginx n'est pas actif » |
+
+### UC-A3 (défi) — Prévenir la saturation du stockage avec des quotas
+
+Choix : **quotas** plutôt que RAID logiciel. Un seul disque de test est réservé au TP (`/data`) ; un RAID de démonstration aurait demandé d'ajouter des disques à la VM.
+
+| Élément | Contenu |
+| --- | --- |
+| Besoin | Empêcher qu'un administrateur web (alice, bruno) monopolise l'espace commun de `/data` |
+| Périmètre | Disque de **test** `/data` de LINUX01 (série `INFRA-DATA01`), dossier `/data/partage-web` (groupe `webadmins`, setgid) ; jamais `/` ni un disque de données réel |
+| Seuils | Avertissement (souple) 200 Mio, délai de grâce 7 jours ; blocage (strict) 250 Mio par utilisateur |
+| Comportement attendu | Écriture acceptée au-delà de 200 Mio, avec signalement et délai de grâce ; refus (`Disk quota exceeded`) à 250 Mio ; les autres utilisateurs ne sont pas affectés |
+| Mise en œuvre | `linux_base.yml` : options de montage `usrquota,grpquota` (variable `data_mount_opts`) ; `linux_quotas.yml` : **garde-fou** (numéro de série du disque et options vérifiés avant toute modification), paquet `quota`, `quotacheck`, `quotaon`, `setquota` seulement si les limites diffèrent |
+| Prérequis et restauration | Snapshot `s09_avant_seance6` ; retour arrière : `quotaoff -ug /data`, retirer `usrquota,grpquota` de `data_mount_opts` et rejouer `linux_base.yml`, supprimer `/data/aquota.*` |
+| Résultats observés | alice : 220 Mio acceptés (`220M*`, grâce `7days`), puis bloquée à 250 Mio (`dd: … Disk quota exceeded`, code 1) ; bruno écrit 50 Mio sans gêne ; fichiers de test supprimés (P-89) |
+| Limites | root n'est pas soumis aux quotas ; `repquota` lit le fichier de quotas, mis à jour en différé, alors que `quota -u` interroge le noyau et fait foi ; aucune trace dans le journal système, l'erreur est renvoyée à l'application |
+| Surveillance proposée | Capacité du volume : `DisquePresquePlein` et panneau d'évolution, déjà en place. Quotas, non réalisé : script `repquota -uv -O csv` lancé par un timer, qui publierait `infraready_quota_utilise_octets{user}` et `infraready_quota_limite_octets{user}` (collecteur textfile), avec une alerte quand l'utilisation dépasse 90 % du seuil souple pendant 15 min |
+
+### Difficultés / décision / retour arrière
+
+| Problème | Cause | Correction | Résultat |
+| --- | --- | --- | --- |
+| VM éteintes, lab injoignable au démarrage | Hôte redémarré, VM sans `onboot` | Démarrage manuel | Levé (P-80) |
+| Jeton API Proxmox sans droit | « Privilege Separation » | Séparation retirée par l'étudiant | Snapshot `s09` pris |
+| 4 règles chargées au lieu de 5 | Copie du projet sur OPS01 non resynchronisée | Copie resynchronisée, `ops01_monitoring.yml` rejoué | 5 puis 7 règles (P-81) |
+| Vérification des cibles réussie avec **0 cible**, puis échec sur une cible « unknown » | Vérification lancée juste après le redémarrage de Prometheus, avant le premier scrape | `until` (8 × 5 s) + liste non vide exigée | Test du cas en échec OK, idempotent (P-81a → P-81b) |
+| `openipmi.service` en échec à chaque démarrage | Paquet recommandé installé par nos playbooks, sans matériel IPMI | Service désactivé + `reset-failed` par handler, dans les deux playbooks | Contrôle de santé sans ECHEC (P-80b) |
+| Synthèse du contrôle de santé jamais affichée | PowerShell : `try/catch` interdit directement dans un littéral de table de hachage, et un play dont tous les hôtes échouent arrête le playbook | `$(try { … } catch { … })`, `block/rescue` et `ignore_unreachable` | Ligne ECHEC / INACCESSIBLE au lieu d'un arrêt (P-82) |
+| Liste des disques Windows reçue comme texte | Profondeur de sérialisation par défaut de `win_powershell` (2) | `depth: 4` | Disques lus comme données |
+| Hôtes exclus par `--limit` signalés INACCESSIBLE | Synthèse calculée sur tout l'inventaire | Hôtes visés = `inventory_hostnames` de `ansible_limit` | Test 3b correct (P-82) |
+| `linux_quotas.yml` non idempotent | `repquota` sans `-v` n'affiche pas les comptes sans occupation | `repquota -uv` | `changed=0` au 2ᵉ passage (P-89a → P-89) |
+| Arrêt ACPI de WIN-DC01 ignoré | Stratégie `ShutdownWithoutLogon = 0` (défaut Windows Server) | Correction préparée dans `windows_base.yml`, **en attente de validation** | Diagnostic confirmé par reproduction (P-86) |
+| Requête des services Windows vide | Noms sensibles à la casse | `name=~"DNS\|NTDS\|…"` | Valeurs lues (P-81) |
+
+### Checklist de fin de séance (6.1 du support)
+
+- [x] État initial documenté pour les systèmes du périmètre (P-80).
+- [x] Collecte des métriques Linux et Windows vérifiée (P-81).
+- [x] Tableau de bord avec indicateurs lisibles et unités explicites (P-85).
+- [x] Au moins une alerte définie et testée dans les limites de l'environnement (P-84).
+- [ ] Un incident analysé avec journaux, hypothèse, correction et test de retour au service : analyse, hypothèse et reproduction faites (P-86) ; **correction et test de retour en attente de validation**.
+- [x] Résultats, configurations et documentation intégrés au dépôt (PR de la séance 6).
+- [x] Pipeline CI/CD vérifié, sans prétendre qu'il déploie dans le réseau privé (P-64).
+- [x] Aucun secret publié ; captures et journaux expurgés.
+- [x] Compléments (UC-C1 à UC-C4) et défi avancé (UC-A3) réalisés.
+
+---
+
+## 13. Sécurité et limites d'intervention
 
 - [x] VM du laboratoire uniquement, aucun système externe — seules les VM 100 à 102 ont été modifiées ; les autres VM de l'hôte n'ont pas été touchées.
 - [x] Cibles contrôlées avant formatage / partitionnement — disques système vérifiés vides avant installation ; disque de test identifié par numéro de série + 5 contrôles avec arrêt automatique.
-- [x] Snapshots avant changements majeurs — `s01_installation_ok`, `s02_avant_adds`, `s02_avant_maj_c`, `s02_avant_monitoring`, `s03_avant_ansible`, `s04_avant_maintenance_e`, `s04_avant_maj_windows` ; état final figé dans `s05_phases_a_h_terminees` (arbre complet : [P-05](docs/preuves/P-05-proxmox-snapshots-arbre-complet.txt)).
+- [x] Snapshots avant changements majeurs — `s01_installation_ok`, `s02_avant_adds`, `s02_avant_maj_c`, `s02_avant_monitoring`, `s03_avant_ansible`, `s04_avant_maintenance_e`, `s04_avant_maj_windows` ; état final figé dans `s05_phases_a_h_terminees` (arbre complet : [P-05](docs/preuves/P-05-proxmox-snapshots-arbre-complet.txt)) ; puis `s06_avant_mdp_password`, `s07_avant_seance4`, `s08_avant_validation_pr3_5` et `s09_avant_seance6` (23/10/2026 09:05, avant toute modification de la séance 6).
 - [x] Moindre privilège — comptes Linux verrouillés, droits par groupe, chloe lit sans écrire, support IT en lecture seule sur le partage Compta, compte `ansible` dédié.
 - [x] Ports limités au strict besoin — UFW sur LINUX01 (refus par défaut), WinRM/ICMP limités au labo, exporters limités à OPS01, labo isolé du réseau domestique.
 - [x] Aucun secret en clair dans Git ou dans ce dossier — vault AES256, modèles avec `__PLACEHOLDERS__`, fichiers de réponse supprimés après usage, recherche des vrais secrets avant chaque commit, gitleaks dans la CI.
 - [x] Playbooks testés avant exécution large — un hôte par playbook, snapshot préalable, second passage pour vérifier la stabilité.
 - [x] Changements perturbateurs documentés — redémarrage de promotion du DC, modification réseau de l'hôte (sauvegarde `interfaces.bak-infraready`), changement DNS des VM Linux (sauvegarde netplan).
-- [x] Fonctionnalités non réalisées signalées — voir section 14.
+- [x] Fonctionnalités non réalisées signalées — voir section 15.
+- [x] Changements sur le contrôleur de domaine soumis à validation — la correction de l'incident INC-2026-10-23-01 (registre de WIN-DC01) n'est pas appliquée sans accord explicite de l'équipe.
 
-**Limites connues** : WinRM en HTTP (5985) avec chiffrement NTLM du message, mais sans certificat TLS ; Grafana consultable sans compte en lecture seule (rôle Viewer, réseau du labo uniquement) ; Prometheus et Grafana sans TLS (labo isolé) ; mot de passe `sudo` de l'hôte Proxmox faible et à changer en fin de projet.
+**Limites connues** : WinRM en HTTP (5985) avec chiffrement NTLM du message, mais sans certificat TLS ; Grafana consultable sans compte en lecture seule (rôle Viewer, réseau du labo uniquement) ; Prometheus et Grafana sans TLS (labo isolé) ; mot de passe `sudo` de l'hôte Proxmox faible et à changer en fin de projet ; **jeton API Proxmox** (`root@pam!claude`, séparation des privilèges retirée le 23/10) à révoquer après la remise ; le service du contrôle planifié tourne en root, mais sans aucune capacité et avec un système de fichiers en lecture seule.
 
 ---
 
-## 13. Recette finale et matrice des preuves
+## 14. Recette finale et matrice des preuves
 
 ### Recette finale
 
@@ -757,6 +1061,7 @@ Retour arrière : snapshot Proxmox `s07_avant_seance4` des 3 VM pris avant la s�
 | G | Workflow GitHub Actions réussi | ✅ Validé (contributions de Kenzi Bendjelloul à compléter) | P-60, P-61 à P-63 |
 | H | Incident corrigé / retour normal | ✅ Validé | P-70 à P-73, `docs/rapport-incident.md` |
 | Séance 4 | Scripts de vérification / processus et services / 6 scénarios de panne / mode check | ✅ Validé (bilans individuels à compléter) | P-14, P-25, P-26, P-38 à P-39, P-74 à P-79 |
+| Séance 6 | État initial, collecte Linux/Windows, dashboard v3, alerte testée, contrôle de santé, tâche planifiée, maintenance avant/après, tendance, quotas | ✅ Validé — ⚠️ incident UC-05 diagnostiqué, correction en attente de validation | P-80 à P-89, P-64 |
 
 ### Matrice des preuves
 
@@ -777,6 +1082,7 @@ Retour arrière : snapshot Proxmox `s07_avant_seance4` des 3 VM pris avant la s�
 | P-12b | 19/10/2026 | dcdiag tests fonctionnels + NTP | [P-12b](docs/preuves/P-12b-dcdiag-tests-fonctionnels-ntp.txt) |
 | P-13 | 19/10/2026 | Journaux Windows (Security, Directory Service, DNS, System) | [P-13](docs/preuves/P-13-journaux-windows-ad.txt) |
 | P-14 | 20/10/2026 | Windows : état initial, services, processus, journal System, script `Check-DnsClient.ps1` (0/1/2) | [P-14](docs/preuves/P-14-win-dc01-processus-services-script-dnsclient.txt) |
+| P-15 | 20/10/2026 | `windows_adds.yml` idempotent après correction du DNS du DC (`changed=0` ×2) | [P-15](docs/preuves/P-15-windows-adds-dns-idempotence.txt) |
 | P-20 | 19/10/2026 | Comptes, groupes, permissions Linux + tests de droits | [P-20](docs/preuves/P-20-linux01-comptes-groupes-permissions.txt) |
 | P-21 | 19/10/2026 | nginx, service et processus | [P-21](docs/preuves/P-21-linux01-service-nginx-processus.txt) |
 | P-22 | 19/10/2026 | Disque de test : contrôles, formatage, montage UUID | [P-22](docs/preuves/P-22-linux01-disque-test-montage.txt) |
@@ -816,6 +1122,20 @@ Retour arrière : snapshot Proxmox `s07_avant_seance4` des 3 VM pris avant la s�
 | P-77 | 20/10/2026 | Scénario 4 : handler non notifié | [P-77](docs/preuves/P-77-scenario4-handler-non-notifie.txt) |
 | P-78 | 20/10/2026 | Scénario 5 : nginx arrêté | [P-78](docs/preuves/P-78-scenario5-nginx-arrete.txt) |
 | P-79 | 20/10/2026 | Scénario 6 : contrôle fonctionnel du contenu | [P-79](docs/preuves/P-79-scenario6-controle-fonctionnel-contenu.txt) |
+| P-80 | 23/10/2026 | Séance 6 : état initial des 3 serveurs avant toute modification, blocages initiaux | [P-80](docs/preuves/P-80-seance6-etat-initial-trois-serveurs.txt) |
+| P-80b | 23/10/2026 | `openipmi` désactivé par Ansible ; contrôle de santé sans ECHEC | [P-80b](docs/preuves/P-80b-seance6-correction-openipmi-et-controle-sante-vert.txt) |
+| P-81a | 23/10/2026 | Redéploiement de la supervision : écart de règles corrigé, vérification des cibles instable | [P-81a](docs/preuves/P-81a-seance6-redeploiement-monitoring-verification-cibles-instable.txt) |
+| P-81b | 23/10/2026 | Vérification des cibles corrigée (attente du 1ᵉʳ scrape), idempotence | [P-81b](docs/preuves/P-81b-seance6-monitoring-verification-cibles-corrigee.txt) |
+| P-81 | 23/10/2026 | Cibles attendues / observées, endpoints, métriques Linux et Windows, règles | [P-81](docs/preuves/P-81-seance6-collecte-metriques-linux-windows.txt) |
+| P-82 | 23/10/2026 | `controle_sante.yml` : exécution, `--check`, hôte injoignable, correctif `--limit` | [P-82](docs/preuves/P-82-controle-sante-ansible-lecture-seule.txt) |
+| P-83 | 23/10/2026 | Tâche planifiée : timer systemd, journal, métriques textfile, 2 nouvelles règles | [P-83](docs/preuves/P-83-controle-planifie-timer-systemd.txt) |
+| P-84 | 23/10/2026 | Alertes `SiteWebIndisponible` et `ControlePlanifieEnRetard` : déclenchement et retour à la normale + capture | [P-84](docs/preuves/P-84-alerte-sitewebindisponible-test-controle.txt), [png](docs/preuves/P-84-prometheus-alerte-sitewebindisponible-firing.png) |
+| P-85 | 23/10/2026 | Dashboard Grafana v3 : déploiement, vérification par l'API + capture | [P-85](docs/preuves/P-85-grafana-dashboard-v3-deploiement.txt), [png](docs/preuves/P-85-grafana-dashboard-v3-exploitation.png) |
+| P-86 | 23/10/2026 | Incident INC-2026-10-23-01 : arrêt non propre de WIN-DC01, diagnostic et reproduction | [P-86](docs/preuves/P-86-incident-arret-non-propre-win-dc01-diagnostic.txt) |
+| P-87 | 23/10/2026 | Maintenance LINUX01 avec contrôle de santé avant / après | [P-87](docs/preuves/P-87-maintenance-linux01-controle-avant-apres.txt) |
+| P-88 | 23/10/2026 | Espace disque : observation ponctuelle et historique Prometheus | [P-88](docs/preuves/P-88-observation-ponctuelle-vs-historique-disque.txt) |
+| P-89a | 23/10/2026 | Quotas — 1ᵉʳ essai non idempotent (`repquota` sans `-v`) | [P-89a](docs/preuves/P-89a-quotas-1er-essai-non-idempotent.txt) |
+| P-89 | 23/10/2026 | Quotas sur `/data` : idempotence, dépassement souple / strict, nettoyage | [P-89](docs/preuves/P-89-quotas-disque-test-data-linux01.txt) |
 | P-50a | 19/10/2026 | Monitoring — 1er essai : échec de connexion admin Grafana | [P-50a](docs/preuves/P-50a-ops01-grafana-1er-essai-echec-mot-de-passe-ini.txt) |
 | P-50 | 19/10/2026 | Playbook Prometheus + Grafana (cibles up, admin OK) | [P-50](docs/preuves/P-50-ops01-prometheus-grafana-installation.txt) |
 | P-50b | 19/10/2026 | Playbook monitoring — 2ᵉ passage (changed=0) | [P-50b](docs/preuves/P-50b-ops01-monitoring-2e-passage-idempotence.txt) |
@@ -830,17 +1150,18 @@ Retour arrière : snapshot Proxmox `s07_avant_seance4` des 3 VM pris avant la s�
 | P-61 | 20/10/2026 | Validation des PR #2 et #4 : `verif-idempotence.sh` sur `windows_base` et `linux_base` (IDEMPOTENT) | [P-61](docs/preuves/P-61-validation-pr-idempotence-playbooks.txt) |
 | P-62 | 20/10/2026 | Tests négatifs (non idempotent → 1, échec → 2, vault absent ou invalide) ; diagnostic du DNS de `windows_adds` | [P-62](docs/preuves/P-62-validation-pr-tests-negatifs.txt) |
 | P-63 | 20/10/2026 | Validation de la PR #1 : calcul d'occupation disque de `linux_maintenance` (simulation) | [P-63](docs/preuves/P-63-validation-pr1-maintenance-linux-calcul-disque.txt) |
+| P-64 | 23/10/2026 | GitHub Actions sur les PR de la séance 6 : contrôles exécutés sur chaque branche | [P-64](docs/preuves/P-64-github-actions-pr-seance6.txt) |
 
 ---
 
-## 14. Difficultés, limites et bilan
+## 15. Difficultés, limites et bilan
 
-- **Blocages et corrections :** détaillés dans chaque phase (ISO Ubuntu 26.04 remplacée, carte e1000 → e1000e, nftables à la place d'iptables, paramètre `reboot_timeout` non supporté, `win_powershell` sans `path`, PTR du DC manquant, chemin de disque deviné, secret dans une preuve détecté et nettoyé, push GitHub bloqué par le droit `workflow`, lecteur CD vu comme volume plein, boucle Windows Update sur KB5007651, handler nginx non exécuté après un test en échec).
+- **Blocages et corrections :** détaillés dans chaque phase (ISO Ubuntu 26.04 remplacée, carte e1000 → e1000e, nftables à la place d'iptables, paramètre `reboot_timeout` non supporté, `win_powershell` sans `path`, PTR du DC manquant, chemin de disque deviné, secret dans une preuve détecté et nettoyé, push GitHub bloqué par le droit `workflow`, lecteur CD vu comme volume plein, boucle Windows Update sur KB5007651, handler nginx non exécuté après un test en échec ; séance 6 : règles d'alerte non déployées, vérification des cibles réussie sans cible, `openipmi` en échec au démarrage, quotas non idempotents, arrêt ACPI ignoré par le DC — voir section 12).
 - **Écarts à l'architecture :**
 	- **Proxmox VE 9.1 au lieu de VMware Workstation** — à faire valider par le formateur. Avantages : snapshots, ajout de disque à chaud, installations pilotables en ligne de commande, ressources suffisantes.
 	- Ressources légèrement supérieures au plan (vCPU) ; disque Windows en IDE (choix initial conservé).
 	- Ubuntu 24.04.**5** (dernière révision de la 24.04 LTS).
-- **Fonctionnalités inachevées / pistes :** commits des autres membres de l'équipe ; `KB5007651` exclue de l'installation automatique (boucle Windows Update) et à suivre manuellement ; pas de sonde HTTP du site dans Prometheus (`blackbox_exporter` à ajouter) ; snapshot Proxmox non pris avant l'incident H (sauvegarde fichier jugée suffisante pour un changement d'une ligne, réversible).
+- **Fonctionnalités inachevées / pistes :** commits des autres membres de l'équipe ; `KB5007651` exclue de l'installation automatique (boucle Windows Update) et à suivre manuellement ; correction de l'arrêt non propre de WIN-DC01 préparée mais non appliquée (en attente de validation, INC-2026-10-23-01) ; pas d'Alertmanager (alertes visibles dans Prometheus et Grafana, sans notification) ; supervision hébergée sur le même hôte que les serveurs supervisés (aveugle pendant un arrêt de l'hôte) ; VM sans démarrage automatique avec l'hôte ; snapshot Proxmox non pris avant l'incident H (sauvegarde fichier jugée suffisante pour un changement d'une ligne, réversible).
 - **Bilan de l'équipe :** [À compléter — synthèse commune en 3 à 5 lignes]
 
 > [!todo] Bilans individuels (questions du support, section 7 « Bilan de fin de séance ») — à rédiger par chaque membre
@@ -869,7 +1190,7 @@ Retour arrière : snapshot Proxmox `s07_avant_seance4` des 3 VM pris avant la s�
 
 ---
 
-## 15. Annexes et journal de changements
+## 16. Annexes et journal de changements
 
 ### Arborescence GitHub
 
@@ -885,20 +1206,24 @@ InfraReady/
 │   │       ├── all.yml
 │   │       ├── linux/vars.yml
 │   │       └── windows/{vars.yml, vault.yml (chiffré)}
-│   ├── playbooks/{windows_adds.yml, linux_base.yml, windows_base.yml}
-│   └── templates/{index.html.j2, nginx-infraready.conf.j2}
+│   ├── playbooks/{windows_adds.yml, windows_base.yml, windows_maintenance.yml,
+│   │              linux_base.yml, linux_maintenance.yml, linux_quotas.yml,
+│   │              ops01_monitoring.yml, controle_sante.yml}
+│   └── playbooks/templates/{index.html.j2, nginx-infraready.conf.j2}
 ├── lab/
 │   ├── autoinstall-user-data.yml.tpl
 │   ├── autounattend.xml.tpl
 │   └── proxmox/{vmbr1.interfaces, infraready-nat.nft, provision-vms.sh}
 ├── monitoring/
 │   ├── prometheus/{prometheus.yml, rules/infraready.rules.yml}
-│   └── grafana/provisioning/{datasources/prometheus.yml, dashboards/infraready.yml}
+│   └── grafana/{dashboards/infraready.json, provisioning/{datasources/prometheus.yml, dashboards/infraready.yml}}
 ├── scripts/
 │   ├── bootstrap-ansible-user.sh
 │   ├── ad-objets.ps1
 │   ├── verif-domaine.ps1 · verif-dcdiag-ntp.ps1 · verif-dns-depuis-dc.ps1 · journaux-ad.ps1
-├── docs/preuves/            (P-01 … P-35)
+│   ├── check-nginx.sh · Check-DnsClient.ps1 · verif-idempotence.sh · controle-site-planifie.sh
+├── docs/{procedure-maintenance.md, rapport-incident.md}
+├── docs/preuves/            (P-01 … P-89)
 ├── .gitignore · .yamllint · README.md
 └── InfraReady - Dossier technique.md
 ```
@@ -935,12 +1260,23 @@ InfraReady/
 | 20/10/2026 14:21 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | Tests négatifs ; exécution réelle non voulue de `windows_adds.yml` (DNS du DC rejoué, valeur inchangée) | Résolution DNS OK | P-62 / `s08_avant_validation_pr3_5` |
 | 20/10/2026 14:24 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | `linux_maintenance.yml` en simulation (PR #1) | Calcul identique à P-40 | P-63 / — |
 | 20/10/2026 14:26 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | Correctif DNS de `windows_adds.yml` testé (PR #6), puis copie d'OPS01 remise à la version de `main` | IDEMPOTENT | P-15 (PR #6) / `s08_avant_validation_pr3_5` |
+| 23/10/2026 09:05 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | Snapshot des 3 VM avant la séance 6 (API Proxmox) | Tâches `qmsnapshot` OK | `s09_avant_seance6` |
+| 23/10/2026 09:06 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | État initial des 3 serveurs (lecture seule) | 5 écarts relevés | P-80 / — |
+| 23/10/2026 09:17 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | Copie du projet sur OPS01 resynchronisée ; `ops01_monitoring.yml` rejoué (5 règles) puis corrigé (attente du 1ᵉʳ scrape) | IDEMPOTENT | P-81a, P-81b / `s09_avant_seance6` |
+| 23/10/2026 09:22 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | Timer `infraready-controle-site` (`linux_base.yml`) et 2 règles d'alerte (`ops01_monitoring.yml`) | `changed=0` au 2ᵉ passage, 7 règles | P-83 / `s09_avant_seance6` |
+| 23/10/2026 09:26 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | Test d'alerte : nginx arrêté sur LINUX01 puis redémarré (09:30) | firing à +3 min 08 s, résolue 27 s après | P-84 / — |
+| 23/10/2026 09:35 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | `openipmi` désactivé (`linux_base.yml`, `ops01_monitoring.yml`) | Contrôle de santé sans ECHEC | P-80b / `s09_avant_seance6` |
+| 23/10/2026 09:38 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | Reproduction : arrêt ACPI de WIN-DC01 demandé sans arrêt forcé | Ignoré pendant 90 s, VM restée allumée | P-86 / — |
+| 23/10/2026 09:43 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | Dashboard Grafana v3 (`ops01_monitoring.yml`) | IDEMPOTENT, version 3 chargée | P-85 / `s09_avant_seance6` |
+| 23/10/2026 09:45 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | Maintenance LINUX01 (3 paquets) entre deux contrôles de santé | Aucun écart de statut | P-87 / `s09_avant_seance6` |
+| 23/10/2026 09:48 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | `/data` remonté avec `usrquota,grpquota` ; quotas alice / bruno (`linux_quotas.yml`) | IDEMPOTENT après correction ; dépassement testé | P-89a, P-89 / `s09_avant_seance6` |
+| 23/10/2026 09:54 | MIR Mahan / Jolan Allen / Kenzi Bendjelloul | Test d'alerte : timer du contrôle planifié arrêté (09:54) puis redémarré (10:04) | `ControlePlanifieEnRetard` firing à 10:04:01, résolue à 10:04:17 | P-84 / — |
 
 **Annexes** : sorties complètes dans `docs/preuves/`, modèles d'installation dans `lab/`, configurations dans `ansible/` et `monitoring/`.
 
 ---
 
-## 16. Checklist de remise
+## 17. Checklist de remise
 
 - [ ] Dépôt GitHub prêt, avec contributions de l'équipe
 - [ ] Dossier technique exporté en PDF + lien du dépôt
@@ -949,7 +1285,10 @@ InfraReady/
 - [ ] PowerPoint final préparé selon modalités du formateur
 - [x] TP de la séance 4 réalisé et documenté (section 11, preuves P-14, P-25, P-26, P-38 à P-39, P-74 à P-79)
 - [ ] Bilans individuels et revue croisée de la séance 4 (chaque membre)
+- [x] TP de la séance 6 réalisé et documenté (section 12, preuves P-80 à P-89, P-64)
+- [ ] Correction de l'incident INC-2026-10-23-01 (arrêt non propre de WIN-DC01) : validation de l'équipe puis application
+- [ ] Jeton API Proxmox utilisé pendant la séance 6 révoqué
 - [x] Aucun secret présent dans les livrables (vérifié à chaque commit)
-- [x] Tous les écarts et limites sont mentionnés (section 14)
+- [x] Tous les écarts et limites sont mentionnés (section 15)
 
 **Date et plateforme de remise :** [À compléter]

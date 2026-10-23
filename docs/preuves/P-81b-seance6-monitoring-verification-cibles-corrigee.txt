@@ -1,0 +1,36 @@
+# Preuve : P-81b-seance6-monitoring-verification-cibles-corrigee
+# Séance 6, UC-02 — correctif de ops01_monitoring.yml : la tâche « Cibles Prometheus » attend (until, 8 × 5 s) qu'au moins
+#   une cible existe et qu'aucune ne soit « unknown » ; l'assertion exige une liste non vide.
+# Test du cas qui échouait (Prometheus redémarré juste avant le playbook), puis idempotence (scripts/verif-idempotence.sh).
+# 2026-10-23 09:18:40 CEST — test du correctif : redémarrage de Prometheus puis playbook immédiatement (cas qui échouait)
+$ sudo systemctl restart prometheus && ansible-playbook playbooks/ops01_monitoring.yml
+TASK [Attendre Prometheus et Grafana] ******************************************
+ok: [ops01] => (item=9090)
+ok: [ops01] => (item=3000)
+TASK [Cibles Prometheus (attente du premier scrape de chaque cible)] ***********
+FAILED - RETRYING: [ops01]: Cibles Prometheus (attente du premier scrape de chaque cible) (8 retries left).
+ok: [ops01]
+TASK [Toutes les cibles sont « up »] *******************************************
+ok: [ops01] => 
+    changed: false
+    msg: '4 cibles up : [''linux01'', ''ops01'', ''ops01'', ''win-dc01'']'
+TASK [Le compte admin Grafana fonctionne avec le mot de passe du vault] ********
+ok: [ops01]
+TASK [La source Prometheus est provisionnée (lecture anonyme)] *****************
+ok: [ops01]
+TASK [Résumé] ******************************************************************
+ok: [ops01] => 
+    msg: Grafana OK — 1 dashboard(s), source 'Prometheus' -> http://localhost:9090
+PLAY RECAP *********************************************************************
+ops01                      : ok=27   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+# 2026-10-23 09:19:03 CEST — idempotence
+$ ../scripts/verif-idempotence.sh playbooks/ops01_monitoring.yml ; echo "code retour : $?"
+== 1er passage : mise à jour de l'état si nécessaire
+    msg: '4 cibles up : [''linux01'', ''ops01'', ''ops01'', ''win-dc01'']'
+ops01                      : ok=27   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+== 2e passage : doit afficher changed=0
+    msg: '4 cibles up : [''linux01'', ''ops01'', ''ops01'', ''win-dc01'']'
+ops01                      : ok=27   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+IDEMPOTENT : 2e passage sans changement (changed=0, failed=0, unreachable=0)
+code retour : 0

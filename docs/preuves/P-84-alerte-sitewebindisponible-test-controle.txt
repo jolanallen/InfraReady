@@ -1,0 +1,84 @@
+# Preuve : P-84-alerte-sitewebindisponible-test-controle (+ 2e test : ControlePlanifieEnRetard, en fin de fichier)
+# Séance 6, UC-04 — test contrôlé de l'alerte SiteWebIndisponible (règle versionnée dans monitoring/prometheus/rules/)
+#   Condition : infraready_controle_succes{controle="site_web"} == 0 pendant 2 min (deux contrôles planifiés consécutifs en échec)
+#   Méthode de test : arrêt de nginx sur LINUX01 (service de test, sans impact sur AD/DNS ni la supervision), snapshot s09_avant_seance6
+#   Pas de notification externe (pas d'Alertmanager) : le test porte sur l'ÉTAT de l'alerte dans Prometheus, pas sur la réception d'un message.
+# Suivi : API Prometheus /api/v1/alerts et /api/v1/query interrogée toutes les 5 s depuis le poste (tunnel SSH vers OPS01) ;
+#   seuls les changements d'état sont affichés. Capture : P-84-prometheus-alerte-sitewebindisponible-firing.png
+# Date : 2026-10-23
+## État avant le test
+09:25:55 (+  1s) succes=1 code=0 up(linux01)=1 SiteWebIndisponible=inactive InstanceDown=inactive
+## Arrêt contrôlé de nginx sur LINUX01
+09:26:14 systemctl stop nginx
+inactive
+09:26:16 (+  1s) succes=1 code=0 up(linux01)=1 SiteWebIndisponible=inactive InstanceDown=inactive
+09:27:16 (+ 61s) succes=0 code=1 up(linux01)=1 SiteWebIndisponible=inactive InstanceDown=inactive
+09:27:23 (+ 68s) succes=0 code=1 up(linux01)=1 SiteWebIndisponible=pending InstanceDown=inactive
+09:29:22 (+187s) succes=0 code=1 up(linux01)=1 SiteWebIndisponible=firing InstanceDown=inactive
+
+[linux01 — 09:29:48] traces pendant la panne (éléments à examiner si la tâche échoue)
+$ systemctl is-active nginx; systemctl is-failed infraready-controle-site.service
+inactive
+failed
+$ systemctl show infraready-controle-site.service -p Result -p ExecMainStatus -p ExecMainExitTimestamp
+Result=exit-code
+ExecMainExitTimestamp=Fri 2026-10-23 09:29:12 CEST
+ExecMainStatus=1
+$ journalctl -u infraready-controle-site --since "-4min" --no-pager -o short-iso | grep -v -E "Starting|Finished"
+2026-10-23T09:26:09+02:00 linux01 infraready-controle-site[17198]: OK : nginx actif, http://127.0.0.1/ répond 200 et contient « InfraReady »
+2026-10-23T09:26:09+02:00 linux01 systemd[1]: infraready-controle-site.service: Deactivated successfully.
+2026-10-23T09:27:12+02:00 linux01 infraready-controle-site[17357]: ECHEC : le service nginx n'est pas actif (inactive)
+2026-10-23T09:27:12+02:00 linux01 systemd[1]: infraready-controle-site.service: Main process exited, code=exited, status=1/FAILURE
+2026-10-23T09:27:12+02:00 linux01 systemd[1]: infraready-controle-site.service: Failed with result 'exit-code'.
+2026-10-23T09:27:12+02:00 linux01 systemd[1]: Failed to start infraready-controle-site.service - InfraReady - contrôle du site web (check-nginx.sh) publié pour Prometheus.
+2026-10-23T09:28:12+02:00 linux01 infraready-controle-site[17376]: ECHEC : le service nginx n'est pas actif (inactive)
+2026-10-23T09:28:12+02:00 linux01 systemd[1]: infraready-controle-site.service: Main process exited, code=exited, status=1/FAILURE
+2026-10-23T09:28:12+02:00 linux01 systemd[1]: infraready-controle-site.service: Failed with result 'exit-code'.
+2026-10-23T09:28:12+02:00 linux01 systemd[1]: Failed to start infraready-controle-site.service - InfraReady - contrôle du site web (check-nginx.sh) publié pour Prometheus.
+2026-10-23T09:29:12+02:00 linux01 infraready-controle-site[17393]: ECHEC : le service nginx n'est pas actif (inactive)
+2026-10-23T09:29:12+02:00 linux01 systemd[1]: infraready-controle-site.service: Main process exited, code=exited, status=1/FAILURE
+2026-10-23T09:29:12+02:00 linux01 systemd[1]: infraready-controle-site.service: Failed with result 'exit-code'.
+2026-10-23T09:29:12+02:00 linux01 systemd[1]: Failed to start infraready-controle-site.service - InfraReady - contrôle du site web (check-nginx.sh) publié pour Prometheus.
+$ grep -v "^#" /var/lib/prometheus/node-exporter/infraready_controle.prom
+infraready_controle_succes{controle="site_web"} 0
+infraready_controle_code_retour{controle="site_web"} 1
+infraready_controle_derniere_execution_secondes{controle="site_web"} 1792740552
+infraready_controle_duree_secondes{controle="site_web"} 0.017
+
+## Retour à la normale
+09:30:05 systemctl start nginx
+active
+09:30:06 (+  1s) succes=0 code=1 up(linux01)=1 SiteWebIndisponible=firing InstanceDown=inactive
+09:30:32 (+ 26s) succes=1 code=0 up(linux01)=1 SiteWebIndisponible=inactive InstanceDown=inactive
+[linux01 — 09:30:40]
+$ systemctl is-failed infraready-controle-site.service; journalctl -u infraready-controle-site --since -2min --no-pager -o short-iso | grep infraready-controle-site\[
+inactive
+(grep : expression invalide — relancé ci-dessous avec grep -F)
+$ /usr/local/lib/infraready/check-nginx.sh; echo code=$?
+OK : nginx actif, http://127.0.0.1/ répond 200 et contient « InfraReady »
+code=0
+$ journalctl -u infraready-controle-site --since 09:29:30 -o short-iso | grep -F "infraready-controle-site["
+2026-10-23T09:30:12+02:00 linux01 infraready-controle-site[17693]: OK : nginx actif, http://127.0.0.1/ répond 200 et contient « InfraReady »
+
+# --- 2e test : alerte ControlePlanifieEnRetard (âge du dernier contrôle > 300 s pendant 5 min) ---
+# Méthode : arrêt du timer du contrôle planifié sur LINUX01 (nginx reste actif, le site reste servi), puis redémarrage.
+# Suivi : API Prometheus toutes les 5 s, une ligne par minute ou à chaque changement d'état.
+## Arrêt contrôlé du timer (la tâche planifiée ne tourne plus ; nginx reste actif)
+09:54:02 systemctl stop infraready-controle-site.timer
+inactive
+09:54:02 (+   0s) âge du dernier contrôle=66 s  ControlePlanifieEnRetard=inactive SiteWebIndisponible=inactive
+09:55:04 (+  61s) âge du dernier contrôle=67 s  ControlePlanifieEnRetard=inactive SiteWebIndisponible=inactive
+09:56:03 (+ 121s) âge du dernier contrôle=127 s  ControlePlanifieEnRetard=inactive SiteWebIndisponible=inactive
+09:57:03 (+ 181s) âge du dernier contrôle=187 s  ControlePlanifieEnRetard=inactive SiteWebIndisponible=inactive
+09:58:02 (+ 240s) âge du dernier contrôle=246 s  ControlePlanifieEnRetard=inactive SiteWebIndisponible=inactive
+09:59:02 (+ 300s) âge du dernier contrôle=305 s  ControlePlanifieEnRetard=pending SiteWebIndisponible=inactive
+10:00:02 (+ 360s) âge du dernier contrôle=365 s  ControlePlanifieEnRetard=pending SiteWebIndisponible=inactive
+10:01:02 (+ 420s) âge du dernier contrôle=425 s  ControlePlanifieEnRetard=pending SiteWebIndisponible=inactive
+10:04:01 (+ 598s) âge du dernier contrôle=604 s  ControlePlanifieEnRetard=firing SiteWebIndisponible=inactive
+## Redémarrage du timer
+10:04:06 systemctl start infraready-controle-site.timer
+active
+NEXT                         LEFT LAST                         PASSED UNIT                           ACTIVATES
+Fri 2026-10-23 10:05:06 CEST  54s Fri 2026-10-23 10:04:06 CEST 5s ago infraready-controle-site.timer infraready-controle-site.service
+10:04:12 (+   0s) âge du dernier contrôle=615 s  ControlePlanifieEnRetard=firing SiteWebIndisponible=inactive
+10:04:17 (+   5s) âge du dernier contrôle=12 s  ControlePlanifieEnRetard=inactive SiteWebIndisponible=inactive

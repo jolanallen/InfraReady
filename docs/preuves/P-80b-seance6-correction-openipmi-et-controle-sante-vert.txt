@@ -1,0 +1,94 @@
+# Preuve : P-80b-seance6-correction-openipmi-et-controle-sante-vert
+# Séance 6, UC-01 / UC-C2 — correction de l'écart n° 4 de P-80 : openipmi.service en échec à chaque démarrage sur LINUX01 et OPS01.
+#   Cause confirmée (journal apt, 19/10) : prometheus-node-exporter installé par nos playbooks → paquet recommandé
+#   prometheus-node-exporter-collectors → ipmitool → service SysV openipmi, sans matériel IPMI dans une VM.
+#   Correctif rejoué en Ansible (pas de modification manuelle) : service désactivé + handler « systemctl reset-failed »
+#   dans linux_base.yml (LINUX01) et ops01_monitoring.yml (OPS01) ; idempotence vérifiée ; contrôle de santé ensuite sans ECHEC
+#   (les 3 ATTENTION sont des événements réels des dernières 24 h : test UC-04 sur LINUX01, sudo refusé sur OPS01,
+#   arrêt non propre de WIN-DC01 → incident UC-05, P-86).
+# 2026-10-23 09:35:51 CEST — $ ../scripts/verif-idempotence.sh playbooks/linux_base.yml
+== 1er passage : mise à jour de l'état si nécessaire
+TASK [Service openipmi désactivé (aucun matériel IPMI dans une VM)] ************
+changed: [linux01]
+RUNNING HANDLER [Effacer l'échec enregistré d'openipmi] ************************
+changed: [linux01]
+linux01                    : ok=28   changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+Service openipmi désactivé (aucun matériel IPMI dans une VM) ------------ 1.34s
+== 2e passage : doit afficher changed=0
+TASK [Service openipmi désactivé (aucun matériel IPMI dans une VM)] ************
+linux01                    : ok=27   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+Service openipmi désactivé (aucun matériel IPMI dans une VM) ------------ 0.61s
+IDEMPOTENT : 2e passage sans changement (changed=0, failed=0, unreachable=0)
+code retour : 0
+
+# 2026-10-23 09:36:25 CEST — $ ../scripts/verif-idempotence.sh playbooks/ops01_monitoring.yml
+== 1er passage : mise à jour de l'état si nécessaire
+TASK [Service openipmi désactivé (aucun matériel IPMI dans une VM)] ************
+changed: [ops01]
+RUNNING HANDLER [Effacer l'échec enregistré d'openipmi] ************************
+changed: [ops01]
+ops01                      : ok=29   changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+Service openipmi désactivé (aucun matériel IPMI dans une VM) ------------ 1.39s
+== 2e passage : doit afficher changed=0
+TASK [Service openipmi désactivé (aucun matériel IPMI dans une VM)] ************
+ops01                      : ok=28   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+Service openipmi désactivé (aucun matériel IPMI dans une VM) ------------ 0.57s
+IDEMPOTENT : 2e passage sans changement (changed=0, failed=0, unreachable=0)
+code retour : 0
+
+# 09:37:03 — $ ansible-playbook playbooks/controle_sante.yml -e sante_rapport=true ; echo "code retour : $?"
+TASK [Résultat du contrôle de santé] *******************************************
+ok: [localhost] => 
+    msg: |-
+        linux01   Identité                   OK              linux01 192.168.50.20, Ubuntu 24.04, noyau 6.8.0-147-generic, démarré depuis 0.6 h
+        linux01   Heure                      OK              2026-10-23 09:37:04 CEST, NTP synchronisé : yes
+        linux01   Espace disque              OK              / 29.2 %  /data 5.3 %  /boot 11.4 %  (seuil 85 %)
+        linux01   Disque de données /data    OK              /data monté
+        linux01   Services attendus          OK              ssh, nginx, prometheus-node-exporter actifs
+        linux01   Unités systemd en échec    OK              aucune
+        linux01   Journal (erreurs 24 h)     ATTENTION       4 ligne(s) ; dernière : 2026-10-23T09:29:12+02:00 linux01 systemd[1]: Failed to start infraready-controle-site.service - InfraReady - contrôle du site web (check-nginx.sh) publié pour Prometheus.
+        linux01   DNS du domaine             OK              win-dc01.infraready.test -> 192.168.50.10
+        linux01   Site web (HTTP + contenu)  OK              http://linux01.infraready.test/ -> HTTP 200
+        ops01     Identité                   OK              ops01 192.168.50.30, Ubuntu 24.04, noyau 6.8.0-147-generic, démarré depuis 0.6 h
+        ops01     Heure                      OK              2026-10-23 09:37:04 CEST, NTP synchronisé : yes
+        ops01     Espace disque              OK              / 26.3 %  /boot 11.4 %  (seuil 85 %)
+        ops01     Disque de données /data    NON APPLICABLE  pas de disque de données sur cet hôte
+        ops01     Services attendus          OK              prometheus, grafana-server, prometheus-node-exporter actifs
+        ops01     Unités systemd en échec    OK              aucune
+        ops01     Journal (erreurs 24 h)     ATTENTION       2 ligne(s) ; dernière : 2026-10-23T09:03:23+02:00 ops01 sudo[1795]: infraadmin : a password is required ; PWD=/home/infraadmin ; USER=root ; COMMAND=/usr/bin/true
+        ops01     DNS du domaine             OK              win-dc01.infraready.test -> 192.168.50.10
+        ops01     Prometheus - cibles        OK              4/4 cibles up
+        ops01     Grafana - API              OK              base ok, version 13.2.4
+        win-dc01  Identité                   OK              WIN-DC01 192.168.50.10, Microsoft Windows Server 2025 Standard Evaluation (build 26100), démarré depuis 0.6 h
+        win-dc01  Heure                      OK              2026-10-23T09:37:12+02:00, source NTP : 0.fr.pool.ntp.org,0x8
+        win-dc01  Espace disque              OK              C: 37.3 %  (seuil 85 %)
+        win-dc01  Services attendus          OK              NTDS, DNS, Netlogon, Kdc, W32Time, WinRM, windows_exporter actifs
+        win-dc01  Journal (erreurs 24 h)     ATTENTION       2 événement(s) System ; 2026-10-23 09:01 41 Microsoft-Windows-Kernel-Power | 2026-10-23 09:01 6008 EventLog
+        win-dc01  DNS du domaine             OK              linux01.infraready.test -> 192.168.50.20 (serveur DNS local)
+        win-dc01  Active Directory           OK              domaine infraready.test
+        win-dc01  windows_exporter           OK              http://localhost:9182/metrics -> HTTP 200
+TASK [Dossier des rapports] ****************************************************
+ok: [localhost]
+TASK [Rapport de contrôle de santé] ********************************************
+changed: [localhost]
+TASK [Aucun contrôle en échec et aucun hôte inaccessible] **********************
+ok: [localhost] => 
+    changed: false
+    msg: 23 OK, 3 ATTENTION, 1 NON APPLICABLE, 0 ECHEC, 0 INACCESSIBLE
+PLAY RECAP *********************************************************************
+linux01                    : ok=9    changed=0    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
+localhost                  : ok=5    changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+ops01                      : ok=10   changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+win-dc01                   : ok=2    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+code retour : 0
+
+$ ls -l ~/infraready-logs/controle-sante-*
+-rw-r----- 1 ansible ansible 3049 Oct 23 09:37 /home/ansible/infraready-logs/controle-sante-20261023-093713.txt
+
+# 09:37:14 — 2e exécution sans rapport (lecture seule) : $ ansible-playbook playbooks/controle_sante.yml | PLAY RECAP
+PLAY RECAP *********************************************************************
+linux01                    : ok=9    changed=0    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
+localhost                  : ok=3    changed=0    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
+ops01                      : ok=10   changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+win-dc01                   : ok=2    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+code retour : 0

@@ -1,0 +1,63 @@
+# Preuve : P-89a-quotas-1er-essai-non-idempotent
+# Séance 6, défi UC-A3 — 1er essai : linux_base.yml (options usrquota,grpquota, /data remonté) puis linux_quotas.yml.
+#   Quotas appliqués, mais 2e passage changed=1 : « Limites par utilisateur » réécrites à chaque passage.
+#   Cause : repquota sans -v n'affiche pas les comptes sans occupation (alice, bruno) → limites lues = 0 → setquota relancé.
+#   Correctif : repquota -uv (P-89). Une 2e exécution de contrôle a d'abord été lancée sans redéployer le fichier corrigé
+#   (yamllint lancé hors du dépôt, enchaînement « && » interrompu) : même résultat, sans conséquence.
+# Hôte : ops01 (ansible) — 2026-10-23 ; snapshot s09_avant_seance6
+# 0) Avant — 2026-10-23 09:48:48 CEST : $ ansible linux01 -a 'findmnt -no SOURCE,OPTIONS /data'
+linux01 | CHANGED | rc=0 >>
+/dev/sdb rw,relatime
+
+# 1) linux_base.yml : options de montage usrquota,grpquota sur /data — $ ../scripts/verif-idempotence.sh playbooks/linux_base.yml
+== 1er passage : mise à jour de l'état si nécessaire
+TASK [Monter le disque de données via fstab - /data] ***************************
+changed: [linux01]
+linux01                    : ok=27   changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+Monter le disque de données via fstab - /data --------------------------- 0.31s
+== 2e passage : doit afficher changed=0
+TASK [Monter le disque de données via fstab - /data] ***************************
+linux01                    : ok=27   changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+Monter le disque de données via fstab - /data --------------------------- 0.31s
+IDEMPOTENT : 2e passage sans changement (changed=0, failed=0, unreachable=0)
+code retour : 0
+
+# 2) linux_quotas.yml — $ ../scripts/verif-idempotence.sh playbooks/linux_quotas.yml
+== 1er passage : mise à jour de l'état si nécessaire
+PLAY [LINUX01 - quotas sur le disque de test /data] ****************************
+TASK [Périphérique et options de montage de /data] *****************************
+TASK [Numéro de série du disque monté sur /data] *******************************
+TASK [/data est le disque de test et accepte les quotas] ***********************
+ok: [linux01] => 
+    changed: false
+    msg: /data = disque de test INFRA-DATA01, options rw,relatime,quota,usrquota,grpquota
+TASK [Outils de gestion des quotas] ********************************************
+changed: [linux01]
+TASK [Fichiers de quotas initialisés (comptage de l'occupation existante)] *****
+changed: [linux01]
+TASK [État d'application des quotas] *******************************************
+TASK [Application des quotas utilisateurs et groupes] **************************
+changed: [linux01]
+TASK [Espace partagé des webadmins (soumis aux quotas)] ************************
+changed: [linux01]
+TASK [Limites actuelles (repquota, en Kio)] ************************************
+TASK [Limites par utilisateur] *************************************************
+changed: [linux01] => (item=alice : 200 / 250 Mio)
+changed: [linux01] => (item=bruno : 200 / 250 Mio)
+TASK [Rapport des quotas] ******************************************************
+TASK [Quotas en place] *********************************************************
+ok: [linux01] => 
+    msg:
+    - '*** Report for user quotas on device /dev/sdb'
+    - 'Block grace time: 7days; Inode grace time: 7days'
+    - '                        Space limits                File limits'
+    - User            used    soft    hard  grace    used  soft  hard  grace
+    - '----------------------------------------------------------------------'
+    - 'root      --     32K      0K      0K              5     0     0       '
+PLAY RECAP *********************************************************************
+linux01                    : ok=12   changed=5    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+== 2e passage : doit afficher changed=0
+== 2e passage : doit afficher changed=0
+linux01                    : ok=11   changed=1    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+NON IDEMPOTENT : changed=1 failed=0 unreachable=0 sur le 2e passage
+code retour : 1

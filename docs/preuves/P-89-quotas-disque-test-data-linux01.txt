@@ -1,0 +1,67 @@
+# Preuve : P-89-quotas-disque-test-data-linux01
+# Séance 6, défi UC-A3 — quotas utilisateurs sur le disque de TEST /data (série INFRA-DATA01) de LINUX01 :
+#   alice et bruno : 200 Mio souple (avertissement, grâce 7 jours) / 250 Mio strict (blocage) dans /data/partage-web (groupe webadmins).
+#   Garde-fou : le playbook vérifie le numéro de série du disque et les options de montage avant toute modification.
+# 1) linux_quotas.yml corrigé (repquota -v) : idempotent. 2) Test de dépassement réel, puis nettoyage.
+# Limites observées : root n'est pas soumis aux quotas ; repquota lit le fichier de quotas (mis à jour en différé) alors que
+#   quota -u interroge le noyau (fait foi) ; aucun message dans le journal noyau, l'erreur EDQUOT est renvoyée à l'application.
+# 3) Correctif repquota -v — 2026-10-23 09:51:39 CEST — $ ../scripts/verif-idempotence.sh playbooks/linux_quotas.yml
+== 1er passage : mise à jour de l'état si nécessaire
+linux01                    : ok=10   changed=0    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
+== 2e passage : doit afficher changed=0
+linux01                    : ok=10   changed=0    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
+IDEMPOTENT : 2e passage sans changement (changed=0, failed=0, unreachable=0)
+TASK [Quotas en place] *********************************************************
+ok: [linux01] => 
+    msg:
+    - '*** Report for user quotas on device /dev/sdb'
+    - 'Block grace time: 7days; Inode grace time: 7days'
+    - '                        Space limits                File limits'
+    - User            used    soft    hard  grace    used  soft  hard  grace
+    - '----------------------------------------------------------------------'
+    - 'root      --     32K      0K      0K              5     0     0       '
+    - 'alice     --      0K    200M    250M              0     0     0       '
+    - 'bruno     --      0K    200M    250M              0     0     0       '
+    - ''
+    - 'Statistics:'
+    - 'Total blocks: 7'
+    - 'Data blocks: 1'
+    - 'Entries: 3'
+    - 'Used average: 3.000000'
+
+
+IDEMPOTENT : 2e passage sans changement (changed=0, failed=0, unreachable=0)
+code retour : 0
+
+[linux01, root via sudo — 2026-10-23 09:52:05 CEST] test du dépassement (fichiers de test supprimés à la fin)
+$ df -h /data | tail -1; repquota -s /data | grep -E "^(alice|bruno)"
+/dev/sdb        9.8G   52K  9.3G   1% /data
+# a) alice écrit 220 Mio : au-dessus du seuil souple (200 Mio) — accepté, délai de grâce de 7 jours
+$ sudo -u alice dd if=/dev/zero of=/data/partage-web/test-alice-1.bin bs=1M count=220 status=none; echo "code dd : $?"
+code dd : 0
+$ quota -s -u alice | tail -1
+       /dev/sdb    220M*   200M    250M   7days       1       0       0        
+# b) alice écrit 100 Mio de plus : bloquée au seuil strict (250 Mio)
+$ sudo -u alice dd if=/dev/zero of=/data/partage-web/test-alice-2.bin bs=1M count=100 status=none; echo "code dd : $?"
+dd: error writing '/data/partage-web/test-alice-2.bin': Disk quota exceeded
+code dd : 1
+$ ls -l --block-size=M /data/partage-web/; quota -s -u alice | tail -1
+total 250M
+-rw-rw-r-- 1 alice webadmins 220M Oct 23 09:52 test-alice-1.bin
+-rw-rw-r-- 1 alice webadmins  30M Oct 23 09:52 test-alice-2.bin
+       /dev/sdb    250M*   200M    250M   7days       2       0       0        
+# c) bruno, dans le même dossier, n'est pas affecté par la consommation d'alice
+$ sudo -u bruno dd if=/dev/zero of=/data/partage-web/test-bruno.bin bs=1M count=50 status=none; echo "code dd : $?"; quota -s -u bruno | tail -1
+code dd : 0
+       /dev/sdb  51200K    200M    250M               1       0       0        
+# d) root n'est pas soumis aux quotas (limite connue) ; espace global du disque inchangé pour les autres usages
+$ repquota -s /data | grep -E "^(root|alice|bruno)"; df -h /data | tail -1
+root      --     32K      0K      0K              5     0     0       
+alice     --      0K    200M    250M              2     0     0       
+bruno     --      0K    200M    250M              1     0     0       
+/dev/sdb        9.8G  301M  9.0G   4% /data
+$ journalctl -k --since "-3min" --no-pager | grep -i -E "quota" | tail -3; echo "(journal noyau : aucun message de quota attendu, l erreur est renvoyée à l application)"
+(journal noyau : aucun message de quota attendu, l erreur est renvoyée à l application)
+# e) nettoyage
+$ rm -f /data/partage-web/test-*.bin; repquota -s /data | grep -E "^(alice|bruno)"; df -h /data | tail -1
+/dev/sdb        9.8G   52K  9.3G   1% /data

@@ -1,0 +1,159 @@
+# Preuve : P-87-maintenance-linux01-controle-avant-apres
+# Séance 6, UC-C1 — maintenance planifiée sur LINUX01 (VM de test) avec contrôle avant / après, procédure docs/procedure-maintenance.md
+#   Retour arrière : snapshot Proxmox s09_avant_seance6 (pris à 09:05:43). Conditions d'arrêt : pré-contrôle disque > 85 % ou
+#   service attendu inactif (assertions du playbook). Mécanisme réel : apt (+ unattended-upgrades), aucune distribution centralisée.
+#   Redémarrage non autorisé (allow_reboot=false) — non requis. WIN-DC01 : non mis à jour dans cette séance (voir dossier, UC-C1).
+# Hôte : ops01 (utilisateur ansible, ~/infraready/ansible) — 2026-10-23
+# AVANT — 2026-10-23 09:45:02 CEST — $ ansible-playbook playbooks/controle_sante.yml --limit linux01,ops01,localhost -e sante_rapport=true
+    msg: |-
+        linux01   Identité                   OK              linux01 192.168.50.20, Ubuntu 24.04, noyau 6.8.0-147-generic, démarré depuis 0.7 h
+        linux01   Heure                      OK              2026-10-23 09:45:04 CEST, NTP synchronisé : yes
+        linux01   Espace disque              OK              / 29.2 %  /data 5.3 %  /boot 11.4 %  (seuil 85 %)
+        linux01   Disque de données /data    OK              /data monté
+        linux01   Services attendus          OK              ssh, nginx, prometheus-node-exporter actifs
+        linux01   Unités systemd en échec    OK              aucune
+        linux01   Journal (erreurs 24 h)     ATTENTION       4 ligne(s) ; dernière : 2026-10-23T09:29:12+02:00 linux01 systemd[1]: Failed to start infraready-controle-site.service - InfraReady - contrôle du site web (check-nginx.sh) publié pour Prometheus.
+        linux01   DNS du domaine             OK              win-dc01.infraready.test -> 192.168.50.10
+        linux01   Site web (HTTP + contenu)  OK              http://linux01.infraready.test/ -> HTTP 200
+        ops01     Identité                   OK              ops01 192.168.50.30, Ubuntu 24.04, noyau 6.8.0-147-generic, démarré depuis 0.7 h
+        ops01     Heure                      OK              2026-10-23 09:45:03 CEST, NTP synchronisé : yes
+        ops01     Espace disque              OK              / 26.3 %  /boot 11.4 %  (seuil 85 %)
+        ops01     Disque de données /data    NON APPLICABLE  pas de disque de données sur cet hôte
+        ops01     Services attendus          OK              prometheus, grafana-server, prometheus-node-exporter actifs
+        ops01     Unités systemd en échec    OK              aucune
+        ops01     Journal (erreurs 24 h)     ATTENTION       2 ligne(s) ; dernière : 2026-10-23T09:03:23+02:00 ops01 sudo[1795]: infraadmin : a password is required ; PWD=/home/infraadmin ; USER=root ; COMMAND=/usr/bin/true
+        ops01     DNS du domaine             OK              win-dc01.infraready.test -> 192.168.50.10
+        ops01     Prometheus - cibles        OK              4/4 cibles up
+        ops01     Grafana - API              OK              base ok, version 13.2.4
+$ apt list --upgradable (LINUX01)
+linux01 | CHANGED | rc=0 >>
+Listing...
+cloud-init/noble-updates 26.2-0ubuntu1~24.04.2 all [upgradable from: 26.1-0ubuntu1~24.04.1]
+gir1.2-glib-2.0/noble-updates 2.80.0-6ubuntu3.10 amd64 [upgradable from: 2.80.0-6ubuntu3.9]
+libglib2.0-0t64/noble-updates 2.80.0-6ubuntu3.10 amd64 [upgradable from: 2.80.0-6ubuntu3.9]
+libglib2.0-bin/noble-updates 2.80.0-6ubuntu3.10 amd64 [upgradable from: 2.80.0-6ubuntu3.9]
+libglib2.0-data/noble-updates 2.80.0-6ubuntu3.10 all [upgradable from: 2.80.0-6ubuntu3.9]
+tmux/noble-updates 3.4-1ubuntu0.2 amd64 [upgradable from: 3.4-1ubuntu0.1]
+ubuntu-pro-client-l10n/noble-updates 38ubuntu0~24.04 amd64 [upgradable from: 37.2ubuntu~24.04.1]
+ubuntu-pro-client/noble-updates 38ubuntu0~24.04 amd64 [upgradable from: 37.2ubuntu~24.04.1]
+
+# MAINTENANCE — 09:45:12 — $ ansible-playbook playbooks/linux_maintenance.yml --limit linux01
+PLAY [Maintenance Linux] *******************************************************
+ok: [linux01] => (item=/)
+ok: [linux01] => (item=/data)
+ok: [linux01] => (item=/boot)
+TASK [Espace disque suffisant avant mise à jour] *******************************
+TASK [Les services attendus sont actifs avant maintenance] *********************
+ok: [linux01] => (item=ssh)
+ok: [linux01] => (item=nginx)
+ok: [linux01] => (item=prometheus-node-exporter)
+TASK [Paquet unattended-upgrades] **********************************************
+TASK [Mises à jour de sécurité automatiques quotidiennes, sans redémarrage automatique] ***
+TASK [Mise à jour des index et des paquets (upgrade, sans suppression)] ********
+changed: [linux01]
+TASK [Suppression des dépendances devenues inutiles] ***************************
+TASK [Redémarrage requis ?] ****************************************************
+TASK [Redémarrage (uniquement si demandé ET autorisé par -e allow_reboot=true)] ***
+TASK [Les services attendus sont actifs après maintenance] *********************
+ok: [linux01] => (item=ssh)
+ok: [linux01] => (item=nginx)
+ok: [linux01] => (item=prometheus-node-exporter)
+TASK [Le site web répond toujours (LINUX01)] ***********************************
+ok: [linux01 -> localhost]
+ok: [linux01 -> localhost]
+TASK [Rapport de maintenance] **************************************************
+changed: [linux01 -> localhost]
+TASK [Résumé] ******************************************************************
+ok: [linux01] => 
+    msg: 'linux01 : disques 29.2 % max, paquets mis à jour, reboot requis=False'
+PLAY RECAP *********************************************************************
+linux01                    : ok=16   changed=2    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+code retour : 0
+
+# APRÈS — 09:45:29 — $ ansible-playbook playbooks/controle_sante.yml --limit linux01,ops01,localhost -e sante_rapport=true
+    msg: |-
+        linux01   Identité                   OK              linux01 192.168.50.20, Ubuntu 24.04, noyau 6.8.0-147-generic, démarré depuis 0.7 h
+        linux01   Heure                      OK              2026-10-23 09:45:31 CEST, NTP synchronisé : yes
+        linux01   Espace disque              OK              / 29.2 %  /data 5.3 %  /boot 11.4 %  (seuil 85 %)
+        linux01   Disque de données /data    OK              /data monté
+        linux01   Services attendus          OK              ssh, nginx, prometheus-node-exporter actifs
+        linux01   Unités systemd en échec    OK              aucune
+        linux01   Journal (erreurs 24 h)     ATTENTION       4 ligne(s) ; dernière : 2026-10-23T09:29:12+02:00 linux01 systemd[1]: Failed to start infraready-controle-site.service - InfraReady - contrôle du site web (check-nginx.sh) publié pour Prometheus.
+        linux01   DNS du domaine             OK              win-dc01.infraready.test -> 192.168.50.10
+        linux01   Site web (HTTP + contenu)  OK              http://linux01.infraready.test/ -> HTTP 200
+        ops01     Identité                   OK              ops01 192.168.50.30, Ubuntu 24.04, noyau 6.8.0-147-generic, démarré depuis 0.7 h
+        ops01     Heure                      OK              2026-10-23 09:45:31 CEST, NTP synchronisé : yes
+        ops01     Espace disque              OK              / 26.3 %  /boot 11.4 %  (seuil 85 %)
+        ops01     Disque de données /data    NON APPLICABLE  pas de disque de données sur cet hôte
+        ops01     Services attendus          OK              prometheus, grafana-server, prometheus-node-exporter actifs
+        ops01     Unités systemd en échec    OK              aucune
+        ops01     Journal (erreurs 24 h)     ATTENTION       2 ligne(s) ; dernière : 2026-10-23T09:03:23+02:00 ops01 sudo[1795]: infraadmin : a password is required ; PWD=/home/infraadmin ; USER=root ; COMMAND=/usr/bin/true
+        ops01     DNS du domaine             OK              win-dc01.infraready.test -> 192.168.50.10
+        ops01     Prometheus - cibles        OK              4/4 cibles up
+        ops01     Grafana - API              OK              base ok, version 13.2.4
+
+$ ls -l ~/infraready-logs/ | tail -4
+-rw-r----- 1 ansible ansible   10696 Oct 19 16:49 maintenance-ops01-20261019T164833.txt
+-rw-r----- 1 ansible ansible     995 Oct 19 16:47 maintenance-win-dc01-20261019T164643.txt
+-rw-r----- 1 ansible ansible    1596 Oct 19 19:21 maintenance-win-dc01-20261019T192112.txt
+-rw-r----- 1 ansible ansible    1692 Oct 19 19:23 maintenance-win-dc01-20261019T192242.txt
+$ cat /home/ansible/infraready-logs/maintenance-linux01-20261023T094513.txt
+Rapport de maintenance InfraReady — linux01 (192.168.50.20)
+Date      : 2026-10-23T07:45:13Z
+Noyau     : 6.8.0-147-generic  |  Ubuntu 24.04
+Disques   : /=29.2% /data=5.3% /boot=11.4% 
+Services  : ssh, nginx, prometheus-node-exporter -> OK
+Paquets   : mis à jour
+Redémarrage requis : non (autorisé : False)
+--- apt ---
+Reading package lists...
+Building dependency tree...
+Reading state information...
+Calculating upgrade...
+The following upgrades have been deferred due to phasing:
+  cloud-init gir1.2-glib-2.0 libglib2.0-0t64 libglib2.0-bin libglib2.0-data
+The following packages will be upgraded:
+  tmux ubuntu-pro-client ubuntu-pro-client-l10n
+3 upgraded, 0 newly installed, 0 to remove and 5 not upgraded.
+Need to get 759 kB of archives.
+After this operation, 0 B of additional disk space will be used.
+Get:1 http://fr.archive.ubuntu.com/ubuntu noble-updates/main amd64 ubuntu-pro-client-l10n amd64 38ubuntu0~24.04 [19.8 kB]
+Get:2 http://fr.archive.ubuntu.com/ubuntu noble-updates/main amd64 ubuntu-pro-client amd64 38ubuntu0~24.04 [259 kB]
+Get:3 http://fr.archive.ubuntu.com/ubuntu noble-updates/main amd64 tmux amd64 3.4-1ubuntu0.2 [480 kB]
+Fetched 759 kB in 0s (5875 kB/s)
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 89276 files and directories currently installed.)
+Preparing to unpack .../ubuntu-pro-client-l10n_38ubuntu0~24.04_amd64.deb ...
+Unpacking ubuntu-pro-client-l10n (38ubuntu0~24.04) over (37.2ubuntu~24.04.1) ...
+Preparing to unpack .../ubuntu-pro-client_38ubuntu0~24.04_amd64.deb ...
+Unpacking ubuntu-pro-client (38ubuntu0~24.04) over (37.2ubuntu~24.04.1) ...
+Preparing to unpack .../tmux_3.4-1ubuntu0.2_amd64.deb ...
+Unpacking tmux (3.4-1ubuntu0.2) over (3.4-1ubuntu0.1) ...
+Setting up tmux (3.4-1ubuntu0.2) ...
+Setting up ubuntu-pro-client (38ubuntu0~24.04) ...
+Installing new version of config file /etc/apparmor.d/ubuntu_pro_esm_cache ...
+Setting up ubuntu-pro-client-l10n (38ubuntu0~24.04) ...
+Processing triggers for debianutils (5.17build1) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+$ diff <rapport de santé avant> <rapport de santé après>  (colonnes hôte / contrôle / statut)
+aucun écart de statut entre avant et après
+
+# Écart observé : le collecteur apt de node_exporter (panneau « Maintenance Linux ») comptait 8 paquets « retenus » et
+#   0 « à installer » à 09:31 alors que apt upgrade en a installé 3 ; après la maintenance il compte 5 retenus = les 5 reportés
+#   par le phasage d'Ubuntu (« deferred due to phasing »). Référence = apt list --upgradable en pré-contrôle.
+[linux01 — 09:45:59]
+$ grep -E "^apt_upgrades" /var/lib/prometheus/node-exporter/apt.prom; ls -l --time-style=+%H:%M /var/lib/prometheus/node-exporter/apt.prom
+apt_upgrades_held{arch="all",origin="Ubuntu:noble/noble-updates"} 2.0
+apt_upgrades_held{arch="amd64",origin="Ubuntu:noble/noble-updates"} 6.0
+-rw-r--r-- 1 root root 679 09:31 /var/lib/prometheus/node-exporter/apt.prom
+$ systemctl start prometheus-node-exporter-apt.service; grep -E "^apt_upgrades" /var/lib/prometheus/node-exporter/apt.prom; ls -l --time-style=+%H:%M /var/lib/prometheus/node-exporter/apt.prom
+apt_upgrades_held{arch="all",origin="Ubuntu:noble/noble-updates"} 2.0
+apt_upgrades_held{arch="amd64",origin="Ubuntu:noble/noble-updates"} 3.0
+-rw-r--r-- 1 root root 679 09:45 /var/lib/prometheus/node-exporter/apt.prom
+$ apt list --upgradable 2>/dev/null | tail -n +2 | wc -l
+5
+$ grep -n -i -E "held|keep|phas" /usr/share/prometheus-node-exporter-collectors/apt_info.py | head -12
+71:def _write_held_upgrades(registry, cache):
+72:    held_candidates = {p.candidate for p in cache if p.is_upgradable and p.marked_keep}
+73:    upgrade_list = _convert_candidates_to_upgrade_infos(held_candidates)
+76:        g = Gauge('apt_upgrades_held', "Apt packages pending updates but held back.",
+116:    _write_held_upgrades(registry, cache)

@@ -1,0 +1,76 @@
+# Preuve : P-81-seance6-collecte-metriques-linux-windows
+# Séance 6, UC-02 — configuration réelle de Prometheus, cibles attendues / observées, endpoints des exporters,
+#   métriques Linux (node_exporter) et Windows (windows_exporter) effectivement stockées, règles chargées (5/5 après P-81b).
+# Hôte : ops01 (root via sudo) — lecture seule
+[ops01 — 2026-10-23 09:20:01 CEST]
+$ grep -v "^#" /etc/prometheus/prometheus.yml | grep -E "job_name|targets|labels"
+  - job_name: prometheus
+      - targets: ["localhost:9090"]
+        labels: {host: ops01}
+  - job_name: linux
+      - targets: ["192.168.50.20:9100"]
+        labels: {host: linux01, os: linux}
+      - targets: ["localhost:9100"]
+        labels: {host: ops01, os: linux}
+  - job_name: windows
+      - targets: ["192.168.50.10:9182"]
+        labels: {host: win-dc01, os: windows}
+$ curl -s localhost:9090/api/v1/targets | python3 -c "import json,sys
+for t in json.load(sys.stdin)[\"data\"][\"activeTargets\"]: print(t[\"labels\"][\"job\"], t[\"labels\"].get(\"host\"), t[\"scrapeUrl\"], t[\"health\"], \"%.0f ms\" % (t[\"lastScrapeDuration\"]*1000), t[\"lastError\"] or \"-\")"
+linux linux01 http://192.168.50.20:9100/metrics up 55 ms -
+linux ops01 http://localhost:9100/metrics up 50 ms -
+prometheus ops01 http://localhost:9090/metrics up 3 ms -
+windows win-dc01 http://192.168.50.10:9182/metrics up 25 ms -
+$ ss -tn state established "( dport = :9100 or dport = :9182 )" | tail -n +2
+0      0      192.168.50.30:56070 192.168.50.20:9100       
+0      0          127.0.0.1:54294     127.0.0.1:9100       
+0      0      192.168.50.30:51198 192.168.50.10:9182       
+$ curl -s -o /dev/null -w "linux01 node_exporter   : HTTP %{http_code}, %{size_download} octets\n" http://192.168.50.20:9100/metrics
+linux01 node_exporter   : HTTP 200, 164376 octets
+$ curl -s -o /dev/null -w "win-dc01 windows_exporter: HTTP %{http_code}, %{size_download} octets\n" http://192.168.50.10:9182/metrics
+win-dc01 windows_exporter: HTTP 200, 262634 octets
+$ curl -s http://192.168.50.20:9100/metrics | grep -E "^node_(filesystem_avail_bytes\{.*mountpoint=\"/data\"|memory_MemAvailable_bytes|load1 )"
+node_filesystem_avail_bytes{device="/dev/sdb",fstype="ext4",mountpoint="/data"} 9.910341632e+09
+node_load1 0.01
+node_memory_MemAvailable_bytes 3.678179328e+09
+$ curl -s http://192.168.50.10:9182/metrics | grep -E "^windows_(logical_disk_free_bytes\{volume=\"C:\"|memory_available_bytes|service_state\{name=\"ntds\",state=\"running\")"
+windows_logical_disk_free_bytes{volume="C:"} 3.2928432128e+10
+windows_memory_available_bytes 6.534582272e+09
+# Métriques réellement stockées par Prometheus (valeurs instantanées)
+$ curl -s localhost:9090/api/v1/query --data-urlencode 'query=count by (job, host) ({job=~"linux|windows"})'
+   linux01   = 1692.0
+   ops01   = 1764.0
+   win-dc01   = 3285.0
+$ curl -s localhost:9090/api/v1/query --data-urlencode 'query=100 - avg by (host) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100'
+   linux01   = 0.17
+   ops01   = 6.52
+$ curl -s localhost:9090/api/v1/query --data-urlencode 'query=100 - avg by (host) (rate(windows_cpu_time_total{mode="idle"}[2m])) * 100'
+   win-dc01   = 0.79
+$ curl -s localhost:9090/api/v1/query --data-urlencode 'query=(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100'
+   linux01   = 10.39
+   ops01   = 12.3
+$ curl -s localhost:9090/api/v1/query --data-urlencode 'query=(1 - windows_memory_available_bytes / windows_memory_physical_total_bytes) * 100'
+   win-dc01   = 23.76
+$ curl -s localhost:9090/api/v1/query --data-urlencode 'query=(1 - node_filesystem_avail_bytes{fstype=~"ext4|xfs"} / node_filesystem_size_bytes{fstype=~"ext4|xfs"}) * 100'
+   linux01 /  = 29.23
+   ops01 /  = 26.29
+   linux01 /boot  = 11.41
+   ops01 /boot  = 11.41
+   linux01 /data  = 5.29
+$ curl -s localhost:9090/api/v1/query --data-urlencode 'query=(1 - windows_logical_disk_free_bytes{volume=~"[A-Z]:"} / windows_logical_disk_size_bytes{volume=~"[A-Z]:"}) * 100'
+   win-dc01 C:  = 37.31
+$ curl -s localhost:9090/api/v1/query --data-urlencode 'query=windows_service_state{name=~"dns|ntds|netlogon|kdc", state="running"}'
+$ curl -s localhost:9090/api/v1/rules | python3 -c "import json,sys
+for g in json.load(sys.stdin)[\"data\"][\"groups\"]:
+  for x in g[\"rules\"]: print(x[\"name\"], x[\"health\"], x[\"state\"])"
+InstanceDown ok inactive
+ServiceWindowsCritiqueArrete ok inactive
+CpuEleve ok inactive
+MemoireElevee ok inactive
+DisquePresquePlein ok inactive
+# Requête précédente vide : les noms de service windows_exporter sont sensibles à la casse (NTDS, DNS…) — requête corrigée (09:20:47) :
+$ curl -s localhost:9090/api/v1/query --data-urlencode 'query=windows_service_state{name=~"DNS|NTDS|Netlogon|Kdc", state="running"}'
+   win-dc01 DNS running = 1
+   win-dc01 Kdc running = 1
+   win-dc01 NTDS running = 1
+   win-dc01 Netlogon running = 1

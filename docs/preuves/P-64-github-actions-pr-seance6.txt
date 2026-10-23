@@ -1,0 +1,70 @@
+# Preuve : P-64-github-actions-pr-seance6
+# Séance 6, UC-06 — GitHub Actions (.github/workflows/validation.yml) exécuté sur chaque branche et chaque PR de la séance 6
+#   (jolanallen/InfraReady, PR #8 à #13). La CI VALIDE les fichiers (arborescence, yamllint, syntax-check de tous les
+#   playbooks dont controle_sante.yml et linux_quotas.yml, ansible-lint, promtool, JSON du dashboard, gitleaks, vault chiffré) ;
+#   elle ne déploie rien : un runner hébergé par GitHub ne peut pas joindre le réseau privé du labo (déploiement depuis OPS01).
+# Relevé : 2026-10-23 10:05:39 CEST
+
+$ gh pr list --repo jolanallen/InfraReady --state open
+  #10  feat/controle-sante-ansible  —  Contrôle de santé des trois serveurs : playbook en lecture seule
+  #11  feat/controle-planifie-site-web  —  Contrôle planifié du site web (timer systemd) et alertes associées
+  #12  feat/dashboard-exploitation-v3  —  Dashboard Grafana v3 : tableau de bord d'exploitation
+  #13  feat/quotas-disque-test  —  Quotas disque sur le disque de test /data de LINUX01 (défi UC-A3)
+  #8  fix/supervision-verification-cibles  —  Supervision : la vérification des cibles attend le premier scrape
+  #9  fix/openipmi-vm  —  Linux : désactiver openipmi, en échec à chaque démarrage des VM
+
+$ gh run list --repo jolanallen/InfraReady --limit 12
+  39921922247  2026-10-23T08:03:05Z  pull_request	feat/quotas-disque-test  b0764db  success
+  39921915217  2026-10-23T08:03:01Z  pull_request	feat/dashboard-exploitation-v3  3a23ced  success
+  39921909925  2026-10-23T08:02:59Z  pull_request	feat/controle-planifie-site-web  6e59625  success
+  39921905620  2026-10-23T08:02:56Z  pull_request	feat/controle-sante-ansible  35c5dc8  success
+  39921849417  2026-10-23T08:02:28Z  pull_request	fix/openipmi-vm  4a37d19  success
+  39921844981  2026-10-23T08:02:25Z  pull_request	fix/supervision-verification-cibles  f646f5b  success
+  39921808295  2026-10-23T08:02:07Z  push	feat/quotas-disque-test  b0764db  success
+  39921803784  2026-10-23T08:02:05Z  push	feat/dashboard-exploitation-v3  3a23ced  success
+  39921799058  2026-10-23T08:02:02Z  push	feat/controle-planifie-site-web  6e59625  success
+  39921794136  2026-10-23T08:02:00Z  push	feat/controle-sante-ansible  35c5dc8  success
+  39921790594  2026-10-23T08:01:58Z  push	fix/openipmi-vm  4a37d19  success
+  39921786079  2026-10-23T08:01:55Z  push	fix/supervision-verification-cibles  f646f5b  success
+
+$ gh run view 39921922247 --json jobs
+  branche feat/quotas-disque-test
+    Arborescence attendue : success (5/5 étapes réussies)
+    YAML + Ansible (syntaxe et lint) : success (11/11 étapes réussies)
+    Aucun secret en clair : success (6/6 étapes réussies)
+    Prometheus + Grafana : success (6/6 étapes réussies)
+
+$ gh run view 39921915217 --json jobs
+  branche feat/dashboard-exploitation-v3
+    Prometheus + Grafana : success (6/6 étapes réussies)
+    Arborescence attendue : success (5/5 étapes réussies)
+    Aucun secret en clair : success (6/6 étapes réussies)
+    YAML + Ansible (syntaxe et lint) : success (11/11 étapes réussies)
+
+$ gh run view 39921909925 --json jobs
+  branche feat/controle-planifie-site-web
+    YAML + Ansible (syntaxe et lint) : success (11/11 étapes réussies)
+    Arborescence attendue : success (5/5 étapes réussies)
+    Aucun secret en clair : success (6/6 étapes réussies)
+    Prometheus + Grafana : success (6/6 étapes réussies)
+
+$ gh run view 39921905620 --json jobs
+  branche feat/controle-sante-ansible
+    Prometheus + Grafana : success (6/6 étapes réussies)
+    Aucun secret en clair : success (6/6 étapes réussies)
+    YAML + Ansible (syntaxe et lint) : success (11/11 étapes réussies)
+    Arborescence attendue : success (5/5 étapes réussies)
+
+$ gh run view 39921849417 --json jobs
+  branche fix/openipmi-vm
+    Arborescence attendue : success (5/5 étapes réussies)
+    Prometheus + Grafana : success (6/6 étapes réussies)
+    Aucun secret en clair : success (6/6 étapes réussies)
+    YAML + Ansible (syntaxe et lint) : success (11/11 étapes réussies)
+
+$ gh run view 39921844981 --json jobs
+  branche fix/supervision-verification-cibles
+    Prometheus + Grafana : success (6/6 étapes réussies)
+    Arborescence attendue : success (5/5 étapes réussies)
+    YAML + Ansible (syntaxe et lint) : success (11/11 étapes réussies)
+    Aucun secret en clair : success (6/6 étapes réussies)
