@@ -123,6 +123,75 @@
             group: auditeurs
             mode: "2750"
 
+    # Contrôle planifié du site (séance 6, UC-C4) : check-nginx.sh chaque minute par un timer systemd,
+    # résultat publié pour Prometheus (collecteur textfile de node_exporter) et sortie dans le journal.
+    - name: Dossier des scripts de contrôle InfraReady
+      ansible.builtin.file:
+        path: /usr/local/lib/infraready
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Scripts de contrôle (lecture seule) depuis le dépôt
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../scripts/{{ item }}"
+        dest: /usr/local/lib/infraready/{{ item }}
+        owner: root
+        group: root
+        mode: "0755"
+      loop: [check-nginx.sh, controle-site-planifie.sh]
+
+    - name: Service et timer du contrôle planifié
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/{{ item.nom }}
+        owner: root
+        group: root
+        mode: "0644"
+        content: "{{ item.contenu }}"
+      loop:
+        - nom: infraready-controle-site.service
+          contenu: |
+            # Géré par Ansible (linux_base.yml) — séance 6, UC-C4
+            [Unit]
+            Description=InfraReady - contrôle du site web (check-nginx.sh) publié pour Prometheus
+            After=nginx.service
+
+            [Service]
+            Type=oneshot
+            ExecStart=/usr/local/lib/infraready/controle-site-planifie.sh
+            SyslogIdentifier=infraready-controle-site
+            # Compte root SANS aucune capacité ; tout le système en lecture seule sauf le dossier textfile
+            CapabilityBoundingSet=
+            NoNewPrivileges=true
+            ProtectSystem=strict
+            ProtectHome=true
+            PrivateTmp=true
+            ReadWritePaths=/var/lib/prometheus/node-exporter
+        - nom: infraready-controle-site.timer
+          contenu: |
+            # Géré par Ansible (linux_base.yml) — séance 6, UC-C4
+            [Unit]
+            Description=InfraReady - contrôle du site web toutes les minutes
+
+            [Timer]
+            OnBootSec=1min
+            OnUnitActiveSec=1min
+            AccuracySec=5s
+
+            [Install]
+            WantedBy=timers.target
+      loop_control:
+        label: "{{ item.nom }}"
+      register: controle_unites
+
+    - name: Timer du contrôle planifié actif et activé au démarrage
+      ansible.builtin.systemd_service:
+        name: infraready-controle-site.timer
+        state: started
+        enabled: true
+        daemon_reload: "{{ controle_unites.changed }}"
+
     # Pare-feu : uniquement ce dont le labo a besoin
     - name: UFW - SSH depuis le sous-réseau du labo
       community.general.ufw:
