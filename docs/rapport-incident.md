@@ -72,4 +72,65 @@ En production, la mitigation immédiate aurait été un `systemctl reload nginx`
 | `nginx -t` ne garantit pas qu'un site fonctionne | Tester en HTTP après chaque rechargement (le playbook le fait, désormais au bon moment) |
 | Un test en échec dans un playbook peut masquer un handler non exécuté | `flush_handlers` avant les vérifications (corrigé) ; lire le RECAP (`changed=1 failed=1` est un signal) |
 | Un changement manuel sur un serveur géré par Ansible dérive de la référence | Passer par le dépôt + playbook pour tout changement ; rejouer le playbook pour détecter la dérive |
-| Le site n'est pas supervisé en HTTP (seul `up` du node_exporter l'est) | Piste : sonde HTTP (`blackbox_exporter`) et alerte `SiteWebHS` dans Prometheus |
+| Le site n'est pas supervisé en HTTP (seul `up` du node_exporter l'est) | **Réalisé en séance 6** : contrôle planifié du site chaque minute (timer `infraready-controle-site`) et alerte `SiteWebIndisponible`, testée (P-83, P-84) |
+
+---
+
+# Rapport d'incident — INC-2026-10-23-01 : arrêt non propre de WIN-DC01 à chaque arrêt de l'hôte
+
+| Champ | Valeur |
+| --- | --- |
+| Référence | INC-2026-10-23-01 (séance 6, UC-05) |
+| Date / heure du constat | 23/10/2026 09:06 (CEST), fiche d'état initial (P-80) |
+| Système concerné | WIN-DC01 (192.168.50.10), contrôleur de domaine `infraready.test` (AD DS, DNS) — VM 100 sur l'hôte Proxmox `corsair1` |
+| Impact | Le DC est tué par l'hyperviseur au bout de 180 s à chaque arrêt de l'hôte (19/10 et 20/10) : risque d'incohérence de la base AD (NTDS) et des zones DNS ; arrêt de l'hôte rallongé de 3 min. Aucun dysfonctionnement constaté à ce jour (contrôle de santé OK) |
+| Gravité | Moyenne (risque sur le service d'annuaire, pas de perte constatée) |
+| Type | Incident réel, découvert par l'état initial — pas un scénario préparé |
+| Statut | **Diagnostiqué et reproduit ; correction préparée, en attente de validation** (elle modifie le DC partagé) |
+| Responsable | MIR Mahan / Jolan Allen / Kenzi Bendjelloul |
+
+## 1. Symptôme
+
+Au démarrage du 23/10 à 09:01, le journal System de WIN-DC01 contient l'événement **41** (Kernel-Power, « redémarrage sans arrêt propre ») et l'événement **6008** (EventLog, « l'arrêt précédent du système le 20/10/2026 à 19:32:34 était inattendu »). Le contrôle de santé (`controle_sante.yml`) les remonte en ATTENTION. Le même couple d'événements existe le 20/10 à 10:40, pour l'arrêt du 19/10 à 20:50.
+
+## 2. Chronologie
+
+| Date / heure (CEST) | Événement | Preuve |
+| --- | --- | --- |
+| 19/10 20:48:08 → 20:51:10 | `stopall` de l'hôte : LINUX01 arrêtée en 2 s, OPS01 en 12 s, **VM 100 en 182 s** | P-86 |
+| 20/10 10:40 | Démarrage du DC : 41 + 6008 (arrêt du 19/10 20:50:25 inattendu) | P-86 |
+| 20/10 19:29:50 → 19:32:53 | `stopall` : LINUX01 et OPS01 en 9 s ; **VM 100 en 183 s**, « VM still running - terminating now with SIGTERM » | P-86 |
+| 23/10 09:01 | Démarrage manuel des VM ; DC : 41 + 6008 (arrêt du 20/10 19:32:34 inattendu) | P-80 |
+| 23/10 09:06 | Constat dans la fiche d'état initial | P-80 |
+| 23/10 09:38:45 → 09:40:15 | Reproduction contrôlée : arrêt ACPI demandé par l'API, délai 90 s, sans arrêt forcé → « VM quit/powerdown failed - got timeout », VM toujours allumée | P-86 |
+
+## 3. Diagnostic
+
+1. **Journaux Windows** : 41 / 6008 à chaque démarrage qui suit un arrêt de l'hôte ; pas d'événement 1074 / 6006 (arrêt propre), alors qu'ils existent pour les redémarrages demandés par Windows Update. Le problème est donc systématique, pas accidentel.
+2. **Journal des tâches de l'hyperviseur** : les VM Linux s'arrêtent en quelques secondes ; la VM 100 atteint le délai de 180 s du `stopall` puis reçoit SIGTERM, ce qui équivaut à couper le courant.
+3. **Comparaison** : les VM Linux terminent proprement leur journal (`systemd-shutdown … Journal stopped`). La VM 100 n'a pas d'agent invité QEMU (`agent` non défini).
+4. **Métriques** : le dernier échantillon de toutes les cibles date de 19:29:4x le 20/10. Prometheus, hébergé sur OPS01, s'arrête en même temps que les autres VM : **la supervision ne peut pas observer cet incident** (limite d'architecture).
+5. **Hypothèse** : Windows Server ignore le bouton d'alimentation ACPI à l'écran d'ouverture de session quand la stratégie « Arrêt : permet au système d'être arrêté sans avoir à se connecter » est désactivée, ce qui est la valeur par défaut sur Windows Server.
+6. **Observation discriminante** : `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\shutdownwithoutlogon = 0`, aucune session ouverte (`quser`), pas de service QEMU-GA.
+7. **Reproduction contrôlée** (sans risque : `forceStop=0`) : l'arrêt ACPI reste sans effet pendant 90 s. **Cause confirmée.**
+
+## 4. Correction proposée
+
+Correction autorisée, réversible et rejouée en Ansible (le dépôt décrit le labo) : dans `windows_base.yml`, tâche `ansible.windows.win_regedit` qui passe `shutdownwithoutlogon` à **1**. Retour arrière : valeur 0, ou snapshot `s09_avant_seance6`.
+
+> **Non appliquée à ce stade** : la modification touche le contrôleur de domaine partagé et attend une validation explicite de l'équipe.
+
+## 5. Validation prévue après correction
+
+- Arrêt ACPI par l'API Proxmox (`status/shutdown`, délai 90 s, `forceStop=0`) : la VM doit s'arrêter seule, bien avant le délai ;
+- redémarrage : événements 1074 / 6006 présents, **aucun 41 / 6008** ;
+- `controle_sante.yml` complet sans ECHEC, `dcdiag /q` sans erreur ;
+- `windows_base.yml` rejoué deux fois (`changed=0` au 2ᵉ passage).
+
+## 6. Leçons et actions de prévention
+
+| Leçon | Action |
+| --- | --- |
+| Un arrêt « réussi » côté hyperviseur (`TASK OK`) peut cacher un arrêt brutal de la VM | Lire le journal de la tâche (« terminating now with SIGTERM ») et les événements 41 / 6008 au démarrage suivant |
+| La supervision hébergée sur le même hôte ne voit pas les arrêts de l'hôte | Contrôle d'état au démarrage (`controle_sante.yml`) ; à terme, une sonde externe à l'hôte |
+| Le DC dépend d'un réglage Windows non décrit dans le dépôt | Le décrire dans `windows_base.yml` (correction proposée) ; envisager l'agent invité QEMU (`agent: 1`) |
