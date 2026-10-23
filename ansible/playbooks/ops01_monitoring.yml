@@ -29,6 +29,14 @@
         update_cache: true
         cache_valid_time: 3600
 
+    # Le paquet recommandé ipmitool (via prometheus-node-exporter-collectors) installe le service openipmi :
+    # aucun matériel IPMI dans une VM, il échoue à chaque démarrage (séance 6, preuves P-80 et P-80b).
+    - name: Service openipmi désactivé (aucun matériel IPMI dans une VM)
+      ansible.builtin.systemd_service:
+        name: openipmi
+        enabled: false
+      notify: Effacer l'échec enregistré d'openipmi
+
     - name: Dossier des règles d'alerte
       ansible.builtin.file:
         path: /etc/prometheus/rules
@@ -252,3 +260,7 @@
       ansible.builtin.service:
         name: grafana-server
         state: restarted
+
+    - name: Effacer l'échec enregistré d'openipmi
+      ansible.builtin.command: systemctl reset-failed openipmi.service  # noqa: command-instead-of-module
+      changed_when: true
