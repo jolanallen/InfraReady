@@ -188,16 +188,25 @@
         timeout: 60
       loop: [9090, 3000]
 
-    - name: Cibles Prometheus
+    # Juste après un redémarrage, Prometheus n'a encore aucune cible (liste vide : l'assertion réussissait
+    # sans rien vérifier) puis des cibles « unknown » jusqu'au premier scrape (15 s) — séance 6, P-81a.
+    - name: Cibles Prometheus (attente du premier scrape de chaque cible)
       ansible.builtin.uri:
         url: http://127.0.0.1:9090/api/v1/targets
         return_content: true
       register: targets
       become: false
+      until: >-
+        targets.json.data.activeTargets | default([]) | length > 0
+        and targets.json.data.activeTargets | selectattr('health', 'equalto', 'unknown') | list | length == 0
+      retries: 8
+      delay: 5
 
     - name: Toutes les cibles sont « up »
       ansible.builtin.assert:
-        that: targets.json.data.activeTargets | map(attribute='health') | reject('equalto', 'up') | list | length == 0
+        that:
+          - targets.json.data.activeTargets | length > 0
+          - targets.json.data.activeTargets | map(attribute='health') | reject('equalto', 'up') | list | length == 0
         fail_msg: >-
           Cibles en défaut :
           {{ targets.json.data.activeTargets | rejectattr('health', 'equalto', 'up') | map(attribute='labels.host') | list }}
