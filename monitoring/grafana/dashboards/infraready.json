@@ -1,14 +1,14 @@
 {
   "uid": "infraready-serveurs",
   "title": "InfraReady — Serveurs",
-  "description": "CPU, mémoire, stockage, uptime et disponibilité de WIN-DC01, LINUX01 et OPS01 (Prometheus : node_exporter + windows_exporter)",
+  "description": "Tableau de bord d'exploitation InfraReady (prise de poste) : disponibilité, uptime, CPU, mémoire, stockage, contrôle planifié du site web, maintenance Linux et alertes actives de WIN-DC01, LINUX01 et OPS01. Source : Prometheus (node_exporter, windows_exporter, collecteur textfile). Période par défaut : 6 dernières heures. Lecture : tout ce qui n'est pas vert, toute alerte active ou toute case « NON COLLECTÉ » justifie une investigation (contrôle de santé : ansible-playbook playbooks/controle_sante.yml).",
   "tags": ["infraready"],
   "timezone": "browser",
   "editable": true,
   "schemaVersion": 39,
-  "version": 2,
+  "version": 3,
   "refresh": "30s",
-  "time": { "from": "now-1h", "to": "now" },
+  "time": { "from": "now-6h", "to": "now" },
   "templating": {
     "list": [
       {
@@ -33,6 +33,7 @@
       "id": 1,
       "type": "stat",
       "title": "Disponibilité des serveurs",
+      "description": "Résultat du dernier scrape (up) par serveur : EN LIGNE = exporter joignable, HORS LIGNE = scrape en échec (alerte InstanceDown après 1 min), NON COLLECTÉ = aucune série (cible absente de la configuration Prometheus ou Prometheus arrêté). Décision : HORS LIGNE ou NON COLLECTÉ → vérifier la VM, le service exporter et le pare-feu.",
       "gridPos": { "h": 5, "w": 12, "x": 0, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "prometheus-infraready" },
       "targets": [
@@ -52,6 +53,7 @@
       },
       "fieldConfig": {
         "defaults": {
+          "noValue": "NON COLLECTÉ",
           "mappings": [
             { "type": "value", "options": { "0": { "text": "HORS LIGNE", "color": "red", "index": 0 }, "1": { "text": "EN LIGNE", "color": "green", "index": 1 } } }
           ],
@@ -64,7 +66,7 @@
       "id": 6,
       "type": "stat",
       "title": "Uptime",
-      "description": "Durée depuis le dernier démarrage (node_boot_time_seconds sur Linux, windows_system_boot_time_timestamp sur Windows)",
+      "description": "Durée depuis le dernier démarrage (node_boot_time_seconds sous Linux, windows_system_boot_time_timestamp sous Windows), en jours/heures. Décision : une valeur courte inattendue signale un redémarrage non planifié → consulter le journal (Windows : événements 41 / 6008).",
       "gridPos": { "h": 5, "w": 12, "x": 12, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "prometheus-infraready" },
       "targets": [
@@ -90,6 +92,7 @@
       },
       "fieldConfig": {
         "defaults": {
+          "noValue": "NON COLLECTÉ",
           "unit": "s",
           "color": { "mode": "fixed", "fixedColor": "blue" },
           "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
@@ -101,6 +104,7 @@
       "id": 2,
       "type": "timeseries",
       "title": "CPU (%)",
+      "description": "Utilisation CPU moyenne par serveur sur 2 min, en % (0-100 %). Seuils : orange 80 %, rouge 95 % (alerte CpuEleve > 80 % pendant 2 min). Un trou dans la courbe = pas de donnée collectée (serveur ou supervision arrêtés), pas un CPU à 0 %.",
       "gridPos": { "h": 9, "w": 12, "x": 0, "y": 5 },
       "datasource": { "type": "prometheus", "uid": "prometheus-infraready" },
       "targets": [
@@ -117,10 +121,11 @@
       ],
       "fieldConfig": {
         "defaults": {
+          "noValue": "Aucune donnée",
           "unit": "percent",
           "min": 0,
           "max": 100,
-          "custom": { "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": false },
           "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 80 }, { "color": "red", "value": 95 }] }
         },
         "overrides": []
@@ -134,6 +139,7 @@
       "id": 3,
       "type": "timeseries",
       "title": "Mémoire utilisée (%)",
+      "description": "Mémoire utilisée par serveur, en % de la mémoire physique (MemAvailable sous Linux). Seuils : orange 80 %, rouge 90 % (alerte MemoireElevee > 90 % pendant 5 min). Un trou = absence de donnée.",
       "gridPos": { "h": 9, "w": 12, "x": 12, "y": 5 },
       "datasource": { "type": "prometheus", "uid": "prometheus-infraready" },
       "targets": [
@@ -150,10 +156,11 @@
       ],
       "fieldConfig": {
         "defaults": {
+          "noValue": "Aucune donnée",
           "unit": "percent",
           "min": 0,
           "max": 100,
-          "custom": { "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": false },
           "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 80 }, { "color": "red", "value": 90 }] }
         },
         "overrides": []
@@ -167,6 +174,7 @@
       "id": 4,
       "type": "bargauge",
       "title": "Stockage utilisé (%) par volume",
+      "description": "Occupation actuelle de chaque volume, en % (ext4/xfs sous Linux, lettres de lecteur sous Windows). Seuils : orange 70 %, rouge 85 % (alerte DisquePresquePlein). Décision : au-delà de 85 %, identifier ce qui grossit avant toute maintenance (la maintenance Linux s'arrête au-delà de 85 %).",
       "gridPos": { "h": 9, "w": 12, "x": 0, "y": 14 },
       "datasource": { "type": "prometheus", "uid": "prometheus-infraready" },
       "targets": [
@@ -192,6 +200,7 @@
       },
       "fieldConfig": {
         "defaults": {
+          "noValue": "NON COLLECTÉ",
           "unit": "percent",
           "min": 0,
           "max": 100,
@@ -205,6 +214,7 @@
       "id": 5,
       "type": "table",
       "title": "Alertes Prometheus actives",
+      "description": "Alertes Prometheus à l'état « firing ». Tableau vide = aucune alerte active (valeur réellement nulle) ; ce panneau ne remplace pas le panneau Disponibilité si Prometheus lui-même est arrêté.",
       "gridPos": { "h": 9, "w": 12, "x": 12, "y": 14 },
       "datasource": { "type": "prometheus", "uid": "prometheus-infraready" },
       "targets": [
@@ -226,7 +236,189 @@
         }
       ],
       "options": { "showHeader": true, "cellHeight": "sm" },
-      "fieldConfig": { "defaults": {}, "overrides": [] }
+      "fieldConfig": { "defaults": { "noValue": "Aucune alerte active" }, "overrides": [] }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Contrôle planifié du site web (LINUX01)",
+      "description": "Résultat du timer infraready-controle-site (check-nginx.sh chaque minute, collecteur textfile) : OK / ÉCHEC, et âge du dernier contrôle en secondes. Décision : ÉCHEC → site indisponible pour les utilisateurs même si le serveur est EN LIGNE (alerte SiteWebIndisponible après 2 min) ; âge > 300 s → la tâche planifiée ne tourne plus (alerte ControlePlanifieEnRetard) ; NON COLLECTÉ → fichier de métriques absent.",
+      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 23 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-infraready" },
+      "targets": [
+        {
+          "refId": "Etat",
+          "expr": "max by (host) (infraready_controle_succes{controle=\"site_web\", host=~\"$host\"})",
+          "legendFormat": "{{host}} état",
+          "instant": true
+        },
+        {
+          "refId": "Age",
+          "expr": "time() - max by (host) (infraready_controle_derniere_execution_secondes{controle=\"site_web\", host=~\"$host\"})",
+          "legendFormat": "{{host}} âge du dernier contrôle",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": { "noValue": "NON COLLECTÉ" },
+        "overrides": [
+          {
+            "matcher": { "id": "byFrameRefID", "options": "Etat" },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": { "text": "ÉCHEC", "color": "red", "index": 0 },
+                      "1": { "text": "OK", "color": "green", "index": 1 }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "thresholds",
+                "value": { "mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}] }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "Age" },
+            "properties": [
+              { "id": "unit", "value": "s" },
+              { "id": "decimals", "value": 0 },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 120}, {"color": "red", "value": 300}]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "Maintenance Linux (paquets et redémarrage)",
+      "description": "Collecteur apt de node_exporter (mis à jour toutes les 15 min) : paquets à installer, paquets retenus (mises à jour progressives d'Ubuntu, non installées par « apt upgrade »), redémarrage requis. 0 = valeur réellement nulle (le collecteur a tourné) ; NON COLLECTÉ = collecteur absent. Décision : préparer une fenêtre de maintenance (docs/procedure-maintenance.md) si des paquets sont à installer ou si un redémarrage est requis.",
+      "gridPos": { "h": 5, "w": 16, "x": 8, "y": 23 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-infraready" },
+      "targets": [
+        {
+          "refId": "AInstaller",
+          "expr": "sum by (host) (apt_upgrades_pending{host=~\"$host\"}) or sum by (host) (apt_upgrades_held{host=~\"$host\"}) * 0 or max by (host) (apt_autoremove_pending{host=~\"$host\"}) * 0",
+          "legendFormat": "{{host}} à installer",
+          "instant": true
+        },
+        {
+          "refId": "Retenus",
+          "expr": "sum by (host) (apt_upgrades_held{host=~\"$host\"}) or max by (host) (apt_autoremove_pending{host=~\"$host\"}) * 0",
+          "legendFormat": "{{host}} retenus",
+          "instant": true
+        },
+        {
+          "refId": "Reboot",
+          "expr": "max by (host) (node_reboot_required{host=~\"$host\"})",
+          "legendFormat": "{{host}} redémarrage requis",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "NON COLLECTÉ",
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": { "mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 1}] }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byFrameRefID", "options": "Retenus" },
+            "properties": [
+              {
+                "id": "thresholds",
+                "value": { "mode": "absolute", "steps": [{"color": "blue", "value": null}] }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "Reboot" },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": { "text": "non", "color": "green", "index": 0 },
+                      "1": { "text": "OUI", "color": "orange", "index": 1 }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Stockage utilisé (%) — évolution",
+      "description": "Historique de l'occupation de chaque volume, en % (seuil d'alerte 85 % en pointillé). Sert à distinguer une mesure ponctuelle d'une tendance (séance 6, UC-C3) : choisir une période longue (7 jours) ; les trous correspondent aux périodes où le labo était éteint (aucune donnée, pas une occupation nulle).",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-infraready" },
+      "targets": [
+        {
+          "refId": "Linux",
+          "expr": "(1 - node_filesystem_avail_bytes{fstype=~\"ext4|xfs\", host=~\"$host\"} / node_filesystem_size_bytes{fstype=~\"ext4|xfs\", host=~\"$host\"}) * 100",
+          "legendFormat": "{{host}} {{mountpoint}}"
+        },
+        {
+          "refId": "Windows",
+          "expr": "(1 - windows_logical_disk_free_bytes{volume=~\"[A-Z]:\", host=~\"$host\"} / windows_logical_disk_size_bytes{volume=~\"[A-Z]:\", host=~\"$host\"}) * 100",
+          "legendFormat": "{{host}} {{volume}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "decimals": 1,
+          "noValue": "Aucune donnée",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "thresholdsStyle": { "mode": "dashed" }
+          },
+          "thresholds": { "mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 85}] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["min", "max", "lastNotNull"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
     }
   ]
 }
