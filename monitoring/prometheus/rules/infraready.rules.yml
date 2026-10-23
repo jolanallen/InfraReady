@@ -18,6 +18,32 @@ groups:
           summary: "Service {{ $labels.name }} arrêté sur {{ $labels.host }}"
           description: "Le service Windows {{ $labels.name }} n'est plus en cours d'exécution depuis 1 minute."
 
+      # Séance 6 (UC-04) : contrôle fonctionnel du site publié par le timer infraready-controle-site
+      # (collecteur textfile de node_exporter). 2 min = deux contrôles consécutifs en échec (un timer par minute) :
+      # un échec isolé (redémarrage de nginx pendant une maintenance) ne déclenche pas d'alerte.
+      - alert: SiteWebIndisponible
+        expr: infraready_controle_succes{controle="site_web"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "Site web de {{ $labels.host }} en échec (contrôle planifié)"
+          description: >-
+            check-nginx.sh échoue depuis 2 minutes (code de retour : métrique infraready_controle_code_retour).
+            Première action : journalctl -u infraready-controle-site -n 5 sur {{ $labels.host }}, puis systemctl status nginx.
+
+      # Le contrôle lui-même doit tourner : résultat plus vieux que 5 min (timer arrêté, script en erreur 3)
+      # ou métrique absente (fichier supprimé, node_exporter sans collecteur textfile).
+      - alert: ControlePlanifieEnRetard
+        expr: |
+          time() - infraready_controle_derniere_execution_secondes{controle="site_web"} > 300
+          or
+          absent(infraready_controle_derniere_execution_secondes{controle="site_web", host="linux01"})
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Contrôle planifié du site non exécuté depuis plus de 5 minutes"
+          description: "Vérifier systemctl list-timers infraready-controle-site.timer et journalctl -u infraready-controle-site sur LINUX01."
+
       - alert: CpuEleve
         expr: |
           (100 - avg by (host) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100) > 80
