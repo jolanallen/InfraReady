@@ -12,9 +12,9 @@ Laboratoire : 3 VM sur Proxmox VE, réseau isolé `192.168.50.0/24`.
 
 ## Documents
 
-- **Dossier technique** : [InfraReady - Dossier technique.md](InfraReady%20-%20Dossier%20technique.md) (phases A à H, TP de la séance 4 en section 11, preuves, écarts)
+- **Dossier technique** : [InfraReady - Dossier technique.md](InfraReady%20-%20Dossier%20technique.md) (phases A à H, TP de la séance 4 en section 11, TP de la séance 6 en section 12, preuves, écarts)
 - **Procédure de maintenance** : [docs/procedure-maintenance.md](docs/procedure-maintenance.md)
-- **Rapport d'incident** (phase H) : [docs/rapport-incident.md](docs/rapport-incident.md)
+- **Rapports d'incident** (phase H, séance 6) : [docs/rapport-incident.md](docs/rapport-incident.md)
 - **Preuves** : `docs/preuves/` (sorties de commandes horodatées et captures, numérotées par phase)
 
 ## Arborescence
@@ -40,6 +40,8 @@ ansible-playbook playbooks/windows_base.yml        # phase B/D : objets AD, part
 ansible-playbook playbooks/ops01_monitoring.yml    # phase F : Prometheus + Grafana
 ansible-playbook playbooks/linux_maintenance.yml   # phase E (voir docs/procedure-maintenance.md)
 ansible-playbook playbooks/windows_maintenance.yml # phase E (recherche ; -e maintenance_apply=true pour installer)
+ansible-playbook playbooks/controle_sante.yml      # séance 6 : contrôle de santé des 3 serveurs, lecture seule
+ansible-playbook playbooks/linux_quotas.yml        # séance 6 (défi) : quotas sur le disque de test /data de LINUX01
 
 # Vérification de l'idempotence d'un playbook (2e passage doit afficher changed=0)
 ../scripts/verif-idempotence.sh playbooks/linux_base.yml
@@ -67,6 +69,28 @@ ansible-playbook playbooks/linux_base.yml                   # 2e passage attendu
 
 **Limites** : `check-nginx.sh` contrôle l'hôte local (pas le DNS ni le pare-feu) ; `Check-DnsClient.ps1` vérifie l'état du service, pas la résolution d'un nom ; lancé via le module `script` d'Ansible, tout code non nul devient 1 ; en `--check`, l'assertion de contenu compare la nouvelle valeur à la page encore en place.
 
+## Séance 6 — maintenance opérationnelle et supervision
+
+**Prérequis** : laboratoire démarré (les VM ne démarrent pas seules avec l'hôte), snapshot Proxmox `s09_avant_seance6`, copie du projet sur OPS01 identique au dépôt (`~/infraready`).
+
+```bash
+# Sur OPS01 (ansible, dossier ansible/) — contrôle de santé, lecture seule (changed=0)
+ansible-playbook playbooks/controle_sante.yml                       # tableau OK / ATTENTION / ECHEC / NON APPLICABLE / INACCESSIBLE
+ansible-playbook playbooks/controle_sante.yml -e sante_rapport=true # + rapport daté dans ~/infraready-logs/
+ansible-playbook playbooks/controle_sante.yml --limit linux01,localhost   # un seul hôte (localhost = synthèse)
+# code retour 2 si un contrôle est en ECHEC ou un hôte INACCESSIBLE
+
+# Sur LINUX01 — contrôle planifié du site (timer systemd déployé par linux_base.yml)
+systemctl list-timers infraready-controle-site.timer
+journalctl -u infraready-controle-site -n 5
+cat /var/lib/prometheus/node-exporter/infraready_controle.prom       # métriques lues par node_exporter
+```
+
+- **Alertes ajoutées** : `SiteWebIndisponible` (contrôle du site en échec pendant 2 min) et `ControlePlanifieEnRetard` (contrôle non exécuté depuis 5 min). Pas d'Alertmanager : l'état se lit dans Prometheus (`/classic/alerts`) et Grafana.
+- **Dashboard v3** : unités et descriptions sur chaque panneau, « NON COLLECTÉ » / « Aucune donnée » au lieu d'un faux zéro, panneaux « Contrôle planifié du site web », « Maintenance Linux » et « Stockage utilisé (%) — évolution ».
+- **Validation et déploiement** : la CI GitHub Actions valide les fichiers (lint, syntaxe, `promtool`, JSON, secrets) mais ne déploie rien ; le déploiement se fait depuis OPS01, seul à joindre le réseau privé du labo.
+- **Limites** : le contrôle planifié ne teste que le site de LINUX01 ; root n'est pas soumis aux quotas de `/data` ; la correction de l'arrêt non propre de WIN-DC01 (incident INC-2026-10-23-01) est préparée mais pas encore appliquée.
+
 ## Où trouver les preuves
 
 | Exigence | Preuves (`docs/preuves/`) |
@@ -79,6 +103,7 @@ ansible-playbook playbooks/linux_base.yml                   # 2e passage attendu
 | Supervision Prometheus / Grafana (F) | P-50 à P-55 |
 | GitHub Actions (G) | P-60a, P-60 |
 | Incident (H) et six scénarios de panne contrôlée (séance 4, 7.4) | P-70 à P-79, `docs/rapport-incident.md` |
+| Séance 6 : état initial, collecte, contrôle de santé, tâche planifiée, alerte, dashboard v3, incident du DC, maintenance avant / après, tendance, quotas | P-80 à P-89, P-64 |
 
 Une preuve suffixée `a` (ex. P-39a) est un premier essai en échec, conservé et expliqué dans le dossier.
 
